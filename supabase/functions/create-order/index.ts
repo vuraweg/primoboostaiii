@@ -2,234 +2,250 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 interface OrderRequest {
-  planId: string
-  couponCode?: string
-  walletDeduction?: number
-  addOnsTotal?: number // New property
+  planId: string
+  couponCode?: string
+  walletDeduction?: number
+  addOnsTotal?: number // New property
 }
 
 interface PlanConfig {
-  id: string
-  name: string
-  price: number
-  duration: string
-  optimizations: number
-  scoreChecks: number
-  linkedinMessages: number
-  guidedBuilds: number
-  durationInHours: number
+  id: string
+  name: string
+  price: number
+  duration: string
+  optimizations: number
+  scoreChecks: number
+  linkedinMessages: number
+  guidedBuilds: number
+  durationInHours: number
 }
 
 const plans: PlanConfig[] = [
-  {
-    id: 'career_pro_max',
-    name: 'Career Pro Max',
-    price: 1999,
-    duration: 'One-time Purchase',
-    optimizations: 30,
-    scoreChecks: 50,
-    linkedinMessages: 999999,
-    guidedBuilds: 5,
-    durationInHours: 24 * 365 * 10
-  },
-  {
-    id: 'career_boost_plus',
-    name: 'Career Boost+',
-    price: 1499,
-    duration: 'One-time Purchase',
-    optimizations: 15,
-    scoreChecks: 30,
-    linkedinMessages: 999999,
-    guidedBuilds: 3,
-    durationInHours: 24 * 365 * 10
-  },
-  {
-    id: 'pro_resume_kit',
-    name: 'Pro Resume Kit',
-    price: 999,
-    duration: 'One-time Purchase',
-    optimizations: 10,
-    scoreChecks: 20,
-    linkedinMessages: 100,
-    guidedBuilds: 2,
-    durationInHours: 24 * 365 * 10
-  },
-  {
-    id: 'smart_apply_pack',
-    name: 'Smart Apply Pack',
-    price: 499,
-    duration: 'One-time Purchase',
-    optimizations: 5,
-    scoreChecks: 10,
-    linkedinMessages: 50,
-    guidedBuilds: 1,
-    durationInHours: 24 * 365 * 10
-  },
-  {
-    id: 'resume_fix_pack',
-    name: 'Resume Fix Pack',
-    price: 199,
-    duration: 'One-time Purchase',
-    optimizations: 2,
-    scoreChecks: 2,
-    linkedinMessages: 0,
-    guidedBuilds: 0,
-    durationInHours: 24 * 365 * 10
-  },
-  {
-    id: 'lite_check',
-    name: 'Lite Check',
-    price: 99,
-    duration: 'One-time Purchase',
-    optimizations: 1,
-    scoreChecks: 2,
-    linkedinMessages: 10,
-    guidedBuilds: 0,
-    durationInHours: 24 * 365 * 10
-  },
-  {
-    id: 'free_trial',
-    name: 'Free Trial',
-    price: 0,
-    duration: 'One-time Use',
-    optimizations: 0,
-    scoreChecks: 2,
-    linkedinMessages: 5,
-    guidedBuilds: 0,
-    durationInHours: 24 * 365 * 10
-  }
+  {
+    id: 'career_pro_max',
+    name: 'Career Pro Max',
+    price: 1999,
+    duration: 'One-time Purchase',
+    optimizations: 30,
+    scoreChecks: 50,
+    linkedinMessages: 999999,
+    guidedBuilds: 5,
+    durationInHours: 24 * 365 * 10
+  },
+  {
+    id: 'career_boost_plus',
+    name: 'Career Boost+',
+    price: 1499,
+    duration: 'One-time Purchase',
+    optimizations: 15,
+    scoreChecks: 30,
+    linkedinMessages: 999999,
+    guidedBuilds: 3,
+    durationInHours: 24 * 365 * 10
+  },
+  {
+    id: 'pro_resume_kit',
+    name: 'Pro Resume Kit',
+    price: 999,
+    duration: 'One-time Purchase',
+    optimizations: 10,
+    scoreChecks: 20,
+    linkedinMessages: 100,
+    guidedBuilds: 2,
+    durationInHours: 24 * 365 * 10
+  },
+  {
+    id: 'smart_apply_pack',
+    name: 'Smart Apply Pack',
+    price: 499,
+    duration: 'One-time Purchase',
+    optimizations: 5,
+    scoreChecks: 10,
+    linkedinMessages: 50,
+    guidedBuilds: 1,
+    durationInHours: 24 * 365 * 10
+  },
+  {
+    id: 'resume_fix_pack',
+    name: 'Resume Fix Pack',
+    price: 199,
+    duration: 'One-time Purchase',
+    optimizations: 2,
+    scoreChecks: 2,
+    linkedinMessages: 0,
+    guidedBuilds: 0,
+    durationInHours: 24 * 365 * 10
+  },
+  {
+    id: 'lite_check',
+    name: 'Lite Check',
+    price: 99,
+    duration: 'One-time Purchase',
+    optimizations: 1,
+    scoreChecks: 2,
+    linkedinMessages: 10,
+    guidedBuilds: 0,
+    durationInHours: 24 * 365 * 10
+  },
+  {
+    id: 'free_trial',
+    name: 'Free Trial',
+    price: 0,
+    duration: 'One-time Use',
+    optimizations: 0,
+    scoreChecks: 2,
+    linkedinMessages: 5,
+    guidedBuilds: 0,
+    durationInHours: 24 * 365 * 10
+  }
 ]
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  // Log function start
+  console.log(`[${new Date().toISOString()}] - Function execution started.`);
 
-  try {
-    // Retrieve addOnsTotal from the request body
-    const { planId, couponCode, walletDeduction, addOnsTotal }: OrderRequest = await req.json()
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
 
-    // Get user from auth header
-    const authHeader = req.headers.get('authorization')
-    if (!authHeader) {
-      throw new Error('No authorization header')
-    }
+  try {
+    // Retrieve addOnsTotal from the request body
+    const body: OrderRequest = await req.json()
+    const { planId, couponCode, walletDeduction, addOnsTotal } = body
+    console.log(`[${new Date().toISOString()}] - Request body parsed. planId: ${planId}, couponCode: ${couponCode}, walletDeduction: ${walletDeduction}, addOnsTotal: ${addOnsTotal}`);
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    // Get user from auth header
+    const authHeader = req.headers.get('authorization')
+    if (!authHeader) {
+      throw new Error('No authorization header')
+    }
 
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token)
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    if (userError || !user) {
-      throw new Error('Invalid user token')
-    }
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token)
+    
+    // Log after user authentication
+    console.log(`[${new Date().toISOString()}] - User authentication complete. User ID: ${user?.id || 'N/A'}`);
 
-    // Get plan details
-    const plan = plans.find(p => p.id === planId)
-    if (!plan) {
-      throw new Error('Invalid plan selected')
-    }
+    if (userError || !user) {
+      throw new Error('Invalid user token')
+    }
 
-    // Calculate final amount based on plan price
-    let finalAmount = plan.price
-    let discountAmount = 0
-    let appliedCoupon = null
+    // Get plan details
+    const plan = plans.find(p => p.id === planId)
+    if (!plan) {
+      throw new Error('Invalid plan selected')
+    }
 
-    if (couponCode) {
-      const normalizedCoupon = couponCode.toLowerCase().trim()
-      
-      if (normalizedCoupon === 'first100' && planId === 'starter') {
-        finalAmount = 0
-        discountAmount = plan.price
-        appliedCoupon = 'first100'
-      }
-      else if (normalizedCoupon === 'worthyone') {
-        discountAmount = Math.floor(plan.price * 0.5)
-        finalAmount = plan.price - discountAmount
-        appliedCoupon = 'worthyone'
-      }
-    }
+    // Calculate final amount based on plan price
+    let finalAmount = plan.price
+    let discountAmount = 0
+    let appliedCoupon = null
 
-    // Apply wallet deduction
-    if (walletDeduction && walletDeduction > 0) {
-      finalAmount = Math.max(0, finalAmount - walletDeduction)
-    }
+    if (couponCode) {
+      const normalizedCoupon = couponCode.toLowerCase().trim()
+      
+      if (normalizedCoupon === 'first100' && planId === 'starter') {
+        finalAmount = 0
+        discountAmount = plan.price
+        appliedCoupon = 'first100'
+      }
+      else if (normalizedCoupon === 'worthyone') {
+        discountAmount = Math.floor(plan.price * 0.5)
+        finalAmount = plan.price - discountAmount
+        appliedCoupon = 'worthyone'
+      }
+    }
 
-    // Correctly add add-ons total to the final amount
-    if (addOnsTotal && addOnsTotal > 0) {
-      finalAmount += addOnsTotal
-    }
+    // Apply wallet deduction
+    if (walletDeduction && walletDeduction > 0) {
+      finalAmount = Math.max(0, finalAmount - walletDeduction)
+    }
 
-    // Create Razorpay order
-    const razorpayKeyId = Deno.env.get('RAZORPAY_KEY_ID')
-    const razorpayKeySecret = Deno.env.get('RAZORPAY_KEY_SECRET')
+    // Correctly add add-ons total to the final amount
+    if (addOnsTotal && addOnsTotal > 0) {
+      finalAmount += addOnsTotal
+    }
 
-    if (!razorpayKeyId || !razorpayKeySecret) {
-      throw new Error('Razorpay credentials not configured')
-    }
+    // Create Razorpay order
+    const razorpayKeyId = Deno.env.get('RAZORPAY_KEY_ID')
+    const razorpayKeySecret = Deno.env.get('RAZORPAY_KEY_SECRET')
 
-    const orderData = {
-      amount: finalAmount * 100, // Convert to paise
-      currency: 'INR',
-      receipt: `receipt_${Date.now()}`,
-      notes: {
-        planId: planId,
-        planName: plan.name,
-        originalAmount: plan.price,
-        couponCode: appliedCoupon,
-        discountAmount: discountAmount,
-        walletDeduction: walletDeduction || 0,
-        addOnsTotal: addOnsTotal || 0 // Add addOnsTotal to notes for record-keeping
-      }
-    }
+    if (!razorpayKeyId || !razorpayKeySecret) {
+      throw new Error('Razorpay credentials not configured')
+    }
 
-    const auth = btoa(`${razorpayKeyId}:${razorpayKeySecret}`)
-    
-    const response = await fetch('https://api.razorpay.com/v1/orders', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(orderData),
-    })
+    const orderData = {
+      amount: finalAmount * 100, // Convert to paise
+      currency: 'INR',
+      receipt: `receipt_${Date.now()}`,
+      notes: {
+        planId: planId,
+        planName: plan.name,
+        originalAmount: plan.price,
+        couponCode: appliedCoupon,
+        discountAmount: discountAmount,
+        walletDeduction: walletDeduction || 0,
+        addOnsTotal: addOnsTotal || 0 // Add addOnsTotal to notes for record-keeping
+      }
+    }
+    
+    console.log(`[${new Date().toISOString()}] - Before making Razorpay API call with data: ${JSON.stringify(orderData)}`);
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('Razorpay API error:', errorText)
-      throw new Error('Failed to create payment order')
-    }
+    const auth = btoa(`${razorpayKeyId}:${razorpayKeySecret}`)
+    
+    const response = await fetch('https://api.razorpay.com/v1/orders', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(orderData),
+    })
 
-    const order = await response.json()
+    // Log after receiving response from Razorpay
+    console.log(`[${new Date().toISOString()}] - Received response from Razorpay API. Status: ${response.status}`);
 
-    return new Response(
-      JSON.stringify({
-        orderId: order.id,
-        amount: finalAmount,
-        keyId: razorpayKeyId,
-        currency: 'INR'
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      },
-    )
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Razorpay API error:', errorText)
+      throw new Error('Failed to create payment order')
+    }
 
-  } catch (error) {
-    console.error('Error creating order:', error)
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      },
-    )
-  }
+    const order = await response.json()
+
+    // Log before returning the final response
+    console.log(`[${new Date().toISOString()}] - Returning final response. Order ID: ${order.id}`);
+
+    return new Response(
+      JSON.stringify({
+        orderId: order.id,
+        amount: finalAmount,
+        keyId: razorpayKeyId,
+        currency: 'INR'
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      },
+    )
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] - Error creating order:`, error)
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      },
+    )
+  }
 })
