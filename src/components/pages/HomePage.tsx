@@ -144,7 +144,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-purple-600/5"></div>
         <div className="relative container-responsive py-12 sm:py-16 lg:py-20">
-          <div className="text-left max-w-4xl mx-auto">
+          <div className="text-center max-w-4xl mx-auto">
             {/* Logo and Brand */}
             <div className="flex items-center justify-center mb-6">
               <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden shadow-xl mr-4">
@@ -352,44 +352,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       </div>
 
       {/* CTA Section */}
-      <div className="bg-white py-16">
-        <div className="container-responsive text-left">
-          <div className="max-w-2xl mx-auto">
-            <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
-              Ready to Land Your Dream Job?
-            </h3>
-            <p className="text-lg text-gray-600 mb-8">
-              Join thousands of professionals who have already transformed their careers with PrimoBoost AI.
-            </p>
-            
-            {!isAuthenticated ? (
-              <button
-                onClick={onShowAuth}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-4 px-8 rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center space-x-2 mx-auto"
-              >
-                <Sparkles className="w-5 h-5" />
-                <span>Get Started Free</span>
-                <ArrowRight className="w-5 h-5" />
-              </button>
-            ) : (
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <button
-                  onClick={() => onPageChange('guided-builder')}
-                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold py-4 px-6 rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl"
-                >
-                  Build New Resume
-                </button>
-                <button
-                  onClick={() => onPageChange('optimizer')}
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 px-6 rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl"
-                >
-                  Optimize Existing
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      
     </div>
   );
 };
