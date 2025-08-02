@@ -214,7 +214,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               className={`card-hover p-6 flex flex-col items-start sm:flex-row sm:items-center justify-between transition-all duration-300 ${feature.requiresAuth && !isAuthenticated ? 'opacity-70 cursor-not-allowed' : ''}`}
             >
               <div className="flex items-center space-x-4">
-                <div className="bg-primary-100 rounded-xl p-3 group-hover:bg-primary-600 group-hover:text-white transition-all duration-300 shadow-sm flex-shrink-0">
+                <div className="bg-primary-100 rounded-xl p-3 group-hover:bg-primary-600 group-hover:text-white transition-all duration-300 shadow-sm flex-shrink-0 group-hover:scale-110">
                   {React.cloneElement(feature.icon, { className: "w-8 h-8" })}
                 </div>
                 <div>
