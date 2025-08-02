@@ -416,6 +416,9 @@ class PaymentService {
       }
       const userAccessToken = session.access_token;
       console.log('processPayment: User session and access token obtained.');
+      
+      // New logging added here
+      console.log('processPayment: Calling createOrder to initiate a new Razorpay order...');
 
       // Create order via backend, now passing grandTotal and addOnsTotal
       const orderData = await this.createOrder(paymentData.planId, paymentData.amount, addOnsTotal || 0, couponCode, walletDeduction);
