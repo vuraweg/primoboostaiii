@@ -10,7 +10,8 @@ interface OrderRequest {
   planId: string
   couponCode?: string
   walletDeduction?: number
-  addOnsTotal?: number // New property
+  addOnsTotal?: number // This value is what's causing the issue
+  amount: number // Add this field to the interface to explicitly accept the final amount from the frontend
 }
 
 interface PlanConfig {
