@@ -202,17 +202,14 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
           planId: selectedPlan,
           amount: grandTotal,
           currency: 'INR',
-          finalAmount: grandTotal,
-          couponCode: appliedCoupon ? appliedCoupon.code : undefined,
-          walletDeduction: walletDeduction,
-          addOnsTotal: addOnsTotal,
         };
         const result = await paymentService.processPayment(
           paymentData,
           user.email,
           user.name,
-          walletDeduction,
-          addOnsTotal
+          appliedCoupon ? appliedCoupon.code : undefined, // Correctly passing couponCode
+          walletDeduction,                               // Correctly passing walletDeduction
+          addOnsTotal                                    // Correctly passing addOnsTotal
         );
         if (result.success) {
           onSubscriptionSuccess();
