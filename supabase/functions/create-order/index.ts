@@ -113,6 +113,8 @@ serve(async (req) => {
   try {
     // Retrieve addOnsTotal from the request body
     const { planId, couponCode, walletDeduction, addOnsTotal }: OrderRequest = await req.json()
+    // Log the received addOnsTotal
+    console.log('Received addOnsTotal:', addOnsTotal);
 
     // Get user from auth header
     const authHeader = req.headers.get('authorization')
@@ -166,6 +168,9 @@ serve(async (req) => {
     if (addOnsTotal && addOnsTotal > 0) {
       finalAmount += addOnsTotal
     }
+    
+    // Log the final calculated amount
+    console.log('Final amount after all calculations:', finalAmount);
 
     // Create Razorpay order
     const razorpayKeyId = Deno.env.get('RAZORPAY_KEY_ID')
