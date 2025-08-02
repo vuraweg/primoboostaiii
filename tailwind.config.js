@@ -30,31 +30,31 @@ export default {
       // Consistent color palette (3-4 primary colors)
       colors: {
         primary: {
-          50: '#e0f7fa',   // Lightest Teal
-          100: '#b2ebf2',
-          200: '#80deea',
-          300: '#4dd0e1',
-          400: '#26c6da',
-          500: '#00bcd4',  // Main Teal
-          600: '#00acc1',
-          700: '#0097a7',
-          800: '#00838f',
-          900: '#006064',   // Darkest Teal
+          50: '#F0F5FF',   // Lightest Indigo
+          100: '#E0E7FF',
+          200: '#C7D2FE',
+          300: '#A5B5F8',
+          400: '#8A9DF1',
+          500: '#6B82E8',
+          600: '#4F68DE',   // Main Indigo Blue
+          700: '#3C52C7',
+          800: '#2A3B9F',
+          900: '#1B2C77',   // Darkest Indigo
         },
         secondary: {
-          50: '#fdfdfc',   // Lightest Warm Grey/Beige
-          100: '#f8f8f6',
-          200: '#f0f0ed',
-          300: '#e0e0db',
-          400: '#c0c0b8',
-          500: '#a0a095',  // Main Warm Grey/Beige
-          600: '#808075',
-          700: '#606055',
-          800: '#404035',
-          900: '#202015',   // Darkest Warm Grey/Beige
+          50: '#F3F4F6',
+          100: '#E5E7EB',
+          200: '#D1D5DB',
+          300: '#A1A3AF',
+          400: '#6B7280',
+          500: '#4B5563',
+          600: '#374151',
+          700: '#2C2F48',   // Darkest Deep Navy
+          800: '#1E293B',
+          900: '#111827',
         },
         accent: {
-          50: '#fff3e0',   // Lightest Coral/Orange
+          50: '#fff3e0',    // Lightest Coral/Orange
           100: '#ffe0b2',
           200: '#ffcc80',
           300: '#ffb74d',
@@ -63,7 +63,7 @@ export default {
           600: '#fb8c00',
           700: '#f57c00',
           800: '#ef6c00',
-          900: '#e65100',   // Darkest Coral/Orange
+          900: '#e65100',    // Darkest Coral/Orange
         }
       },
       // Minimum touch target sizes
