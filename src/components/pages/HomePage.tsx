@@ -200,7 +200,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       </div>
 
       {/* Main Features Section - Now with a consolidated frame */}
-      <div className="container-responsive py-12 sm:py-16">
+      <div className="container-responsive py-12 sm:py-16 bg-primary-50">
         <div className="mb-12">
           <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4  text-center">
             Choose Your Resume Journey
