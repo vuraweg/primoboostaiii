@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabaseClient';
 // CORRECTED IMPORT STATEMENT:
 // The Header component is in the same directory, so the path should be './Header'.
 import { Header } from './Header';
-import { Navigation } from './navigation/Navigation';
+import { Navigation } from './components/navigation/Navigation';
 
 // Added ChevronUp and ChevronDown
 import { FileText, Sparkles, Download, TrendingUp, Target, Award, User, Briefcase, AlertCircle, CheckCircle, Loader2, RefreshCw, Zap, Plus, Eye, EyeOff, Crown, Calendar, Clock, Users, Star, ArrowRight, Shield, Settings, LogOut, Menu, X, Upload, BarChart3, Lightbulb, ArrowLeft, StretchHorizontal as SwitchHorizontal, ChevronUp, ChevronDown } from 'lucide-react';
@@ -30,7 +30,7 @@ import { parseFile } from '../utils/fileParser';
 import { optimizeResume } from '../services/geminiService';
 
 import { getMatchScore, generateBeforeScore, generateAfterScore, getDetailedResumeScore, reconstructResumeText } from '../services/scoringService';
-import { analyzeProjectAlignment } from '../services/projectAnalysisService';
+import { analyzeProjectAlignment } => '../services/projectAnalysisService';
 import { advancedProjectAnalyzer } from '../services/advancedProjectAnalyzer';
 import { paymentService } from '../services/paymentService';
 import { useAuth } from '../contexts/AuthContext';
@@ -47,7 +47,8 @@ interface ResumeOptimizerProps {
   onNavigateBack: () => void;
 }
 
-const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
+// Change 'const ResumeOptimizer' to 'export const ResumeOptimizer'
+export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
   isAuthenticated,
   onShowAuth,
   onShowProfile,
@@ -172,7 +173,6 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
       const sessionValid = await authService.ensureValidSession();
       if (!sessionValid || !session?.access_token) {
         alert('Your session has expired. Please sign in again.');
-        onShowAuth(); // Prompt user to sign in
         return; // Exit, finally block will set isOptimizing to false
       }
 
@@ -187,7 +187,7 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
 
       // Subscription check before proceeding with optimization
       if (!subscription || (subscription.optimizationsTotal - subscription.optimizationsUsed) <= 0) {
-        alert('You have used all your optimizations or do not have an active plan. Please upgrade your plan.');
+        // REMOVE THIS LINE: alert('You have used all your optimizations or do not have an active plan. Please upgrade your plan.');
         setShowSubscriptionPlans(true); // Show subscription plans modal
         return; // Exit, finally block will set isOptimizing to false
       }
@@ -372,8 +372,8 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
         user!.phone,
         user!.linkedin,
         user!.github,
-        undefined, // linkedinUrl (deprecated)
-        undefined, // githubUrl (deprecated)
+        undefined, // linkedinUrl (deprecated for this call, as user.linkedin is used)
+        undefined, // githubUrl (deprecated for this call, as user.github is used)
         targetRole
       );
 
@@ -601,7 +601,7 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
   const handleSubscriptionSuccess = () => {
     checkSubscriptionStatus();
     setShowSubscriptionPlans(false);
-    setWalletRefreshKey(prevKey => prevKey + 1); // Triggers wallet balance refresh in dependent components
+    setWalletRefreshKey(prevKey => prevKey + 1); // Triggers wallet refresh in dependent components
   };
 
   // Mobile interface sections configuration
@@ -629,7 +629,7 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
             jobDescription={jobDescription}
             targetRole={targetRole || "Target Role"}
             initialDetailedScore={initialResumeScore}
-            finalDetailedScore={finalResumeScore}
+            finalDetailedScore={finalDetailedScore}
           />
         </>
       ) : null
@@ -1089,4 +1089,5 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
   );
 };
 
-export default ResumeOptimizer;
+// Remove this line if it exists:
+// export default ResumeOptimizer;
