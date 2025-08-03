@@ -690,7 +690,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* CTA Section */}
 
-       
+    </div>
                       
 
   );
