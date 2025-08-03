@@ -1,5 +1,6 @@
+// src/components/navigation/Navigation.tsx
 import React, { useState } from 'react';
-import { Home, Info, Phone, BookOpen, FileText, LogIn, LogOut, MessageCircle, ChevronDown, Target, TrendingUp, PlusCircle, Zap } from 'lucide-react';
+import { Home, Info, Phone, BookOpen, MessageCircle, ChevronDown, Target, TrendingUp, PlusCircle, Zap } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface NavigationProps {
@@ -9,7 +10,7 @@ interface NavigationProps {
 
 export const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) => {
   const [showAIToolsDropdown, setShowAIToolsDropdown] = useState(false);
-  const { user, logout } = useAuth();
+  const { isAuthenticated } = useAuth(); // Destructure isAuthenticated from useAuth()
 
   const navigationItems = [
     { id: 'home', label: 'Home', icon: <Home className="w-4 h-4" /> },
@@ -26,17 +27,8 @@ export const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChang
   ];
 
   const handlePageChange = (pageId: string) => {
-    // This is the simplified function. The mobile menu closing logic is now handled in the parent component.
     onPageChange(pageId);
     setShowAIToolsDropdown(false);
-  };
-
-  const handleAuthAction = () => {
-    if (user) {
-      logout();
-    } else {
-      onPageChange('signin');
-    }
   };
 
   return (
@@ -57,36 +49,36 @@ export const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChang
             <span>{item.label}</span>
           </button>
         ))}
-        
-        {/* AI Tools Dropdown */}
-        <div className="relative">
-          <button
-            onClick={() => setShowAIToolsDropdown(!showAIToolsDropdown)}
-            className="flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 hover:bg-primary-50 hover:text-primary-700 text-gray-700"
-          >
-            <Zap className="w-4 h-4" />
-            <span>PRIMO Tools</span>
-            <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showAIToolsDropdown ? 'rotate-180' : ''}`} />
-          </button>
-          
-          {showAIToolsDropdown && (
-            <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-50">
-              {aiTools.map((tool) => (
-                <button
-                  key={tool.id}
-                  onClick={() => handlePageChange(tool.id)}
-                  className="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-primary-50 transition-colors text-gray-700 hover:text-primary-700"
-                >
-                  {tool.icon}
-                  <span className="font-medium">{tool.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </nav>
 
-      {/* The mobile menu and toggle button have been removed from this component */}
+        {/* AI Tools Dropdown - Conditional Rendering */}
+        {isAuthenticated && ( // Add this conditional check
+          <div className="relative">
+            <button
+              onClick={() => setShowAIToolsDropdown(!showAIToolsDropdown)}
+              className="flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 hover:bg-primary-50 hover:text-primary-700 text-gray-700"
+            >
+              <Zap className="w-4 h-4" />
+              <span>PRIMO Tools</span>
+              <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showAIToolsDropdown ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showAIToolsDropdown && (
+              <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-50">
+                {aiTools.map((tool) => (
+                  <button
+                    key={tool.id}
+                    onClick={() => handlePageChange(tool.id)}
+                    className="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-primary-50 transition-colors text-gray-700 hover:text-primary-700"
+                  >
+                    {tool.icon}
+                    <span className="font-medium">{tool.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )} {/* End conditional check */}
+      </nav>
     </>
   );
 };
