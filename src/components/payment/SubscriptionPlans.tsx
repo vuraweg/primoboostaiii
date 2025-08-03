@@ -183,7 +183,14 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
   const grandTotal = finalPlanPrice + addOnsTotal;
 
   const handlePayment = async () => {
-    if (!user || !selectedPlanData) return;
+    console.log('handlePayment: Function triggered.'); // NEW LOG
+    console.log('handlePayment: user:', user); // NEW LOG
+    console.log('handlePayment: selectedPlanData:', selectedPlanData); // NEW LOG
+    console.log('handlePayment: grandTotal:', grandTotal); // NEW LOG
+    if (!user || !selectedPlanData) {
+      console.log('handlePayment: User or selectedPlanData is missing, returning early.'); // NEW LOG
+      return;
+    }
     setIsProcessing(true);
     try {
       // Get the current session to obtain the access token
