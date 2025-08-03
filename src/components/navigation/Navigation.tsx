@@ -120,7 +120,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChang
           {/* AI Tools Section in Mobile Menu */}
           <div className="border-t border-gray-200 pt-2">
             <div className="px-6 py-2">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">AI Tools</span>
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">PRIMO Tools</span>
             </div>
             {aiTools.map((tool) => (
               <button
