@@ -209,40 +209,39 @@ class AuthService {
   }
 
   async logout(): Promise<void> {
-    console.log('authService: Calling supabase.auth.signOut().'); // Log 1: Before Supabase signOut
-    const { error } = await supabase.auth.signOut(); // This is the core logout
+    console.log('authService: Calling supabase.auth.signOut() first for immediate UI feedback.');
+    const { error } = await supabase.auth.signOut();
     
     if (error) {
-      console.error('authService: supabase.auth.signOut() failed:', error); // Log 2: Supabase signOut failed
+      console.error('authService: supabase.auth.signOut() failed:', error);
       throw new Error('Failed to sign out. Please try again.');
     }
 
-    console.log('authService: supabase.auth.signOut() completed successfully.'); // Log 3: Supabase signOut successful
-    console.log('authService: Logout initiated for device tracking.'); // Log 4: Start of device tracking logout process
+    console.log('authService: supabase.auth.signOut() completed. Now handling device tracking.');
     try {
+      // Since supabase.auth.signOut() already cleared the session, we'll try to get the old session info
+      // from the client if it's still available to log the activity.
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        console.log('authService: Session found, attempting device tracking and session end.'); // Log 5: Session found
+        console.log('authService: Previous session found, attempting to log logout activity.');
         const deviceId = await deviceTrackingService.registerDevice(session.user.id);
         if (deviceId) {
-          console.log('authService: Device registered, logging activity.'); // Log 6: Device registered
           await deviceTrackingService.logActivity(session.user.id, 'logout', {
             logoutMethod: 'manual',
             timestamp: new Date().toISOString()
           }, deviceId);
-          console.log('authService: Logout activity logged, ending session.'); // Log 7: Activity logged
+          console.log('authService: Logout activity logged. Ending session via device tracking service.');
           await deviceTrackingService.endSession(session.access_token, 'logout');
-          console.log('authService: Session ended via device tracking service.'); // Log 8: Session ended
         } else {
-          console.warn('authService: Device ID not obtained, skipping device tracking session end.'); // Log 9: Device ID not found
+          console.warn('authService: Device ID not obtained, skipping device tracking session end.');
         }
       } else {
-        console.log('authService: No active session found for device tracking, proceeding with signOut.'); // Log 10: No session for tracking
+        console.log('authService: No active session found to log for device tracking after sign out.');
       }
     } catch (deviceError) {
-      console.warn('authService: Failed to log logout activity or end session via device tracking:', deviceError); // Log 11: Error in device tracking
+      console.warn('authService: Failed to log logout activity or end session via device tracking:', deviceError);
     }
-    console.log('authService: Logout process finished.'); // Log 12: End of logout process
+    console.log('authService: Logout process finished.');
   }
 
   async forgotPassword(data: ForgotPasswordData): Promise<void> {
