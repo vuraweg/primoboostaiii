@@ -5,8 +5,6 @@ import React, { useState, useEffect } from 'react';
 // The Header component is in the same directory, so the path should be './Header'.
 import { Header } from './Header';
 import { Navigation } from './navigation/Navigation';
-import { supabase } from '../lib/supabaseClient';
-
 
 // Added ChevronUp and ChevronDown
 import { FileText, Sparkles, Download, TrendingUp, Target, Award, User, Briefcase, AlertCircle, CheckCircle, Loader2, RefreshCw, Zap, Plus, Eye, EyeOff, Crown, Calendar, Clock, Users, Star, ArrowRight, Shield, Settings, LogOut, Menu, X, Upload, BarChart3, Lightbulb, ArrowLeft, StretchHorizontal as SwitchHorizontal, ChevronUp, ChevronDown } from 'lucide-react';
