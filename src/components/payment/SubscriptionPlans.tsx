@@ -1,4 +1,3 @@
-// src/components/payment/SubscriptionPlans.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Check,
@@ -188,7 +187,10 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
     try {
       // Retrieve the session and access token
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
+      
+      console.log('SubscriptionPlans: session object after getSession:', session);
+      console.log('SubscriptionPlans: session.access_token after getSession:', session?.access_token);
+      
       if (sessionError || !session || !session.access_token) {
         console.error('SubscriptionPlans: No active session found for payment:', sessionError);
         // Optionally, show an error message to the user or redirect to login
@@ -198,7 +200,9 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
       }
 
       const accessToken = session.access_token;
-
+      
+      console.log('SubscriptionPlans: Value of accessToken before calling processPayment:', accessToken);
+      
       if (grandTotal === 0) {
         const result = await paymentService.processFreeSubscription(
           selectedPlan,
