@@ -1,3 +1,4 @@
+// src/components/InputWizard.tsx
 import React, { useState } from 'react';
 import {
   Upload,
@@ -240,7 +241,7 @@ export const InputWizard: React.FC<InputWizardProps> = ({
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log('Optimize button clicked', { isAuthenticated, resumeText: resumeText.length, jobDescription: jobDescription.length });
+                console.log('InputWizard: Optimize button clicked. isAuthenticated:', isAuthenticated, 'resumeText length:', resumeText.length, 'jobDescription length:', jobDescription.length); // ADDED LOG
                 if (isAuthenticated) {
                   handleOptimize();
                 } else {
