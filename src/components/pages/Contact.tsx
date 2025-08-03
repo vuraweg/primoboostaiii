@@ -21,7 +21,7 @@ export const Contact: React.FC = () => {
     {
       icon: <Mail className="w-6 h-6" />,
       title: 'Email Support',
-      details: 'contact@primoboost.ai',
+      details: 'primoboostai@gmail.com',
       description: 'Get help within 24 hours',
       color: 'from-blue-500 to-cyan-500'
     },
