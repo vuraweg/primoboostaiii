@@ -57,23 +57,18 @@ class AuthService {
       // Don't fail login if device tracking fails
     }
 
-    console.log('AuthService: Fetching user profile after login...');
-    const profile = await this.getUserProfile(data.user.id).catch(() => null);
-    console.log('AuthService: User profile fetched. Profile:', profile ? profile.full_name : 'none');
-
+    // After login, we don't need to fetch the profile here.
+    // The AuthContext will handle fetching the full profile after the SIGNED_IN event.
+    // We return a minimal User object based on the Supabase auth user.
     const userResult: User = {
       id: data.user.id,
-      name: profile?.full_name || data.user.email?.split('@')[0] || 'User',
-      email: profile?.email_address || data.user.email!, // Prioritize profile email
-      phone: profile?.phone || undefined, // Include phone from profile
-      linkedin: profile?.linkedin_profile || undefined, // Include linkedin from profile
-      github: profile?.wellfound_profile || undefined, // Mapped to wellfound_profile from DB
+      name: data.user.email?.split('@')[0] || 'User', // Placeholder name
+      email: data.user.email!,
       isVerified: data.user.email_confirmed_at !== null,
       createdAt: data.user.created_at || new Date().toISOString(),
       lastLogin: new Date().toISOString(),
-      hasSeenProfilePrompt: profile?.has_seen_profile_prompt || false, // Include this for consistency
     };
-    console.log('AuthService: Login process completed. Returning user data.');
+    console.log('AuthService: Login process completed. Returning minimal user data.');
     return userResult;
   }
 
@@ -145,25 +140,43 @@ class AuthService {
     return signupResult;
   }
 
-  async getCurrentUser(): Promise<User | null> {
-    console.log('AuthService: Starting getCurrentUser...');
+  // New public method to fetch user profile
+  public async fetchUserProfile(userId: string): Promise<{
+    full_name: string,
+    email_address: string,
+    phone?: string,
+    linkedin_profile?: string,
+    wellfound_profile?: string,
+    username?: string,
+    referral_code?: string,
+    has_seen_profile_prompt?: boolean
+  } | null> {
+    console.log('AuthService: Fetching user profile for user ID:', userId);
     try {
-      // Get current session with timeout
-      const sessionPromise = supabase.auth.getSession();
-      const timeoutPromise = new Promise<null>((_, reject) =>
-        setTimeout(() => reject(new Error('Session timeout in getCurrentUser')), 500000) // 500 seconds
-      );
-
-      let sessionData;
-      try {
-        sessionData = await Promise.race([sessionPromise, timeoutPromise]) as any;
-        console.log('AuthService: getSession or timeout completed.');
-      } catch (timeoutError) {
-        console.warn('AuthService: Session check timed out in getCurrentUser:', timeoutError);
+      const { data, error }
+        = await supabase
+        .from('user_profiles')
+        .select('full_name, email_address, phone, linkedin_profile, wellfound_profile, username, referral_code, has_seen_profile_prompt')
+        .eq('id', userId)
+        .maybeSingle();
+      if (error) {
+        console.error('AuthService: Error fetching user profile from DB:', error);
         return null;
       }
+      console.log('AuthService: User profile fetched from DB:', data ? data.full_name : 'none');
+      return data;
+    } catch (error) {
+      console.error('AuthService: Error in fetchUserProfile catch block:', error);
+      return null;
+    }
+  }
 
-      const { data: { session }, error } = sessionData;
+  // Streamlined getCurrentUser to primarily handle session validity and return full user object
+  async getCurrentUser(): Promise<User | null> {
+    console.log('AuthService: Starting getCurrentUser (streamlined)...');
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+
       if (error) {
         console.error('AuthService: getSession error in getCurrentUser:', error);
         return null;
@@ -175,14 +188,12 @@ class AuthService {
       }
       console.log('AuthService: Session found. User ID:', session.user.id);
 
-      // Validate session is not expired
       const now = Math.floor(Date.now() / 1000);
       if (session.expires_at && session.expires_at < now + 300) { // Refresh if expires in 5 minutes
         console.log('AuthService: Session expiring soon, refreshing...');
         const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
         if (refreshError || !refreshData.session) {
           console.error('AuthService: Session refresh failed:', refreshError);
-          // Explicitly sign out if refresh token is invalid to force a clean state
           if (refreshError?.message === "Invalid Refresh Token: Refresh Token Not Found") {
             console.warn('AuthService: Invalid refresh token detected. Forcing logout.');
             await supabase.auth.signOut();
@@ -190,27 +201,7 @@ class AuthService {
           return null;
         }
         console.log('AuthService: ✅ Session refreshed successfully in getCurrentUser.');
-        // Use refreshed session
-        const refreshedSession = refreshData.session;
-        console.log('AuthService: Fetching user profile after refresh...');
-        const profile = await this.getUserProfile(refreshedSession.user.id).catch(() => null);
-        console.log('AuthService: User profile fetched after refresh. Profile:', profile ? profile.full_name : 'none');
-        const userResult: User = {
-          id: refreshedSession.user.id,
-          name: profile?.full_name || refreshedSession.user.email?.split('@')[0] || 'User',
-          email: profile?.email_address || refreshedSession.user.email!, // Prioritize profile email
-          phone: profile?.phone || undefined,
-          linkedin: profile?.linkedin_profile || undefined,
-          github: profile?.wellfound_profile || undefined, // Mapped to wellfound_profile from DB
-          username: profile?.username || undefined, // Include username from profile
-          referralCode: profile?.referral_code || undefined, // Include referral code from profile
-          isVerified: refreshedSession.user.email_confirmed_at !== null,
-          createdAt: refreshedSession.user.created_at || new Date().toISOString(),
-          lastLogin: new Date().toISOString(),
-          hasSeenProfilePrompt: profile?.has_seen_profile_prompt || false,
-        };
-        console.log('AuthService: getCurrentUser completed after refresh. Returning user data.');
-        return userResult;
+        session.user = refreshData.session.user; // Update user object from refreshed session
       }
 
       // Update device activity for current session
@@ -228,21 +219,21 @@ class AuthService {
         }
       } catch (deviceError) {
         console.warn('AuthService: Device activity update failed during session check:', deviceError);
-        // Don't fail session check if device tracking fails
       }
 
-      console.log('AuthService: Fetching user profile for current session...');
-      const profile = await this.getUserProfile(session.user.id).catch(() => null);
-      console.log('AuthService: User profile fetched. Profile:', profile ? profile.full_name : 'none');
+      // Fetch the full profile using the new public method
+      const profile = await this.fetchUserProfile(session.user.id);
+      console.log('AuthService: User profile fetched for getCurrentUser. Profile:', profile ? profile.full_name : 'none');
+
       const userResult: User = {
         id: session.user.id,
         name: profile?.full_name || session.user.email?.split('@')[0] || 'User',
-        email: profile?.email_address || session.user.email!, // Prioritize profile email
+        email: profile?.email_address || session.user.email!,
         phone: profile?.phone || undefined,
         linkedin: profile?.linkedin_profile || undefined,
-        github: profile?.wellfound_profile || undefined, // Mapped to wellfound_profile from DB
-        referralCode: profile?.referral_code || undefined, // Include referral code from profile
-        username: profile?.username || undefined, // Include username from profile
+        github: profile?.wellfound_profile || undefined,
+        referralCode: profile?.referral_code || undefined,
+        username: profile?.username || undefined,
         isVerified: session.user.email_confirmed_at !== null,
         createdAt: session.user.created_at || new Date().toISOString(),
         lastLogin: new Date().toISOString(),
@@ -268,8 +259,6 @@ class AuthService {
 
     console.log('AuthService: supabase.auth.signOut() completed. Now handling device tracking.');
     try {
-      // Since supabase.auth.signOut() already cleared the session, we'll try to get the old session info
-      // from the client if it's still available to log the activity.
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         console.log('AuthService: Previous session found, attempting to log logout activity.');
@@ -314,36 +303,6 @@ class AuthService {
       throw new Error(error.message);
     }
     console.log('AuthService: Password reset successfully.');
-  }
-
-  private async getUserProfile(userId: string): Promise<{
-    full_name: string,
-    email_address: string,
-    phone?: string,
-    linkedin_profile?: string,
-    wellfound_profile?: string,
-    username?: string,
-    referral_code?: string,
-    has_seen_profile_prompt?: boolean
-  } | null> {
-    console.log('AuthService: Fetching user profile for user ID:', userId);
-    try {
-      const { data, error }
-        = await supabase
-        .from('user_profiles')
-        .select('full_name, email_address, phone, linkedin_profile, wellfound_profile, username, referral_code, has_seen_profile_prompt')
-        .eq('id', userId)
-        .maybeSingle();
-      if (error) {
-        console.error('AuthService: Error fetching user profile from DB:', error);
-        return null;
-      }
-      console.log('AuthService: User profile fetched from DB:', data ? data.full_name : 'none');
-      return data;
-    } catch (error) {
-      console.error('AuthService: Error in getUserProfile catch block:', error);
-      return null;
-    }
   }
 
   async updateUserProfile(userId: string, updates: {
