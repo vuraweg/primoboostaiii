@@ -1,3 +1,4 @@
+// src/components/ResumeScoreChecker.tsx
 import React, { useState } from 'react';
 import {
   Upload,
@@ -25,16 +26,23 @@ import { FileUpload } from './FileUpload';
 import { getDetailedResumeScore } from '../services/scoringService';
 import { DetailedScore } from '../types/resume';
 
+// Import Subscription type if it's not already globally available
+import { Subscription } from '../types/payment'; // Assuming this path is correct
+
 interface ResumeScoreCheckerProps {
   onNavigateBack: () => void;
   isAuthenticated: boolean;
   onShowAuth: () => void;
+  userSubscription: Subscription | null; // Add this prop
+  onShowSubscriptionPlans: () => void; // Add this prop
 }
 
 export const ResumeScoreChecker: React.FC<ResumeScoreCheckerProps> = ({
   onNavigateBack,
   isAuthenticated,
-  onShowAuth
+  onShowAuth,
+  userSubscription, // Destructure the new prop
+  onShowSubscriptionPlans, // Destructure the new prop
 }) => {
   const [resumeText, setResumeText] = useState('');
   const [jobDescription, setJobDescription] = useState('');
@@ -54,7 +62,7 @@ export const ResumeScoreChecker: React.FC<ResumeScoreCheckerProps> = ({
     // Check subscription and score check credits
     if (!userSubscription || (userSubscription.scoreChecksTotal - userSubscription.scoreChecksUsed) <= 0) {
       alert('You have used all your score checks or do not have an active plan. Please upgrade your plan.');
-      onShowSubscriptionPlans();
+      onShowSubscriptionPlans(); // Use the passed prop
       return;
     }
 
@@ -66,6 +74,7 @@ export const ResumeScoreChecker: React.FC<ResumeScoreCheckerProps> = ({
     const jd = jobDescription.trim() || 'General professional role requiring relevant skills, experience, and qualifications.';
 
     try {
+      setIsAnalyzing(true); // Set loading state
       const result = await getDetailedResumeScore(
         { rawText: resumeText } as any, // Cast to any for now; ideally, extract structured data from resumeText
         jd,
@@ -75,6 +84,8 @@ export const ResumeScoreChecker: React.FC<ResumeScoreCheckerProps> = ({
     } catch (error) {
       console.error('Error analyzing resume:', error);
       alert('Failed to analyze resume. Please try again.');
+    } finally {
+      setIsAnalyzing(false); // Ensure loading state is reset
     }
   };
 
