@@ -1,3 +1,4 @@
+// src/App.tsx
 import React, { useState, useEffect } from 'react';
 import { Menu, X, Home, Info, BookOpen, Phone, FileText, LogIn, LogOut, User, Wallet } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -130,7 +131,13 @@ function App() {
       case 'guided-builder':
         return <GuidedResumeBuilder onNavigateBack={() => setCurrentPage('new-home')} userSubscription={userSubscription} onShowSubscriptionPlans={handleShowSubscriptionPlans} />;
       case 'score-checker':
-        return <ResumeScoreChecker onNavigateBack={() => setCurrentPage('new-home')} isAuthenticated={isAuthenticatedProp} onShowAuth={handleShowAuth} userSubscription={userSubscription} onShowSubscriptionPlans={handleShowSubscriptionPlans} />;
+        return <ResumeScoreChecker
+          onNavigateBack={() => setCurrentPage('new-home')}
+          isAuthenticated={isAuthenticatedProp}
+          onShowAuth={handleShowAuth}
+          userSubscription={userSubscription} // Pass userSubscription
+          onShowSubscriptionPlans={handleShowSubscriptionPlans} // Pass onShowSubscriptionPlans
+        />;
       case 'optimizer':
         return (
           <main className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -144,7 +151,13 @@ function App() {
       case 'tutorials':
         return <Tutorials />;
       case 'linkedin-generator':
-        return <LinkedInMessageGenerator onNavigateBack={() => setCurrentPage('new-home')} isAuthenticated={isAuthenticatedProp} onShowAuth={handleShowAuth} userSubscription={userSubscription} onShowSubscriptionPlans={handleShowSubscriptionPlans} />;
+        return <LinkedInMessageGenerator
+          onNavigateBack={() => setCurrentPage('new-home')}
+          isAuthenticated={isAuthenticatedProp}
+          onShowAuth={handleShowAuth}
+          userSubscription={userSubscription} // Pass userSubscription
+          onShowSubscriptionPlans={handleShowSubscriptionPlans} // Pass onShowSubscriptionPlans
+        />;
       default:
         // Pass all props here as a fallback
         return <HomePage {...homePageProps} />;
