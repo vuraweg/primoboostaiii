@@ -10,11 +10,12 @@ declare global {
 
 class PaymentService {
   // Get Razorpay key from environment variables
-  private readonly RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_live_U7N6E8ot31tiej';
+  private readonly RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID; // Removed hardcoded fallback
   
   // Coupon codes
   private readonly COUPON_FIRST100_CODE = 'first100';
   private readonly COUPON_WORTHYONE_CODE = 'worthyone';
+  private readonly COUPON_FULL_SUPPORT_CODE = 'fullsupport'; // NEW: Full Support Coupon
 
   // Updated subscription plans - New structure
   private readonly plans: SubscriptionPlan[] = [
@@ -23,7 +24,7 @@ class PaymentService {
       name: '💎 Career Pro Max',
       price: 1999,
       duration: 'One-time Purchase',
-      optimizations: 50,
+      optimizations: 50, // Updated from 30
       scoreChecks: 50,
       linkedinMessages: Infinity, // Unlimited
       guidedBuilds: 5,
@@ -47,7 +48,7 @@ class PaymentService {
       name: '⭐ Career Boost+',
       price: 1499,
       duration: 'One-time Purchase',
-      optimizations: 30,
+      optimizations: 30, // Updated from 15
       scoreChecks: 30,
       linkedinMessages: Infinity, // Unlimited
       guidedBuilds: 3,
@@ -68,7 +69,7 @@ class PaymentService {
       name: '🔥 Pro Resume Kit',
       price: 999,
       duration: 'One-time Purchase',
-      optimizations: 20,
+      optimizations: 20, // Updated from 10
       scoreChecks: 20,
       linkedinMessages: 100,
       guidedBuilds: 2,
@@ -127,7 +128,7 @@ class PaymentService {
       name: '🎯 Lite Check',
       price: 99,
       duration: 'One-time Purchase',
-      optimizations: 2,
+      optimizations: 2, // Updated from 1
       scoreChecks: 2,
       linkedinMessages: 10,
       guidedBuilds: 0,
@@ -234,8 +235,17 @@ class PaymentService {
 
     const normalizedCoupon = couponCode.toLowerCase().trim();
 
-    // first100 coupon - free starter plan only
-    if (normalizedCoupon === this.COUPON_FIRST100_CODE && planId === 'starter') {
+    // NEW: full_support coupon - free career_pro_max plan
+    if (normalizedCoupon === this.COUPON_FULL_SUPPORT_CODE && planId === 'career_pro_max') {
+      return {
+        finalAmount: 0,
+        discountAmount: plan.price,
+        couponApplied: this.COUPON_FULL_SUPPORT_CODE
+      };
+    }
+
+    // first100 coupon - free lite_check plan only
+    if (normalizedCoupon === this.COUPON_FIRST100_CODE && planId === 'lite_check') {
       return {
         finalAmount: 0,
         discountAmount: plan.price,
@@ -243,8 +253,8 @@ class PaymentService {
       };
     }
 
-    // worthyone coupon - 50% off any plan
-    if (normalizedCoupon === this.COUPON_WORTHYONE_CODE) {
+    // worthyone coupon - 50% off career_pro_max plan only
+    if (normalizedCoupon === this.COUPON_WORTHYONE_CODE && planId === 'career_pro_max') {
       const discountAmount = Math.floor(plan.price * 0.5);
       return {
         finalAmount: plan.price - discountAmount,
@@ -741,71 +751,3 @@ class PaymentService {
 }
 
 export const paymentService = new PaymentService();
-// Payment types for the application
-export interface SubscriptionPlan {
-  id: string;
-  name: string;
-  price: number;
-  duration: string;
-  optimizations: number;
-  scoreChecks: number;
-  linkedinMessages: number;
-  guidedBuilds: number;
-  tag: string;
-  tagColor: string;
-  gradient: string;
-  icon: string;
-  features: string[];
-  popular?: boolean;
-}
-
-export interface PaymentData {
-  planId: string;
-  amount: number;
-  currency: string;
-}
-
-export interface RazorpayOptions {
-  key: string;
-  amount: number;
-  currency: string;
-  name: string;
-  description: string;
-  order_id: string;
-  handler: (response: RazorpayResponse) => void;
-  prefill: {
-    name: string;
-    email: string;
-  };
-  theme: {
-    color: string;
-  };
-  modal: {
-    ondismiss: () => void;
-  };
-}
-
-export interface RazorpayResponse {
-  razorpay_payment_id: string;
-  razorpay_order_id: string;
-  razorpay_signature: string;
-}
-
-export interface Subscription {
-  id: string;
-  userId: string;
-  planId: string;
-  status: string;
-  startDate: string;
-  endDate: string;
-  optimizationsUsed: number;
-  optimizationsTotal: number;
-  paymentId: string | null;
-  couponUsed: string | null;
-  scoreChecksUsed: number;
-  scoreChecksTotal: number;
-  linkedinMessagesUsed: number;
-  linkedinMessagesTotal: number;
-  guidedBuildsUsed: number;
-  guidedBuildsTotal: number;
-}
