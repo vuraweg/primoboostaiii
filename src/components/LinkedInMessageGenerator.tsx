@@ -24,11 +24,14 @@ import {
 } from 'lucide-react';
 import { generateLinkedInMessage } from '../services/linkedinService';
 import { useAuth } from "../contexts/AuthContext";
+import { Subscription } from '../types/payment'; // Import Subscription type
 
 interface LinkedInMessageGeneratorProps {
   onNavigateBack: () => void;
   isAuthenticated: boolean;
   onShowAuth: () => void;
+  userSubscription: Subscription | null; // Add this prop
+  onShowSubscriptionPlans: () => void; // Add this prop
 }
 
 type MessageType = 'connection' | 'cold-outreach' | 'follow-up' | 'job-inquiry';
@@ -52,7 +55,9 @@ interface MessageForm {
 export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> = ({
   onNavigateBack,
   isAuthenticated,
-  onShowAuth
+  onShowAuth,
+  userSubscription, // Destructure the new prop
+  onShowSubscriptionPlans // Destructure the new prop
 }) => {
   const { user } = useAuth();
   const [formData, setFormData] = useState<MessageForm>({
@@ -126,7 +131,7 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
     // Check subscription and LinkedIn message credits
     if (!userSubscription || (userSubscription.linkedinMessagesTotal - userSubscription.linkedinMessagesUsed) <= 0) {
       alert('You have used all your LinkedIn messages or do not have an active plan. Please upgrade your plan.');
-      onShowSubscriptionPlans();
+      onShowSubscriptionPlans(); // Use the passed prop
       return;
     }
 
