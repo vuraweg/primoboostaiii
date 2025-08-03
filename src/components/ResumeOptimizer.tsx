@@ -139,8 +139,9 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
 
 
   const handleOptimize = async () => {
+    setIsOptimizing(true); // Set loading state immediately
     console.log('ResumeOptimizer: Starting handleOptimize function.');
-    // Session validation before any API call
+
     console.log('ResumeOptimizer: Checking supabase object:', supabase);
     console.log('ResumeOptimizer: Getting Supabase session...');
     const { data: { session } } = await supabase.auth.getSession();
@@ -154,16 +155,19 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
       console.log('ResumeOptimizer: Session is not valid or access token missing, showing auth modal.');
       alert('Your session has expired. Please sign in again.');
       onShowAuth();
+      setIsOptimizing(false); // Ensure loading is turned off if early exit
       return;
     }
     console.log('ResumeOptimizer: Session is valid. Proceeding with checks.');
 
     if (!resumeText.trim() || !jobDescription.trim()) {
       alert('Please provide both resume content and job description');
+      setIsOptimizing(false); // Ensure loading is turned off if early exit
       return;
     }
     if (!user) {
       alert('User information not available. Please sign in again.');
+      setIsOptimizing(false); // Ensure loading is turned off if early exit
       return;
     }
 
@@ -172,13 +176,10 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
     if (!subscription || (subscription.optimizationsTotal - subscription.optimizationsUsed) <= 0) {
       alert('You have used all your optimizations or do not have an active plan. Please upgrade your plan.');
       setShowSubscriptionPlans(true);
+      setIsOptimizing(false); // Ensure loading is turned off if early exit
       return;
     }
     console.log('ResumeOptimizer: Subscription is valid. Optimizations available.');
-
-    console.log('ResumeOptimizer: Setting isOptimizing to true.');
-    setIsOptimizing(true);
-    console.log('ResumeOptimizer: isOptimizing set to true.');
 
     try {
       console.log('ResumeOptimizer: Calling optimizeResume (AI model)...');
@@ -371,10 +372,9 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
             setIsCalculatingScore
           );
 
-          const suitableProjects = finalOptimizedResume.projects?.filter(project => {
-            const analysis = projectAnalysis.projectsToReplace.find(p => p.title === project.title);
-            return !analysis || analysis.score >= 80;
-          }) || [];
+          const suitableProjects = finalOptimizedResume.projects?.filter(project =>
+            !projectAnalysis.projectsToReplace.some(lowProject => lowProject.title === project.title)
+          ) || [];
 
           const replacementProjects = projectAnalysis.replacementSuggestions.map(suggestion => ({
             title: suggestion.title,
@@ -543,7 +543,7 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
       setIsCalculatingScore(true);
       const freshInitialScore = await getDetailedResumeScore(updatedResume, jobDescription, setIsCalculatingScore);
       setInitialResumeScore(freshInitialScore);
-      await proceedWithFinalOptimization(updatedResume, freshInitialScore, accessToken);
+      await proceedWithFinalOptimization(updatedUpdatedResume, freshInitialScore, accessToken);
     } catch (error) {
       console.error('Error generating scores after project add:', error);
       alert('Failed to generate updated scores. Please try again.');
