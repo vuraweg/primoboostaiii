@@ -317,7 +317,7 @@ export const InputWizard: React.FC<InputWizardProps> = ({
         </div>
 
         {/* Step Progress Bar - Carousel Effect */}
-        <div className="relative overflow-hidden w-[320px] mx-auto md:w-auto">
+        <div className="relative overflow-x-auto overflow-hidden w-[320px] mx-auto md:w-auto">
           <div
             className="flex items-center space-x-4 mb-6 transition-transform duration-300"
             style={{ transform: `translateX(${translateX}px)` }}
