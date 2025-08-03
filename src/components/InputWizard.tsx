@@ -9,7 +9,8 @@ import {
   ArrowRight,
   Sparkles,
   CheckCircle,
-  Edit3 // Added for profile update button
+  Edit3, // Added for profile update button
+  Loader2 // Added for loading spinner
 } from 'lucide-react';
 import { FileUpload } from './FileUpload';
 import { InputSection } from './InputSection';
@@ -30,6 +31,7 @@ interface InputWizardProps {
   onShowAuth: () => void;
   user: AuthUser | null; // Added user prop
   onShowProfile: (mode?: 'profile' | 'wallet') => void; // Added onShowProfile prop
+  isOptimizing: boolean; // NEW: Add isOptimizing prop
 }
 
 export const InputWizard: React.FC<InputWizardProps> = ({
@@ -45,7 +47,8 @@ export const InputWizard: React.FC<InputWizardProps> = ({
   isAuthenticated,
   onShowAuth,
   user, // Destructure user
-  onShowProfile // Destructure onShowProfile
+  onShowProfile, // Destructure onShowProfile
+  isOptimizing // NEW: Destructure isOptimizing
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
 
@@ -241,24 +244,33 @@ export const InputWizard: React.FC<InputWizardProps> = ({
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log('InputWizard: Optimize button clicked. isAuthenticated:', isAuthenticated, 'resumeText length:', resumeText.length, 'jobDescription length:', jobDescription.length); // ADDED LOG
+                console.log('InputWizard: Optimize button clicked. isAuthenticated:', isAuthenticated, 'resumeText length:', resumeText.length, 'jobDescription length:', jobDescription.length);
                 if (isAuthenticated) {
                   handleOptimize();
                 } else {
                   onShowAuth();
                 }
               }}
-              disabled={!resumeText.trim() || !jobDescription.trim()}
+              disabled={!resumeText.trim() || !jobDescription.trim() || isOptimizing} // NEW: Disable button if isOptimizing is true
               className={`w-full py-4 px-6 rounded-xl font-bold text-lg transition-all duration-300 flex items-center justify-center space-x-3 ${
-                !resumeText.trim() || !jobDescription.trim()
+                !resumeText.trim() || !jobDescription.trim() || isOptimizing // NEW: Add isOptimizing to disabled condition
                   ? 'bg-gray-400 cursor-not-allowed text-white'
                   : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-xl hover:shadow-2xl cursor-pointer'
               }`}
               type="button"
             >
-              <Sparkles className="w-6 h-6" />
-              <span>{isAuthenticated ? 'Optimize My Resume' : 'Sign In to Optimize'}</span>
-              <ArrowRight className="w-5 h-5" />
+              {isOptimizing ? ( // NEW: Show loading spinner inside button
+                <>
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                  <span>Optimizing...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-6 h-6" />
+                  <span>{isAuthenticated ? 'Optimize My Resume' : 'Sign In to Optimize'}</span>
+                  <ArrowRight className="w-5 h-5" />
+                </>
+              )}
             </button>
 
             {!isAuthenticated && (
@@ -409,3 +421,4 @@ export const InputWizard: React.FC<InputWizardProps> = ({
     </div>
   );
 };
+
