@@ -14,7 +14,8 @@ import { FileUpload } from './FileUpload';
 import { InputSection } from './InputSection'; // Assuming this is used if not within InputWizard
 
 import { ResumePreview } from './ResumePreview';
-import { ExportButtons } from './ExportButtons';
+import { ExportButtons }
+from './ExportButtons';
 import { ComprehensiveAnalysis } from './ComprehensiveAnalysis';
 import { ProjectAnalysisModal } from './ProjectAnalysisModal';
 import { MobileOptimizedInterface } from './MobileOptimizedInterface';
@@ -433,7 +434,7 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
       setBeforeScore(beforeScoreData);
 
       const finalScore = await getDetailedResumeScore(finalResumeData, jobDescription, setIsCalculatingScore);
-      setFinalScore(finalScore); // Set the final detailed score
+      setFinalResumeScore(finalScore); // Set the final detailed score
 
       const afterScoreData = generateAfterScore(reconstructResumeText(finalResumeData));
       setAfterScore(afterScoreData);
@@ -576,7 +577,7 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
       setIsCalculatingScore(true);
       const freshInitialScore = await getDetailedResumeScore(updatedResume, jobDescription, setIsCalculatingScore);
       setInitialResumeScore(freshInitialScore);
-      await proceedWithFinalOptimization(updatedResume, freshInitialScore);
+      await proceedWithFinalOptimization(updatedUpdate, freshInitialScore);
     } catch (error) {
       console.error('Error generating scores after project add:', error);
       alert('Failed to generate updated scores. Please try again.');
