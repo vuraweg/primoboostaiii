@@ -1,5 +1,7 @@
 // src/components/ResumeOptimizer.tsx
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabaseClient';
+
 
 // CORRECTED IMPORT STATEMENT:
 // The Header component is in the same directory, so the path should be './Header'.
