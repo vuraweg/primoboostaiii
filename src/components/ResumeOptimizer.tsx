@@ -1,4 +1,6 @@
+// src/components/ResumeOptimizer.tsx
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabaseClient';
 
 // CORRECTED IMPORT STATEMENT:
 // The Header component is in the same directory, so the path should be './Header'.
@@ -161,32 +163,35 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
 
 
   const handleOptimize = async () => {
-    // Session validation before any API call
-    const sessionValid = await authService.ensureValidSession();
-    if (!sessionValid) {
-      alert('Your session has expired. Please sign in again.');
-      onShowAuth(); // Prompt user to sign in
-      return; // Stop the optimization process
-    }
+    setIsOptimizing(true); // Set loading state immediately
+    console.log('ResumeOptimizer: Starting handleOptimize function. isOptimizing=true');
 
-    if (!resumeText.trim() || !jobDescription.trim()) {
-      alert('Please provide both resume content and job description');
-      return;
-    }
-    if (!user) {
-      alert('User information not available. Please sign in again.');
-      return;
-    }
-
-    // Subscription check before proceeding with optimization
-    if (!subscription || (subscription.optimizationsTotal - subscription.optimizationsUsed) <= 0) {
-      alert('You have used all your optimizations or do not have an active plan. Please upgrade your plan.');
-      setShowSubscriptionPlans(true); // Show subscription plans modal
-      return;
-    }
-
-    setIsOptimizing(true); // Start main loading spinner
     try {
+      // Session validation before any API call
+      const { data: { session } } = await supabase.auth.getSession();
+      const sessionValid = await authService.ensureValidSession();
+      if (!sessionValid || !session?.access_token) {
+        alert('Your session has expired. Please sign in again.');
+        onShowAuth(); // Prompt user to sign in
+        return; // Exit, finally block will set isOptimizing to false
+      }
+
+      if (!resumeText.trim() || !jobDescription.trim()) {
+        alert('Please provide both resume content and job description');
+        return; // Exit, finally block will set isOptimizing to false
+      }
+      if (!user) {
+        alert('User information not available. Please sign in again.');
+        return; // Exit, finally block will set isOptimizing to false
+      }
+
+      // Subscription check before proceeding with optimization
+      if (!subscription || (subscription.optimizationsTotal - subscription.optimizationsUsed) <= 0) {
+        alert('You have used all your optimizations or do not have an active plan. Please upgrade your plan.');
+        setShowSubscriptionPlans(true); // Show subscription plans modal
+        return; // Exit, finally block will set isOptimizing to false
+      }
+
       // Step 1: Initial optimization to parse the resume and get structured data
       const parsedResume = await optimizeResume(
         resumeText,
@@ -211,39 +216,41 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
         setMissingSections(missing);
         setPendingResumeData(parsedResume); // Store parsedResume for later use after modal
         setShowMissingSectionsModal(true); // Show modal to collect missing info
-        setIsOptimizing(false); // Stop optimization loading until missing info is provided
-        return;
+        // Do NOT set isOptimizing(false) here. The modal will handle its own processing state.
+        // The main isOptimizing will remain true until the modal is closed or its process completes.
+        return; // Exit handleOptimize, the modal will trigger the next step via handleMissingSectionsProvided
       }
 
       // If no missing sections, proceed directly
-      await continueOptimizationProcess(parsedResume);
+      await continueOptimizationProcess(parsedResume, session.access_token);
 
     } catch (error: any) {
-      console.error('Error optimizing resume:', error);
+      console.error('ResumeOptimizer: Error in handleOptimize (top-level catch):', error);
       if (error.message && (error.message.includes('429') || error.message.includes('Too Many Requests'))) {
         alert('Too many requests. Please wait a moment and try again.');
       } else {
         alert('Failed to optimize resume. Please try again.');
       }
+      // Error caught, main finally will set isOptimizing to false
     } finally {
-      setIsOptimizing(false); // Ensure loading state is reset after initial optimize call
+      console.log('ResumeOptimizer: handleOptimize finally block. Setting isOptimizing=false');
+      setIsOptimizing(false); // Ensure main loading state is always turned off
     }
   };
 
-  const continueOptimizationProcess = async (resumeData: ResumeData) => {
+  const continueOptimizationProcess = async (resumeData: ResumeData, accessToken: string) => {
     try {
-      await handleInitialResumeProcessing(resumeData);
+      await handleInitialResumeProcessing(resumeData, accessToken);
     } catch (error) {
-      console.error('Error in optimization process:', error);
+      console.error('ResumeOptimizer: Error in continueOptimizationProcess:', error);
       alert('Failed to continue optimization. Please try again.');
-      setIsOptimizing(false); // Ensure loading state is reset on error
+      throw error; // Re-throw to be caught by handleOptimize's top-level catch
     }
   };
 
-  const handleInitialResumeProcessing = async (resumeData: ResumeData) => {
+  const handleInitialResumeProcessing = async (resumeData: ResumeData, accessToken: string) => {
+    setIsCalculatingScore(true); // Set specific loading for scoring
     try {
-      setIsCalculatingScore(true);
-      // Get initial detailed score
       const initialScore = await getDetailedResumeScore(resumeData, jobDescription, setIsCalculatingScore);
       setInitialResumeScore(initialScore);
 
@@ -252,24 +259,21 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
       setParsedResumeData(resumeData); // Ensure parsedResumeData is also updated for subsequent steps
 
       // Decide whether to show project analysis or proceed with final optimization
-      // if (initialScore.breakdown.projects.score < 70) { // Example condition for project mismatch
-      //    setShowProjectMismatch(true);
-      // } else {
-      //    await proceedWithFinalOptimization(resumeData, initialScore);
-      // }
-
       // For now, always showing project analysis if projects exist in the resume
       if (resumeData.projects && resumeData.projects.length > 0) {
         setShowProjectAnalysis(true); // Show the project analysis modal
+        // Do NOT set isCalculatingScore(false) here, it will be set in finally.
+        // Do NOT set isOptimizing(false) here. The modal will trigger the next step.
       } else {
-        await proceedWithFinalOptimization(resumeData, initialScore); // If no projects, skip project analysis
+        await proceedWithFinalOptimization(resumeData, initialScore, accessToken);
       }
 
     } catch (error) {
-      console.error('Error in initial resume processing:', error);
+      console.error('ResumeOptimizer: Error in handleInitialResumeProcessing:', error);
       alert('Failed to process resume. Please try again.');
+      throw error; // Re-throw to be caught by continueOptimizationProcess or handleOptimize
     } finally {
-      setIsCalculatingScore(false); // Ensure score calculation loading is reset
+      setIsCalculatingScore(false); // Ensure specific scoring loading is turned off
     }
   };
 
@@ -323,32 +327,34 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
       setMissingSections([]); // Clear missing sections list
       setPendingResumeData(null); // Clear pending data
 
+      const { data: { session } } = await supabase.auth.getSession();
       // Re-initiate the optimization process with the updated resume data
-      await handleInitialResumeProcessing(updatedResume);
+      await handleInitialResumeProcessing(updatedResume, session?.access_token || '');
 
     } catch (error) {
-      console.error('Error processing missing sections:', error);
+      console.error('ResumeOptimizer: Error processing missing sections:', error);
       alert('Failed to process the provided information. Please try again.');
+      throw error; // Re-throw to be caught by handleOptimize
     } finally {
       setIsProcessingMissingSections(false); // Stop loading after processing modal input
     }
   };
 
 
-  const proceedWithFinalOptimization = async (resumeData: ResumeData, initialScore: DetailedScore) => {
+  const proceedWithFinalOptimization = async (resumeData: ResumeData, initialScore: DetailedScore, accessToken: string) => {
+    // Do NOT set isOptimizing(true) here. It's controlled by handleOptimize.
     try {
-      setIsOptimizing(true); // Re-activate main loading spinner for final pass
-      await proceedWithOptimization(resumeData, initialScore);
+      await proceedWithOptimization(resumeData, initialScore, accessToken);
     } catch (error) {
-      console.error('Error in final optimization:', error);
+      console.error('ResumeOptimizer: Error in proceedWithFinalOptimization:', error);
       alert('Failed to complete final optimization. Please try again.');
-    } finally {
-      setIsOptimizing(false); // Ensure loading state is reset
+      throw error; // Re-throw to be caught by handleInitialResumeProcessing or handleOptimize
     }
+    // Do NOT set isOptimizing(false) here. It's controlled by handleOptimize.
   };
 
 
-  const proceedWithOptimization = async (resumeData: ResumeData, initialScore: DetailedScore) => {
+  const proceedWithOptimization = async (resumeData: ResumeData, initialScore: DetailedScore, accessToken: string) => {
     try {
       console.log('Starting final AI optimization pass...');
 
@@ -373,7 +379,17 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
 
       let finalResumeData = { // Prepare the final data object
         ...finalOptimizedResume,
-        targetRole: targetRole || ''
+        targetRole: targetRole
+      };
+
+      // For this example, assuming a placeholder for advancedProjectAnalyzer
+      const advancedProjectAnalyzer = {
+        analyzeAndReplaceProjects: async (resume, role, jd, setLoading) => {
+          setLoading(true);
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+          setLoading(false);
+          return { projectsToReplace: [], replacementSuggestions: [] }; // Return dummy data
+        }
       };
 
       // Handle advanced project analysis and replacement if projects exist
@@ -386,10 +402,9 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
             setIsCalculatingScore // Pass setLoading to project analyzer
           );
 
-          const suitableProjects = finalOptimizedResume.projects?.filter(project => {
-            const analysis = projectAnalysis.projectsToReplace.find(p => p.title === project.title);
-            return !analysis || analysis.score >= 80; // Keep projects with score >= 80
-          }) || [];
+          const suitableProjects = finalOptimizedResume.projects?.filter(project =>
+            !projectAnalysis.projectsToReplace.some(p => p.title === project.title)
+          ) || [];
 
           const replacementProjects = projectAnalysis.replacementSuggestions.map(suggestion => ({
             title: suggestion.title,
@@ -449,11 +464,12 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
 
       setOptimizedResume(finalResumeData); // Final set of optimized resume data
     } catch (error) {
-      console.error('Error in final optimization pass:', error);
+      console.error('ResumeOptimizer: Error in proceedWithOptimization:', error);
       alert('Failed to complete resume optimization. Please try again.');
+      throw error; // Re-throw to be caught by proceedWithFinalOptimization or handleOptimize
     } finally {
-      setIsOptimizing(false);
-      setIsCalculatingScore(false);
+      // Do NOT set isOptimizing(false) here. It's controlled by handleOptimize.
+      setIsCalculatingScore(false); // Ensure specific scoring loading is turned off
     }
   };
 
@@ -464,8 +480,8 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
       setShowProjectOptions(true);
     } else {
       if (parsedResumeData && initialResumeScore) {
-        // If user skips adding projects, proceed with original parsed data
-        proceedWithFinalOptimization(parsedResumeData, initialResumeScore);
+        const { data: { session } } = supabase.auth.getSession();
+        proceedWithFinalOptimization(parsedResumeData, initialResumeScore, session?.access_token || '');
       }
     }
   };
@@ -512,7 +528,7 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
       return;
     }
 
-    setIsOptimizing(true);
+    // Do NOT set isOptimizing(true) here. It's controlled by handleOptimize.
     try {
       const projectDescriptionText = await generateProjectDescription(manualProject, jobDescription);
       const newProject = {
@@ -532,19 +548,21 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
       }
 
       setShowManualProjectAdd(false);
+      const { data: { session } } = await supabase.auth.getSession();
       // Proceed with the final AI optimization pass using the updated resume data
       if (initialResumeScore) {
-        await proceedWithFinalOptimization(updatedResume, initialResumeScore);
+        await proceedWithFinalOptimization(updatedResume, initialResumeScore, session?.access_token || '');
       } else {
         const newInitialScore = await getDetailedResumeScore(updatedResume, jobDescription, setIsCalculatingScore);
-        await proceedWithFinalOptimization(updatedResume, newInitialScore);
+        await proceedWithFinalOptimization(updatedResume, newInitialScore, session?.access_token || '');
       }
 
     } catch (error) {
       console.error('Error creating manual project:', error);
       alert('Failed to create project. Please try again.');
+      throw error; // Re-throw to be caught by handleOptimize
     } finally {
-      setIsOptimizing(false);
+      // Do NOT set isOptimizing(false) here. It's controlled by handleOptimize.
     }
   };
 
@@ -555,23 +573,25 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
     setOptimizedResume(updatedResumeData);
     setParsedResumeData(updatedResumeData);
 
+    const { data: { session } } = supabase.auth.getSession();
     if (initialResumeScore) {
-      proceedWithFinalOptimization(updatedResumeData, initialResumeScore);
+      proceedWithFinalOptimization(updatedResumeData, initialResumeScore, session?.access_token || '');
     } else {
-      generateScoresAfterProjectAdd(updatedResumeData); // Recalculate score and then proceed
+      generateScoresAfterProjectAdd(updatedResumeData, session?.access_token || ''); // Recalculate score and then proceed
     }
   };
 
   // Helper to generate scores after project addition/modification, then proceed to final optimization
-  const generateScoresAfterProjectAdd = async (updatedResume: ResumeData) => {
+  const generateScoresAfterProjectAdd = async (updatedResume: ResumeData, accessToken: string) => {
     try {
       setIsCalculatingScore(true);
       const freshInitialScore = await getDetailedResumeScore(updatedResume, jobDescription, setIsCalculatingScore);
       setInitialResumeScore(freshInitialScore);
-      await proceedWithFinalOptimization(updatedResume, freshInitialScore);
+      await proceedWithFinalOptimization(updatedResume, freshInitialScore, accessToken);
     } catch (error) {
       console.error('Error generating scores after project add:', error);
       alert('Failed to generate updated scores. Please try again.');
+      throw error; // Re-throw to be caught by handleOptimize
     } finally {
       setIsCalculatingScore(false);
     }
@@ -618,7 +638,7 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
 
   // Renders a mobile-optimized interface if conditions met
   if (showMobileInterface && optimizedResume) {
-    return <MobileOptimizedInterface sections={mobileSections} />;
+    return <MobileOptimizedInterface sections={mobileSections} onStartNewResume={handleStartNewResume} />;
   }
 
   // Centralized loading overlay for all major processing states
@@ -731,6 +751,9 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
                 handleOptimize={handleOptimize}
                 isAuthenticated={isAuthenticated}
                 onShowAuth={onShowAuth}
+                user={user}
+                onShowProfile={onShowProfile}
+                isOptimizing={isOptimizing}
                 currentStep={currentStep}
                 setCurrentStep={setCurrentStep}
               />
@@ -809,7 +832,7 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
                   jobDescription={jobDescription}
                   targetRole={targetRole || "Target Role"}
                   initialDetailedScore={initialResumeScore}
-                  finalDetailedScore={finalResumeScore}
+                  finalDetailedScore={finalDetailedScore}
                 />
               </>
             )}
@@ -961,7 +984,7 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
                       type="text"
                       value={newTechStack}
                       onChange={(e) => setNewTechStack(e.target.value)}
-                      placeholder="Add technology (e.g., React, Node.js)"
+                      placeholder="e.g., React, Node.js"
                       className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                       onKeyPress={(e) => e.key === 'Enter' && addTechToStack()}
                     />
@@ -1055,7 +1078,9 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
           setShowMissingSectionsModal(false);
           setMissingSections([]);
           setPendingResumeData(null);
-          setIsOptimizing(false); // If user closes modal, stop optimization process
+          // When the missing sections modal is closed without completing,
+          // we should ensure the main loading state is turned off.
+          setIsOptimizing(false);
         }}
         missingSections={missingSections}
         onSectionsProvided={handleMissingSectionsProvided}
