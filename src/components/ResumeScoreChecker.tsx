@@ -62,7 +62,10 @@ export const ResumeScoreChecker: React.FC<ResumeScoreCheckerProps> = ({
     // Check subscription and score check credits
     if (!userSubscription || (userSubscription.scoreChecksTotal - userSubscription.scoreChecksUsed) <= 0) {
       alert('You have used all your score checks or do not have an active plan. Please upgrade your plan.');
-      onShowSubscriptionPlans(); // Use the passed prop
+      // Add a small delay to allow the alert to be dismissed before showing the modal
+      setTimeout(() => {
+        onShowSubscriptionPlans(); // Use the passed prop
+      }, 100); // Small delay, e.g., 100ms
       return;
     }
 
