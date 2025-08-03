@@ -5,6 +5,7 @@ import { createHmac } from 'https://deno.land/std@0.168.0/node/crypto.ts'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 }
 
 interface PaymentVerificationRequest {
@@ -19,6 +20,9 @@ interface PlanConfig {
   price: number
   duration: string
   optimizations: number
+  scoreChecks: number
+  linkedinMessages: number
+  guidedBuilds: number
   durationInHours: number
 }
 
@@ -28,56 +32,66 @@ const plans: PlanConfig[] = [
     name: 'Career Pro Max',
     price: 1999,
     duration: 'One-time Purchase',
-    optimizations: 30,
-    durationInHours: 24 * 365 * 10 // 10 years for lifetime
+    optimizations: 50, // Updated
+    scoreChecks: 50,
+    linkedinMessages: Infinity, // Updated
+    guidedBuilds: 5,
+    durationInHours: 24 * 365 * 10
   },
   {
     id: 'career_boost_plus',
     name: 'Career Boost+',
     price: 1499,
     duration: 'One-time Purchase',
-    optimizations: 15,
-    durationInHours: 24 * 365 * 10 // 10 years for anytime use
+    optimizations: 30, // Updated
+    scoreChecks: 30,
+    linkedinMessages: Infinity, // Updated
+    guidedBuilds: 3,
+    durationInHours: 24 * 365 * 10
   },
   {
     id: 'pro_resume_kit',
     name: 'Pro Resume Kit',
     price: 999,
     duration: 'One-time Purchase',
-    optimizations: 10,
-    durationInHours: 24 * 365 * 10 // 10 years for anytime use
+    optimizations: 20, // Updated
+    scoreChecks: 20,
+    linkedinMessages: 100,
+    guidedBuilds: 2,
+    durationInHours: 24 * 365 * 10
   },
   {
     id: 'smart_apply_pack',
     name: 'Smart Apply Pack',
     price: 499,
     duration: 'One-time Purchase',
-    optimizations: 5,
-    durationInHours: 24 * 365 * 10 // 10 years for anytime use
+    optimizations: 10,
+    scoreChecks: 10,
+    linkedinMessages: 50,
+    guidedBuilds: 1,
+    durationInHours: 24 * 365 * 10
   },
   {
     id: 'resume_fix_pack',
     name: 'Resume Fix Pack',
     price: 199,
     duration: 'One-time Purchase',
-    optimizations: 2,
-    durationInHours: 24 * 365 * 10 // 10 years
+    optimizations: 5,
+    scoreChecks: 2,
+    linkedinMessages: 0,
+    guidedBuilds: 0,
+    durationInHours: 24 * 365 * 10
   },
   {
     id: 'lite_check',
     name: 'Lite Check',
     price: 99,
     duration: 'One-time Purchase',
-    optimizations: 1,
-    durationInHours: 24 * 365 * 10 // 10 years
-  },
-  {
-    id: 'free_trial',
-    name: 'Free Trial',
-    price: 0,
-    duration: 'One-time Use',
-    optimizations: 0,
-    durationInHours: 24 * 365 * 10 // 10 years
+    optimizations: 2, // Updated
+    scoreChecks: 2,
+    linkedinMessages: 10,
+    guidedBuilds: 0,
+    durationInHours: 24 * 365 * 10
   }
 ]
 
@@ -147,10 +161,6 @@ serve(async (req) => {
       throw new Error('Invalid plan')
     }
 
-    // Calculate subscription dates
-    const startDate = new Date()
-    const endDate = new Date(startDate.getTime() + (plan.durationInHours * 60 * 60 * 1000))
-
     // Create subscription
     const { data: subscription, error: subscriptionError } = await supabase
       .from('subscriptions')
@@ -158,16 +168,16 @@ serve(async (req) => {
         user_id: user.id,
         plan_id: planId,
         status: 'active',
-        start_date: startDate.toISOString(),
-        end_date: endDate.toISOString(),
+        start_date: new Date().toISOString(),
+        end_date: new Date(new Date().getTime() + (plan.durationInHours * 60 * 60 * 1000)).toISOString(),
         optimizations_used: 0,
         optimizations_total: plan.optimizations,
         score_checks_used: 0,
-        score_checks_total: 50, // Default value since scoreChecks is not in PlanConfig
+        score_checks_total: plan.scoreChecks, // Use plan.scoreChecks
         linkedin_messages_used: 0,
-        linkedin_messages_total: 999999, // Default value since linkedinMessages is not in PlanConfig
+        linkedin_messages_total: plan.linkedinMessages, // Use plan.linkedinMessages
         guided_builds_used: 0,
-        guided_builds_total: 5, // Default value since guidedBuilds is not in PlanConfig
+        guided_builds_total: plan.guidedBuilds, // Use plan.guidedBuilds
         payment_id: razorpay_payment_id,
         coupon_used: couponCode
       })
@@ -313,34 +323,3 @@ serve(async (req) => {
     )
   }
 })
-
-// Inside the if (walletDeduction > 0) block
-      // NEW LOG: Confirm walletDeduction value before insertion
-      console.log('Attempting to record wallet deduction:', {
-        userId: user.id,
-        walletDeduction: walletDeduction, // This is still in paise
-        negativeAmount: -(walletDeduction / 100) // Convert to rupees for better readability in log
-      });
-
-      const { error: walletError } = await supabase
-        .from('wallet_transactions')
-        .insert({
-          user_id: user.id,
-          type: 'purchase_use',
-          amount: -(walletDeduction / 100), // Convert paise to rupees (as your UI expects rupees for balance)
-          status: 'completed',
-          transaction_ref: razorpay_payment_id,
-          activity_details: {
-            subscription_id: subscription.id,
-            plan_id: planId,
-            original_amount: (orderData.amount / 100) + (walletDeduction / 100)
-          }
-        })
-        .throwOnError(); // <--- THIS LINE IS CRUCIAL
-
-      if (walletError) {
-        console.error('Wallet deduction recording error (after throwOnError):', walletError);
-        // The .throwOnError() should handle this, but keeping for explicit catch context
-      } else {
-        console.log('Wallet deduction successfully recorded.');
-      }
