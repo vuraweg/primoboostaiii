@@ -183,26 +183,29 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
   const grandTotal = finalPlanPrice + addOnsTotal;
 
   const handlePayment = async () => {
-    console.log('handlePayment: Function triggered.'); // NEW LOG
-    console.log('handlePayment: user:', user); // NEW LOG
-    console.log('handlePayment: selectedPlanData:', selectedPlanData); // NEW LOG
-    console.log('handlePayment: grandTotal:', grandTotal); // NEW LOG
+    console.log('handlePayment: Function triggered.');
+    console.log('handlePayment: user:', user);
+    console.log('handlePayment: selectedPlanData:', selectedPlanData);
+    console.log('handlePayment: grandTotal:', grandTotal);
     if (!user || !selectedPlanData) {
-      console.log('handlePayment: User or selectedPlanData is missing, returning early.'); // NEW LOG
+      console.log('handlePayment: User or selectedPlanData is missing, returning early.');
       return;
     }
     setIsProcessing(true);
     try {
-      // Get the current session to obtain the access token
+      // NEW LOG: Before getSession
+      console.log('handlePayment: Attempting to get Supabase session...');
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      // NEW LOG: After getSession
+      console.log('handlePayment: Supabase session result - session:', session, 'error:', sessionError);
       if (sessionError || !session) {
-        console.error('Failed to get session for payment:', sessionError);
+        // NEW LOG: If session is invalid
+        console.error('handlePayment: Failed to get session for payment, returning early.');
         setIsProcessing(false);
         // Optionally, show an error to the user or redirect to login
         return;
       }
-      const accessToken = session.access_token; // Retrieve the access token
-
+      const accessToken = session.access_token;
       if (grandTotal === 0) {
         const result = await paymentService.processFreeSubscription(
           selectedPlan,
@@ -221,11 +224,13 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
           amount: grandTotal,
           currency: 'INR',
         };
+        // NEW LOG: Before calling processPayment
+        console.log('handlePayment: Calling paymentService.processPayment...');
         const result = await paymentService.processPayment(
           paymentData,
           user.email,
           user.name,
-          accessToken, // Pass the accessToken here as the fourth argument
+          accessToken,
           appliedCoupon ? appliedCoupon.code : undefined,
           walletDeduction,
           addOnsTotal
