@@ -166,7 +166,9 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
     console.log('ResumeOptimizer: handleOptimize function called.'); // ADDED LOG
     // Session validation before any API call
     const sessionValid = await authService.ensureValidSession();
+    console.log('ResumeOptimizer: ensureValidSession returned:', sessionValid); // ADDED LOG
     if (!sessionValid) {
+      console.log('ResumeOptimizer: Session is not valid, showing auth modal.'); // ADDED LOG
       alert('Your session has expired. Please sign in again.');
       onShowAuth(); // Prompt user to sign in
       return; // Stop the optimization process
@@ -431,7 +433,7 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
       setBeforeScore(beforeScoreData);
 
       const finalScore = await getDetailedResumeScore(finalResumeData, jobDescription, setIsCalculatingScore);
-      setFinalResumeScore(finalScore); // Set the final detailed score
+      setFinalScore(finalScore); // Set the final detailed score
 
       const afterScoreData = generateAfterScore(reconstructResumeText(finalResumeData));
       setAfterScore(afterScoreData);
