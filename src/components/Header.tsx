@@ -155,17 +155,9 @@ export const Header: React.FC<HeaderProps> = ({
                           <User className="w-4 h-4" />
                           <span>Profile Settings</span>
                         </button>
+
+                        {/* Device Management Option */}
                         
-                        <button
-                          onClick={() => {
-                            setShowDeviceManagement(true);
-                            setShowUserMenu(false);
-                          }}
-                          className="w-full text-left px-4 py-3 text-sm text-secondary-700 hover:bg-secondary-50 transition-colors flex items-center space-x-3 min-h-touch"
-                        >
-                          <Shield className="w-4 h-4" />
-                          <span>Device Management</span>
-                        </button>
                       </> {/* End Fragment */}
 
                       <button
@@ -202,7 +194,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             {/* Mobile Menu Button */}
-            <div className="md:hidden">
+            <div className="lg:hidden">
               <button
                 onClick={onMobileMenuToggle}
                 className="min-w-touch min-h-touch p-2 text-secondary-600 hover:text-secondary-900 hover:bg-secondary-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500"
