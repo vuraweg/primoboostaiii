@@ -40,23 +40,19 @@ class AuthService {
     // Register device and create session for tracking
     try {
       console.log('AuthService: Attempting device registration and session creation...');
-      // Changed to non-awaited calls
-      deviceTrackingService.registerDevice(data.user.id).then(deviceId => {
-        if (deviceId && data.session) {
-          deviceTrackingService.createSession(data.user.id, deviceId, data.session.access_token);
-          deviceTrackingService.logActivity(data.user.id, 'login', {
-            loginMethod: 'email_password',
-            success: true
-          }, deviceId);
-          console.log('AuthService: Device and session tracking successful.');
-        } else {
-          console.warn('AuthService: Device ID or session not available for tracking.');
-        }
-      }).catch(deviceError => {
-        console.warn('AuthService: Device tracking failed during login:', deviceError);
-      });
+      const deviceId = await deviceTrackingService.registerDevice(data.user.id);
+      if (deviceId && data.session) {
+        await deviceTrackingService.createSession(data.user.id, deviceId, data.session.access_token);
+        await deviceTrackingService.logActivity(data.user.id, 'login', {
+          loginMethod: 'email_password',
+          success: true
+        }, deviceId);
+        console.log('AuthService: Device and session tracking successful.');
+      } else {
+        console.warn('AuthService: Device ID or session not available for tracking.');
+      }
     } catch (deviceError) {
-      console.warn('AuthService: Device tracking failed during login (outer catch):', deviceError);
+      console.warn('AuthService: Device tracking failed during login:', deviceError);
       // Don't fail login if device tracking fails
     }
 
@@ -111,35 +107,28 @@ class AuthService {
     // Register device for new user
     try {
       console.log('AuthService: Attempting device registration for new user...');
-      // Changed to non-awaited call
-      deviceTrackingService.registerDevice(data.user.id).then(deviceId => {
-        if (deviceId) {
-          deviceTrackingService.logActivity(data.user.id, 'signup', {
-            signupMethod: 'email_password',
-            success: true
-          }, deviceId);
-          console.log('AuthService: Device tracking for signup successful.');
-        } else {
-          console.warn('AuthService: Device ID not obtained for signup tracking.');
-        }
-      }).catch(deviceError => {
-        console.warn('AuthService: Device tracking failed during signup:', deviceError);
-      });
+      const deviceId = await deviceTrackingService.registerDevice(data.user.id);
+      if (deviceId) {
+        await deviceTrackingService.logActivity(data.user.id, 'signup', {
+          signupMethod: 'email_password',
+          success: true
+        }, deviceId);
+        console.log('AuthService: Device tracking for signup successful.');
+      } else {
+        console.warn('AuthService: Device ID not obtained for signup tracking.');
+      }
     } catch (deviceError) {
-      console.warn('AuthService: Device tracking failed during signup (outer catch):', deviceError);
+      console.warn('AuthService: Device tracking failed during signup:', deviceError);
       // Don't fail signup if device tracking fails
     }
 
     // Activate free trial for new users (Note: This might be removed based on plan changes)
     try {
       console.log('AuthService: Attempting to activate free trial...');
-      // Changed to non-awaited call
-      paymentService.activateFreeTrial(data.user.id).catch(trialError => {
-        console.error('AuthService: Failed to activate free trial for new user:', trialError);
-      });
+      await paymentService.activateFreeTrial(data.user.id);
       console.log('AuthService: Free trial activation attempted for new user:', data.user.id);
     } catch (trialError) {
-      console.error('AuthService: Failed to activate free trial for new user (outer catch):', trialError);
+      console.error('AuthService: Failed to activate free trial for new user:', trialError);
     }
 
     const signupResult = {
@@ -217,22 +206,18 @@ class AuthService {
       // Update device activity for current session
       try {
         console.log('AuthService: Attempting device activity update...');
-        // Changed to non-awaited calls
-        deviceTrackingService.registerDevice(session.user.id).then(deviceId => {
-          if (deviceId) {
-            deviceTrackingService.logActivity(session.user.id, 'session_activity', {
-              action: 'session_check',
-              timestamp: new Date().toISOString()
-            }, deviceId);
-            console.log('AuthService: Device activity updated.');
-          } else {
-            console.warn('AuthService: Device ID not obtained for activity update.');
-          }
-        }).catch(deviceError => {
-          console.warn('AuthService: Device activity update failed during session check:', deviceError);
-        });
+        const deviceId = await deviceTrackingService.registerDevice(session.user.id);
+        if (deviceId) {
+          await deviceTrackingService.logActivity(session.user.id, 'session_activity', {
+            action: 'session_check',
+            timestamp: new Date().toISOString()
+          }, deviceId);
+          console.log('AuthService: Device activity updated.');
+        } else {
+          console.warn('AuthService: Device ID not obtained for activity update.');
+        }
       } catch (deviceError) {
-        console.warn('AuthService: Device activity update failed during session check (outer catch):', deviceError);
+        console.warn('AuthService: Device activity update failed during session check:', deviceError);
       }
 
       // Fetch the full profile using the new public method
@@ -280,25 +265,22 @@ class AuthService {
     try {
       if (userId && accessToken) {
         console.log('AuthService: Previous session info captured, attempting to log logout activity.');
-        // Changed to non-awaited calls
-        deviceTrackingService.registerDevice(userId).then(deviceId => {
-          if (deviceId) {
-            deviceTrackingService.logActivity(userId, 'logout', {
-              logoutMethod: 'manual',
-              timestamp: new Date().toISOString()
-            }, deviceId);
-            deviceTrackingService.endSession(accessToken, 'logout');
-          } else {
-            console.warn('AuthService: Device ID not obtained, skipping device tracking session end.');
-          }
-        }).catch(deviceError => {
-          console.warn('AuthService: Failed to log logout activity or end session via device tracking:', deviceError);
-        });
+        const deviceId = await deviceTrackingService.registerDevice(userId); // Use captured userId
+        if (deviceId) {
+          await deviceTrackingService.logActivity(userId, 'logout', { // Use captured userId
+            logoutMethod: 'manual',
+            timestamp: new Date().toISOString()
+          }, deviceId);
+          console.log('AuthService: Logout activity logged. Ending session via device tracking service.');
+          await deviceTrackingService.endSession(accessToken, 'logout'); // Use captured accessToken
+        } else {
+          console.warn('AuthService: Device ID not obtained, skipping device tracking session end.');
+        }
       } else {
         console.log('AuthService: No active session info to log for device tracking after sign out.');
       }
     } catch (deviceError) {
-      console.warn('AuthService: Failed to log logout activity or end session via device tracking (outer catch):', deviceError);
+      console.warn('AuthService: Failed to log logout activity or end session via device tracking:', deviceError);
     }
     console.log('AuthService: Logout process finished.');
   }
@@ -381,67 +363,39 @@ class AuthService {
   async ensureValidSession(): Promise<boolean> {
     console.log('AuthService: Starting ensureValidSession...');
     try {
-      console.log('AuthService: Attempting to get session...');
-      const { data: { session }, error } = await Promise.race([
-        supabase.auth.getSession(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Supabase getSession timed out after 10 seconds')), 10000))
-      ]);
-      console.log('AuthService: getSession call completed. Session object:', session, 'Error object:', error);
+      const { data: { session }, error } = await supabase.auth.getSession();
+      console.log('AuthService: getSession result - session:', session ? 'exists' : 'null', 'error:', error); // ADDED LOG
 
       if (error) {
         console.error('AuthService: Session check failed in ensureValidSession:', error);
-        console.log('AuthService: Returning false due to getSession error.');
+        console.log('AuthService: Returning false due to getSession error.'); // NEW LOG
         return false;
       }
 
       if (!session) {
         console.log('AuthService: No active session found in ensureValidSession.');
-        console.log('AuthService: Returning false because no session was found.');
+        console.log('AuthService: Returning false because no session was found.'); // NEW LOG
         return false;
       }
       console.log('AuthService: Session found in ensureValidSession. User ID:', session.user.id);
 
       const now = Math.floor(Date.now() / 1000);
       if (session.expires_at && session.expires_at < now + 300) {
-        console.log('AuthService: Session expiring soon in ensureValidSession, attempting refresh...');
-        const { data: refreshData, error: refreshError } = await Promise.race([
-          supabase.auth.refreshSession(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Supabase refreshSession timed out after 10 seconds')), 10000))
-        ]);
-        console.log('AuthService: refreshSession call completed. Session object:', refreshData.session, 'Error object:', refreshError);
+        console.log('AuthService: Session expiring soon in ensureValidSession, refreshing...');
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        console.log('AuthService: refreshSession result - session:', refreshData.session ? 'exists' : 'null', 'error:', refreshError); // ADDED LOG
         if (refreshError || !refreshData.session) {
           console.error('AuthService: Session refresh failed in ensureValidSession:', refreshError);
-          console.log('AuthService: Returning false due to refreshSession error or no refreshed session.');
+          console.log('AuthService: Returning false due to refreshSession error or no refreshed session.'); // NEW LOG
           return false;
         }
         console.log('AuthService: ✅ Session refreshed successfully in ensureValidSession.');
       }
-
-      // Update device activity for current session (now non-blocking)
-      try {
-        console.log('AuthService: Attempting non-blocking device activity update...');
-        // Changed to non-awaited calls
-        deviceTrackingService.registerDevice(session.user.id).then(deviceId => {
-          if (deviceId) {
-            deviceTrackingService.logActivity(session.user.id, 'session_activity', {
-              action: 'session_check',
-              timestamp: new Date().toISOString()
-            }, deviceId);
-            console.log('AuthService: Device activity updated.');
-          } else {
-            console.warn('AuthService: Device ID not obtained for activity update.');
-          }
-        }).catch(deviceError => {
-          console.warn('AuthService: Device activity update failed during session check:', deviceError);
-        });
-      } catch (deviceError) {
-        console.warn('AuthService: Device activity update failed during session check (outer catch):', deviceError);
-      }
       console.log('AuthService: ensureValidSession completed. Session is valid.');
       return true;
     } catch (error) {
-      console.error('AuthService: Error in ensureValidSession (caught by timeout or other issue):', error.message);
-      console.log('AuthService: Returning false due to unexpected error in ensureValidSession.');
+      console.error('AuthService: Error in ensureValidSession:', error);
+      console.log('AuthService: Returning false due to unexpected error in ensureValidSession.'); // NEW LOG
       return false;
     }
   }
@@ -483,3 +437,4 @@ class AuthService {
 }
 
 export const authService = new AuthService();
+
