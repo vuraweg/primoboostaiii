@@ -82,13 +82,20 @@ export const HomePage: React.FC<HomePageProps> = ({
     console.log('User isAuthenticated:', isAuthenticated);
     console.log('User Subscription:', userSubscription);
 
-    // If the feature requires authentication, prompt to sign in first
-    if (feature.requiresAuth && !isAuthenticated) {
-      onShowAuth();
-      return;
+    // If the feature requires an active plan (or credits) and the user doesn't have it
+    if (!isFeatureAvailable(feature.id)) {
+      // If not authenticated, prompt to sign in first
+      if (!isAuthenticated) {
+        onShowAuth();
+        return;
+      } else {
+        // If authenticated but no credits/plan, show subscription plans
+        onShowSubscriptionPlans(); // Show subscription plans for upgrade
+        return; // Stop further execution
+      }
     }
-    
-    // Navigate to the selected feature page without checking subscription status
+
+    console.log('User is authenticated or feature does not require auth. Navigating to page.');
     onPageChange(feature.id);
   };
 
@@ -114,7 +121,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       icon: <PlusCircle className="w-6 h-6" />,
       requiresAuth: true
     },
-    
+    
     {
       id: 'linkedin-generator',
       title: 'LinkedIn Message Generator',
@@ -195,7 +202,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       {/* Main Features Section - Now with a consolidated frame */}
       <div className="container-responsive py-12 sm:py-16 bg-primary-50">
         <div className="mb-12">
-          <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4  text-center">
+          <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4  text-center">
             Choose Your Resume Journey
           </h3>
         </div>
@@ -290,8 +297,8 @@ export const HomePage: React.FC<HomePageProps> = ({
                 )}
               </div>
             </div>
-            
-            
+            
+            
             <div className="text-center mt-12">
               <button
                 onClick={onShowSubscriptionPlans}
@@ -305,7 +312,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       )}
 
       {/* Additional Features Teaser */}
-      <div className="bg-gradient-to-r from-gray-900 to-blue-900 text-white py-16 px-4 sm:px-0">
+      <div className="bg-gradient-to-r from-gray-900 to-blue-900 text-white py-16">
         <div className="container-responsive text-left">
           <div className="max-w-3xl mx-auto">
             <h3 className="text-2xl sm:text-3xl font-bold mb-4">
@@ -314,30 +321,30 @@ export const HomePage: React.FC<HomePageProps> = ({
             <p className="text-lg text-blue-100 mb-8">
               Our intelligent system understands ATS requirements, job market trends, and recruiter preferences to give you the competitive edge.
             </p>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 mt-12">
+            
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-12">
               <div className="text-center">
-                <div className="bg-blue-500/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <div className="bg-blue-500/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Zap className="w-8 h-8 text-yellow-400" />
                 </div>
-                <h4 className="font-semibold mb-3 text-lg">AI-Powered Analysis</h4>
-                <p className="text-blue-200 leading-relaxed">Advanced algorithms analyze and optimize your resume</p>
+                <h4 className="font-semibold mb-2">AI-Powered Analysis</h4>
+                <p className="text-sm text-blue-200">Advanced algorithms analyze and optimize your resume</p>
               </div>
-              
+              
               <div className="text-center">
-                <div className="bg-blue-500/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <div className="bg-blue-500/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Award className="w-8 h-8 text-green-400" />
                 </div>
-                <h4 className="font-semibold mb-3 text-lg">ATS Optimization</h4>
-                <p className="text-blue-200 leading-relaxed">Ensure your resume passes all screening systems</p>
+                <h4 className="font-semibold mb-2">ATS Optimization</h4>
+                <p className="text-sm text-blue-200">Ensure your resume passes all screening systems</p>
               </div>
-              
+              
               <div className="text-center">
-                <div className="bg-blue-500/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <div className="bg-blue-500/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Users className="w-8 h-8 text-purple-400" />
                 </div>
-                <h4 className="font-semibold mb-3 text-lg">Expert Approved</h4>
-                <p className="text-blue-200 leading-relaxed">Formats trusted by recruiters worldwide</p>
+                <h4 className="font-semibold mb-2">Expert Approved</h4>
+                <p className="text-sm text-blue-200">Formats trusted by recruiters worldwide</p>
               </div>
             </div>
           </div>
@@ -345,7 +352,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       </div>
 
       {/* CTA Section */}
-      
+      
     </div>
   );
 };
