@@ -144,6 +144,11 @@ class AuthService {
         const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
         if (refreshError || !refreshData.session) {
           console.error('Session refresh failed:', refreshError);
+          // Explicitly sign out if refresh token is invalid to force a clean state
+          if (refreshError?.message === "Invalid Refresh Token: Refresh Token Not Found") {
+            console.warn('Invalid refresh token detected. Forcing logout.');
+            await supabase.auth.signOut();
+          }
           return null;
         }
         console.log('✅ Session refreshed successfully');
@@ -204,38 +209,39 @@ class AuthService {
   }
 
   async logout(): Promise<void> {
-    console.log('authService: Logout initiated.'); // Log 1: Start of logout process
+    console.log('authService: Calling supabase.auth.signOut().'); // Log 1: Before Supabase signOut
+    const { error } = await supabase.auth.signOut(); // This is the core logout
+    
+    if (error) {
+      console.error('authService: supabase.auth.signOut() failed:', error); // Log 2: Supabase signOut failed
+      throw new Error('Failed to sign out. Please try again.');
+    }
+
+    console.log('authService: supabase.auth.signOut() completed successfully.'); // Log 3: Supabase signOut successful
+    console.log('authService: Logout initiated for device tracking.'); // Log 4: Start of device tracking logout process
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        console.log('authService: Session found, attempting device tracking and session end.'); // Log 2: Session found
+        console.log('authService: Session found, attempting device tracking and session end.'); // Log 5: Session found
         const deviceId = await deviceTrackingService.registerDevice(session.user.id);
         if (deviceId) {
-          console.log('authService: Device registered, logging activity.'); // Log 3: Device registered
+          console.log('authService: Device registered, logging activity.'); // Log 6: Device registered
           await deviceTrackingService.logActivity(session.user.id, 'logout', {
             logoutMethod: 'manual',
             timestamp: new Date().toISOString()
           }, deviceId);
-          console.log('authService: Logout activity logged, ending session.'); // Log 4: Activity logged
+          console.log('authService: Logout activity logged, ending session.'); // Log 7: Activity logged
           await deviceTrackingService.endSession(session.access_token, 'logout');
-          console.log('authService: Session ended via device tracking service.'); // Log 5: Session ended
+          console.log('authService: Session ended via device tracking service.'); // Log 8: Session ended
         } else {
-          console.warn('authService: Device ID not obtained, skipping device tracking session end.'); // Log 6: Device ID not found
+          console.warn('authService: Device ID not obtained, skipping device tracking session end.'); // Log 9: Device ID not found
         }
       } else {
-        console.log('authService: No active session found for device tracking, proceeding with signOut.'); // Log 7: No session for tracking
+        console.log('authService: No active session found for device tracking, proceeding with signOut.'); // Log 10: No session for tracking
       }
-    } catch (error) {
-      console.warn('authService: Failed to log logout activity or end session via device tracking:', error); // Log 8: Error in device tracking
-      // This catch block does NOT re-throw the error, so the main signOut will still proceed.
+    } catch (deviceError) {
+      console.warn('authService: Failed to log logout activity or end session via device tracking:', deviceError); // Log 11: Error in device tracking
     }
-    console.log('authService: Calling supabase.auth.signOut().'); // Log 9: Before Supabase signOut
-    const { error } = await supabase.auth.signOut(); // This is the core logout
-    if (error) {
-      console.error('authService: supabase.auth.signOut() failed:', error); // Log 10: Supabase signOut failed
-      throw new Error('Failed to sign out. Please try again.');
-    }
-    console.log('authService: supabase.auth.signOut() completed successfully.'); // Log 11: Supabase signOut successful
     console.log('authService: Logout process finished.'); // Log 12: End of logout process
   }
 
