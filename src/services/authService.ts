@@ -2,6 +2,7 @@
 import { User, LoginCredentials, SignupCredentials, ForgotPasswordData } from '../types/auth';
 import { supabase } from '../lib/supabaseClient';
 import { deviceTrackingService } from './deviceTrackingService';
+import { paymentService } from './paymentService'; // 👈 Import the payment service
 
 class AuthService {
   private isValidGmail(email: string): boolean {
@@ -37,7 +38,6 @@ class AuthService {
     }
     console.log('AuthService: User signed in with Supabase. User ID:', data.user.id);
 
-    // Register device and create session for tracking
     try {
       console.log('AuthService: Attempting device registration and session creation...');
       const deviceId = await deviceTrackingService.registerDevice(data.user.id);
@@ -53,15 +53,11 @@ class AuthService {
       }
     } catch (deviceError) {
       console.warn('AuthService: Device tracking failed during login:', deviceError);
-      // Don't fail login if device tracking fails
     }
 
-    // After login, we don't need to fetch the profile here.
-    // The AuthContext will handle fetching the full profile after the SIGNED_IN_ event.
-    // We return a minimal User object based on the Supabase auth user.
     const userResult: User = {
       id: data.user.id,
-      name: data.user.email?.split('@')[0] || 'User', // Placeholder name
+      name: data.user.email?.split('@')[0] || 'User',
       email: data.user.email!,
       isVerified: data.user.email_confirmed_at !== null,
       createdAt: data.user.created_at || new Date().toISOString(),
@@ -104,7 +100,6 @@ class AuthService {
     }
     console.log('AuthService: User signed up with Supabase. User ID:', data.user.id);
 
-    // Register device for new user
     try {
       console.log('AuthService: Attempting device registration for new user...');
       const deviceId = await deviceTrackingService.registerDevice(data.user.id);
@@ -119,10 +114,8 @@ class AuthService {
       }
     } catch (deviceError) {
       console.warn('AuthService: Device tracking failed during signup:', deviceError);
-      // Don't fail signup if device tracking fails
     }
 
-    // Activate free trial for new users (Note: This might be removed based on plan changes)
     try {
       console.log('AuthService: Attempting to activate free trial...');
       await paymentService.activateFreeTrial(data.user.id);
@@ -139,7 +132,21 @@ class AuthService {
     return signupResult;
   }
 
-  // New public method to fetch user profile
+  // New method to handle paid subscriptions
+  async subscribeToPaidPlan(userId: string, planId: string): Promise<string> {
+    console.log(`AuthService: Initiating paid subscription for user ${userId} with plan ${planId}.`);
+    try {
+      const checkoutUrl = await paymentService.createCheckoutSession(userId, planId);
+      console.log('AuthService: Checkout session created successfully.');
+      return checkoutUrl;
+    } catch (paymentError) {
+      console.error('AuthService: Failed to create paid subscription checkout session:', paymentError);
+      throw new Error('Failed to start the paid subscription process. Please try again.');
+    }
+  }
+
+  // The rest of the methods remain the same...
+
   public async fetchUserProfile(userId: string): Promise<{
     full_name: string,
     email_address: string,
@@ -170,7 +177,6 @@ class AuthService {
     }
   }
 
-  // Streamlined getCurrentUser to primarily handle session validity and return full user object
   async getCurrentUser(): Promise<User | null> {
     console.log('AuthService: Starting getCurrentUser (streamlined)...');
     try {
@@ -188,7 +194,7 @@ class AuthService {
       console.log('AuthService: Session found. User ID:', session.user.id);
 
       const now = Math.floor(Date.now() / 1000);
-      if (session.expires_at && session.expires_at < now + 300) { // Refresh if expires in 5 minutes
+      if (session.expires_at && session.expires_at < now + 300) {
         console.log('AuthService: Session expiring soon, refreshing...');
         const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
         if (refreshError || !refreshData.session) {
@@ -200,10 +206,9 @@ class AuthService {
           return null;
         }
         console.log('AuthService: ✅ Session refreshed successfully in getCurrentUser.');
-        session.user = refreshData.session.user; // Update user object from refreshed session
+        session.user = refreshData.session.user;
       }
 
-      // Update device activity for current session
       try {
         console.log('AuthService: Attempting device activity update...');
         const deviceId = await deviceTrackingService.registerDevice(session.user.id);
@@ -220,7 +225,6 @@ class AuthService {
         console.warn('AuthService: Device activity update failed during session check:', deviceError);
       }
 
-      // Fetch the full profile using the new public method
       const profile = await this.fetchUserProfile(session.user.id);
       console.log('AuthService: User profile fetched for getCurrentUser. Profile:', profile ? profile.full_name : 'none');
 
@@ -248,7 +252,6 @@ class AuthService {
 
   async logout(): Promise<void> {
     console.log('AuthService: Starting logout process...');
-    // Capture session info BEFORE signing out
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
     const accessToken = session?.access_token;
@@ -265,14 +268,14 @@ class AuthService {
     try {
       if (userId && accessToken) {
         console.log('AuthService: Previous session info captured, attempting to log logout activity.');
-        const deviceId = await deviceTrackingService.registerDevice(userId); // Use captured userId
+        const deviceId = await deviceTrackingService.registerDevice(userId);
         if (deviceId) {
-          await deviceTrackingService.logActivity(userId, 'logout', { // Use captured userId
+          await deviceTrackingService.logActivity(userId, 'logout', {
             logoutMethod: 'manual',
             timestamp: new Date().toISOString()
           }, deviceId);
           console.log('AuthService: Logout activity logged. Ending session via device tracking service.');
-          await deviceTrackingService.endSession(accessToken, 'logout'); // Use captured accessToken
+          await deviceTrackingService.endSession(accessToken, 'logout');
         } else {
           console.warn('AuthService: Device ID not obtained, skipping device tracking session end.');
         }
@@ -364,17 +367,17 @@ class AuthService {
     console.log('AuthService: Starting ensureValidSession...');
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
-      console.log('AuthService: getSession result - session:', session ? 'exists' : 'null', 'error:', error); // ADDED LOG
+      console.log('AuthService: getSession result - session:', session ? 'exists' : 'null', 'error:', error);
 
       if (error) {
         console.error('AuthService: Session check failed in ensureValidSession:', error);
-        console.log('AuthService: Returning false due to getSession error.'); // NEW LOG
+        console.log('AuthService: Returning false due to getSession error.');
         return false;
       }
 
       if (!session) {
         console.log('AuthService: No active session found in ensureValidSession.');
-        console.log('AuthService: Returning false because no session was found.'); // NEW LOG
+        console.log('AuthService: Returning false because no session was found.');
         return false;
       }
       console.log('AuthService: Session found in ensureValidSession. User ID:', session.user.id);
@@ -383,10 +386,10 @@ class AuthService {
       if (session.expires_at && session.expires_at < now + 300) {
         console.log('AuthService: Session expiring soon in ensureValidSession, refreshing...');
         const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-        console.log('AuthService: refreshSession result - session:', refreshData.session ? 'exists' : 'null', 'error:', refreshError); // ADDED LOG
+        console.log('AuthService: refreshSession result - session:', refreshData.session ? 'exists' : 'null', 'error:', refreshError);
         if (refreshError || !refreshData.session) {
           console.error('AuthService: Session refresh failed in ensureValidSession:', refreshError);
-          console.log('AuthService: Returning false due to refreshSession error or no refreshed session.'); // NEW LOG
+          console.log('AuthService: Returning false due to refreshSession error or no refreshed session.');
           return false;
         }
         console.log('AuthService: ✅ Session refreshed successfully in ensureValidSession.');
@@ -395,7 +398,7 @@ class AuthService {
       return true;
     } catch (error) {
       console.error('AuthService: Error in ensureValidSession:', error);
-      console.log('AuthService: Returning false due to unexpected error in ensureValidSession.'); // NEW LOG
+      console.log('AuthService: Returning false due to unexpected error in ensureValidSession.');
       return false;
     }
   }
@@ -437,4 +440,3 @@ class AuthService {
 }
 
 export const authService = new AuthService();
-
