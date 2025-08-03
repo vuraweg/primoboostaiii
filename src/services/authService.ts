@@ -1,3 +1,4 @@
+// src/services/authService.ts
 import { User, LoginCredentials, SignupCredentials, ForgotPasswordData } from '../types/auth';
 import { supabase } from '../lib/supabaseClient';
 import { deviceTrackingService } from './deviceTrackingService';
@@ -19,6 +20,7 @@ class AuthService {
   }
 
   async login(credentials: LoginCredentials): Promise<User> {
+    console.log('AuthService: Starting login for email:', credentials.email);
     if (!this.isValidGmail(credentials.email)) throw new Error('Please enter a valid Gmail address (@gmail.com)');
 
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -26,11 +28,19 @@ class AuthService {
       password: credentials.password
     });
 
-    if (error) throw new Error(error.message);
-    if (!data.user) throw new Error('Login failed. Please try again.');
+    if (error) {
+      console.error('AuthService: Supabase signInWithPassword error:', error);
+      throw new Error(error.message);
+    }
+    if (!data.user) {
+      console.error('AuthService: signInWithPassword returned no user data.');
+      throw new Error('Login failed. Please try again.');
+    }
+    console.log('AuthService: User signed in with Supabase. User ID:', data.user.id);
 
     // Register device and create session for tracking
     try {
+      console.log('AuthService: Attempting device registration and session creation...');
       const deviceId = await deviceTrackingService.registerDevice(data.user.id);
       if (deviceId && data.session) {
         await deviceTrackingService.createSession(data.user.id, deviceId, data.session.access_token);
@@ -38,29 +48,37 @@ class AuthService {
           loginMethod: 'email_password',
           success: true
         }, deviceId);
+        console.log('AuthService: Device and session tracking successful.');
+      } else {
+        console.warn('AuthService: Device ID or session not available for tracking.');
       }
     } catch (deviceError) {
-      console.warn('Device tracking failed during login:', deviceError);
+      console.warn('AuthService: Device tracking failed during login:', deviceError);
       // Don't fail login if device tracking fails
     }
 
+    console.log('AuthService: Fetching user profile after login...');
     const profile = await this.getUserProfile(data.user.id).catch(() => null);
-    return {
+    console.log('AuthService: User profile fetched. Profile:', profile ? profile.full_name : 'none');
+
+    const userResult: User = {
       id: data.user.id,
       name: profile?.full_name || data.user.email?.split('@')[0] || 'User',
       email: profile?.email_address || data.user.email!, // Prioritize profile email
       phone: profile?.phone || undefined, // Include phone from profile
       linkedin: profile?.linkedin_profile || undefined, // Include linkedin from profile
       github: profile?.wellfound_profile || undefined, // Mapped to wellfound_profile from DB
-      // Removed location: profile?.location || undefined, // Removed new location field
       isVerified: data.user.email_confirmed_at !== null,
       createdAt: data.user.created_at || new Date().toISOString(),
       lastLogin: new Date().toISOString(),
       hasSeenProfilePrompt: profile?.has_seen_profile_prompt || false, // Include this for consistency
     };
+    console.log('AuthService: Login process completed. Returning user data.');
+    return userResult;
   }
 
   async signup(credentials: SignupCredentials): Promise<{ needsVerification: boolean; email: string }> {
+    console.log('AuthService: Starting signup for email:', credentials.email);
     if (!credentials.name.trim()) throw new Error('Full name is required');
     if (credentials.name.trim().length < 2) throw new Error('Name must be at least 2 characters long');
     if (!/^[a-zA-Z\s]+$/.test(credentials.name.trim())) throw new Error('Name can only contain letters and spaces');
@@ -82,80 +100,102 @@ class AuthService {
       }
     });
 
-    if (error) throw new Error(error.message);
-    if (!data.user) throw new Error('Failed to create account. Please try again.');
+    if (error) {
+      console.error('AuthService: Supabase signUp error:', error);
+      throw new Error(error.message);
+    }
+    if (!data.user) {
+      console.error('AuthService: signUp returned no user data.');
+      throw new Error('Failed to create account. Please try again.');
+    }
+    console.log('AuthService: User signed up with Supabase. User ID:', data.user.id);
 
     // Register device for new user
     try {
+      console.log('AuthService: Attempting device registration for new user...');
       const deviceId = await deviceTrackingService.registerDevice(data.user.id);
       if (deviceId) {
         await deviceTrackingService.logActivity(data.user.id, 'signup', {
           signupMethod: 'email_password',
           success: true
         }, deviceId);
+        console.log('AuthService: Device tracking for signup successful.');
+      } else {
+        console.warn('AuthService: Device ID not obtained for signup tracking.');
       }
     } catch (deviceError) {
-      console.warn('Device tracking failed during signup:', deviceError);
+      console.warn('AuthService: Device tracking failed during signup:', deviceError);
       // Don't fail signup if device tracking fails
     }
 
-    // Activate free trial for new users
+    // Activate free trial for new users (Note: This might be removed based on plan changes)
     try {
+      console.log('AuthService: Attempting to activate free trial...');
       await paymentService.activateFreeTrial(data.user.id);
-      console.log('Free trial activated for new user:', data.user.id);
+      console.log('AuthService: Free trial activation attempted for new user:', data.user.id);
     } catch (trialError) {
-      console.error('Failed to activate free trial for new user:', trialError);
+      console.error('AuthService: Failed to activate free trial for new user:', trialError);
     }
 
-    return {
+    const signupResult = {
       needsVerification: !data.session,
       email: credentials.email
     };
+    console.log('AuthService: Signup process completed. Needs verification:', signupResult.needsVerification);
+    return signupResult;
   }
 
   async getCurrentUser(): Promise<User | null> {
+    console.log('AuthService: Starting getCurrentUser...');
     try {
       // Get current session with timeout
       const sessionPromise = supabase.auth.getSession();
       const timeoutPromise = new Promise<null>((_, reject) =>
-        setTimeout(() => reject(new Error('Session timeout')), 500000)
+        setTimeout(() => reject(new Error('Session timeout in getCurrentUser')), 500000) // 500 seconds
       );
 
       let sessionData;
       try {
         sessionData = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        console.log('AuthService: getSession or timeout completed.');
       } catch (timeoutError) {
-        console.warn('Session check timed out, user might be offline');
+        console.warn('AuthService: Session check timed out in getCurrentUser:', timeoutError);
         return null;
       }
 
       const { data: { session }, error } = sessionData;
       if (error) {
-        console.error('Session error:', error);
+        console.error('AuthService: getSession error in getCurrentUser:', error);
         return null;
       }
 
-      if (!session?.user) return null;
+      if (!session?.user) {
+        console.log('AuthService: No user in session in getCurrentUser.');
+        return null;
+      }
+      console.log('AuthService: Session found. User ID:', session.user.id);
 
       // Validate session is not expired
       const now = Math.floor(Date.now() / 1000);
       if (session.expires_at && session.expires_at < now + 300) { // Refresh if expires in 5 minutes
-        console.log('Session expiring soon, refreshing...');
+        console.log('AuthService: Session expiring soon, refreshing...');
         const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
         if (refreshError || !refreshData.session) {
-          console.error('Session refresh failed:', refreshError);
+          console.error('AuthService: Session refresh failed:', refreshError);
           // Explicitly sign out if refresh token is invalid to force a clean state
           if (refreshError?.message === "Invalid Refresh Token: Refresh Token Not Found") {
-            console.warn('Invalid refresh token detected. Forcing logout.');
+            console.warn('AuthService: Invalid refresh token detected. Forcing logout.');
             await supabase.auth.signOut();
           }
           return null;
         }
-        console.log('✅ Session refreshed successfully');
+        console.log('AuthService: ✅ Session refreshed successfully in getCurrentUser.');
         // Use refreshed session
         const refreshedSession = refreshData.session;
+        console.log('AuthService: Fetching user profile after refresh...');
         const profile = await this.getUserProfile(refreshedSession.user.id).catch(() => null);
-        return {
+        console.log('AuthService: User profile fetched after refresh. Profile:', profile ? profile.full_name : 'none');
+        const userResult: User = {
           id: refreshedSession.user.id,
           name: profile?.full_name || refreshedSession.user.email?.split('@')[0] || 'User',
           email: profile?.email_address || refreshedSession.user.email!, // Prioritize profile email
@@ -164,30 +204,37 @@ class AuthService {
           github: profile?.wellfound_profile || undefined, // Mapped to wellfound_profile from DB
           username: profile?.username || undefined, // Include username from profile
           referralCode: profile?.referral_code || undefined, // Include referral code from profile
-          // Removed location: profile?.location || undefined, // Removed location
           isVerified: refreshedSession.user.email_confirmed_at !== null,
           createdAt: refreshedSession.user.created_at || new Date().toISOString(),
           lastLogin: new Date().toISOString(),
           hasSeenProfilePrompt: profile?.has_seen_profile_prompt || false,
         };
+        console.log('AuthService: getCurrentUser completed after refresh. Returning user data.');
+        return userResult;
       }
 
       // Update device activity for current session
       try {
+        console.log('AuthService: Attempting device activity update...');
         const deviceId = await deviceTrackingService.registerDevice(session.user.id);
         if (deviceId) {
           await deviceTrackingService.logActivity(session.user.id, 'session_activity', {
             action: 'session_check',
             timestamp: new Date().toISOString()
           }, deviceId);
+          console.log('AuthService: Device activity updated.');
+        } else {
+          console.warn('AuthService: Device ID not obtained for activity update.');
         }
       } catch (deviceError) {
-        console.warn('Device activity update failed during session check:', deviceError);
+        console.warn('AuthService: Device activity update failed during session check:', deviceError);
         // Don't fail session check if device tracking fails
       }
 
+      console.log('AuthService: Fetching user profile for current session...');
       const profile = await this.getUserProfile(session.user.id).catch(() => null);
-      return {
+      console.log('AuthService: User profile fetched. Profile:', profile ? profile.full_name : 'none');
+      const userResult: User = {
         id: session.user.id,
         name: profile?.full_name || session.user.email?.split('@')[0] || 'User',
         email: profile?.email_address || session.user.email!, // Prioritize profile email
@@ -196,107 +243,119 @@ class AuthService {
         github: profile?.wellfound_profile || undefined, // Mapped to wellfound_profile from DB
         referralCode: profile?.referral_code || undefined, // Include referral code from profile
         username: profile?.username || undefined, // Include username from profile
-        // Removed location: profile?.location || undefined, // Removed location
         isVerified: session.user.email_confirmed_at !== null,
         createdAt: session.user.created_at || new Date().toISOString(),
         lastLogin: new Date().toISOString(),
         hasSeenProfilePrompt: profile?.has_seen_profile_prompt || false,
       };
+      console.log('AuthService: getCurrentUser completed. Returning user data.');
+      return userResult;
     } catch (error) {
-      console.error('Error getting current user:', error);
+      console.error('AuthService: Error in getCurrentUser:', error);
       return null;
     }
   }
 
   async logout(): Promise<void> {
-    console.log('authService: Calling supabase.auth.signOut() first for immediate UI feedback.');
+    console.log('AuthService: Starting logout process...');
+    console.log('AuthService: Calling supabase.auth.signOut() first for immediate UI feedback.');
     const { error } = await supabase.auth.signOut();
     
     if (error) {
-      console.error('authService: supabase.auth.signOut() failed:', error);
+      console.error('AuthService: supabase.auth.signOut() failed:', error);
       throw new Error('Failed to sign out. Please try again.');
     }
 
-    console.log('authService: supabase.auth.signOut() completed. Now handling device tracking.');
+    console.log('AuthService: supabase.auth.signOut() completed. Now handling device tracking.');
     try {
       // Since supabase.auth.signOut() already cleared the session, we'll try to get the old session info
       // from the client if it's still available to log the activity.
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        console.log('authService: Previous session found, attempting to log logout activity.');
+        console.log('AuthService: Previous session found, attempting to log logout activity.');
         const deviceId = await deviceTrackingService.registerDevice(session.user.id);
         if (deviceId) {
           await deviceTrackingService.logActivity(session.user.id, 'logout', {
             logoutMethod: 'manual',
             timestamp: new Date().toISOString()
           }, deviceId);
-          console.log('authService: Logout activity logged. Ending session via device tracking service.');
+          console.log('AuthService: Logout activity logged. Ending session via device tracking service.');
           await deviceTrackingService.endSession(session.access_token, 'logout');
         } else {
-          console.warn('authService: Device ID not obtained, skipping device tracking session end.');
+          console.warn('AuthService: Device ID not obtained, skipping device tracking session end.');
         }
       } else {
-        console.log('authService: No active session found to log for device tracking after sign out.');
+        console.log('AuthService: No active session found to log for device tracking after sign out.');
       }
     } catch (deviceError) {
-      console.warn('authService: Failed to log logout activity or end session via device tracking:', deviceError);
+      console.warn('AuthService: Failed to log logout activity or end session via device tracking:', deviceError);
     }
-    console.log('authService: Logout process finished.');
+    console.log('AuthService: Logout process finished.');
   }
 
   async forgotPassword(data: ForgotPasswordData): Promise<void> {
+    console.log('AuthService: Starting forgotPassword for email:', data.email);
     if (!this.isValidGmail(data.email)) throw new Error('Please enter a valid Gmail address (@gmail.com)');
     const { error } = await supabase.auth.resetPasswordForEmail(data.email, { redirectTo: `${window.location.origin}/reset-password` });
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.error('AuthService: resetPasswordForEmail error:', error);
+      throw new Error(error.message);
+    }
+    console.log('AuthService: Forgot password email sent.');
   }
 
   async resetPassword(newPassword: string): Promise<void> {
+    console.log('AuthService: Starting resetPassword.');
     const passwordValidation = this.validatePasswordStrength(newPassword);
     if (!passwordValidation.isValid) throw new Error(passwordValidation.message!);
     const { error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.error('AuthService: updateUser password error:', error);
+      throw new Error(error.message);
+    }
+    console.log('AuthService: Password reset successfully.');
   }
 
-  // Updated to select 'wellfound_profile'
   private async getUserProfile(userId: string): Promise<{
     full_name: string,
     email_address: string,
     phone?: string,
     linkedin_profile?: string,
-    wellfound_profile?: string, // Changed back to wellfound_profile
+    wellfound_profile?: string,
     username?: string,
     referral_code?: string,
     has_seen_profile_prompt?: boolean
   } | null> {
+    console.log('AuthService: Fetching user profile for user ID:', userId);
     try {
       const { data, error }
         = await supabase
         .from('user_profiles')
-        .select('full_name, email_address, phone, linkedin_profile, wellfound_profile, username, referral_code, has_seen_profile_prompt') // <-- Updated select fields
+        .select('full_name, email_address, phone, linkedin_profile, wellfound_profile, username, referral_code, has_seen_profile_prompt')
         .eq('id', userId)
         .maybeSingle();
       if (error) {
-        console.error('Error fetching user profile:', error);
+        console.error('AuthService: Error fetching user profile from DB:', error);
         return null;
       }
+      console.log('AuthService: User profile fetched from DB:', data ? data.full_name : 'none');
       return data;
     } catch (error) {
-      console.error('Error in getUserProfile:', error);
+      console.error('AuthService: Error in getUserProfile catch block:', error);
       return null;
     }
   }
 
-  // Update user profile - updated to accept wellfound_profile
   async updateUserProfile(userId: string, updates: {
     full_name?: string;
     email_address?: string;
     phone?: string;
     linkedin_profile?: string;
-    github_profile?: string; // This is the frontend property name
+    github_profile?: string;
     has_seen_profile_prompt?: boolean;
   }): Promise<void> {
+    console.log('AuthService: Starting updateUserProfile for user ID:', userId, 'updates:', updates);
     try {
-      // Map frontend github_profile to backend wellfound_profile
       const dbUpdates: { [key: string]: any } = {
         full_name: updates.full_name,
         email_address: updates.email_address,
@@ -307,7 +366,7 @@ class AuthService {
       };
 
       if (updates.github_profile !== undefined) {
-        dbUpdates.wellfound_profile = updates.github_profile; // Explicitly map
+        dbUpdates.wellfound_profile = updates.github_profile;
       }
 
       const { error } = await supabase
@@ -316,89 +375,95 @@ class AuthService {
         .eq('id', userId);
 
       if (error) {
-        console.error('Error updating user profile:', error);
+        console.error('AuthService: Error updating user profile in DB:', error);
         throw new Error('Failed to update profile');
       }
+      console.log('AuthService: User profile updated successfully in DB.');
     } catch (error) {
-      console.error('Error in updateUserProfile:', error);
+      console.error('AuthService: Error in updateUserProfile catch block:', error);
       throw error;
     }
   }
 
-  // Mark profile prompt as seen
   async markProfilePromptSeen(userId: string): Promise<void> {
+    console.log('AuthService: Marking profile prompt as seen for user ID:', userId);
     try {
       await this.updateUserProfile(userId, {
         has_seen_profile_prompt: true
       });
+      console.log('AuthService: Profile prompt marked as seen successfully.');
     } catch (error) {
-      console.error('Error marking profile prompt as seen:', error);
+      console.error('AuthService: Error marking profile prompt as seen:', error);
       throw new Error('Failed to update profile prompt status');
     }
   }
 
-  // Helper method to ensure session is valid before long operations
   async ensureValidSession(): Promise<boolean> {
+    console.log('AuthService: Starting ensureValidSession...');
     try {
-      // First check if we have a current session
       const { data: { session }, error } = await supabase.auth.getSession();
 
       if (error) {
-        console.error('Session check failed:', error);
+        console.error('AuthService: Session check failed in ensureValidSession:', error);
         return false;
       }
 
       if (!session) {
-        console.log('No active session found');
+        console.log('AuthService: No active session found in ensureValidSession.');
         return false;
       }
+      console.log('AuthService: Session found in ensureValidSession. User ID:', session.user.id);
 
-      // Check if session is expired
       const now = Math.floor(Date.now() / 1000);
-      if (session.expires_at && session.expires_at < now + 300) { // Refresh if expires in 5 minutes
-        console.log('Session expiring soon, refreshing...');
+      if (session.expires_at && session.expires_at < now + 300) {
+        console.log('AuthService: Session expiring soon in ensureValidSession, refreshing...');
         const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
         if (refreshError || !refreshData.session) {
-          console.error('Session refresh failed:', refreshError);
+          console.error('AuthService: Session refresh failed in ensureValidSession:', refreshError);
           return false;
         }
-        console.log('✅ Session refreshed successfully');
+        console.log('AuthService: ✅ Session refreshed successfully in ensureValidSession.');
       }
-
+      console.log('AuthService: ensureValidSession completed. Session is valid.');
       return true;
     } catch (error) {
-      console.error('Failed to ensure valid session:', error);
+      console.error('AuthService: Error in ensureValidSession:', error);
       return false;
     }
   }
 
-  // Get user's device management data
   async getUserDevices(userId: string) {
+    console.log('AuthService: Getting user devices for user ID:', userId);
     return deviceTrackingService.getUserDevices(userId);
   }
 
   async getUserSessions(userId: string) {
+    console.log('AuthService: Getting user sessions for user ID:', userId);
     return deviceTrackingService.getUserSessions(userId);
   }
 
   async getUserActivityLogs(userId: string, limit?: number) {
+    console.log('AuthService: Getting user activity logs for user ID:', userId);
     return deviceTrackingService.getUserActivityLogs(userId, limit);
   }
 
-  // Device management methods
   async trustDevice(deviceId: string) {
+    console.log('AuthService: Trusting device ID:', deviceId);
     return deviceTrackingService.trustDevice(deviceId);
   }
 
   async removeDevice(deviceId: string) {
+    console.log('AuthService: Removing device ID:', deviceId);
     return deviceTrackingService.removeDevice(deviceId);
   }
 
   async endSession(sessionId: string) {
+    console.log('AuthService: Ending session ID:', sessionId);
     return deviceTrackingService.endSpecificSession(sessionId);
   }
 
   async endAllOtherSessions(userId: string, currentSessionToken: string) {
+    console.log('AuthService: Ending all other sessions for user ID:', userId);
     return deviceTrackingService.endAllOtherSessions(userId, currentSessionToken);
   }
 }
