@@ -48,9 +48,9 @@ class PaymentService {
       name: '⭐ Career Boost+',
       price: 1499,
       duration: 'One-time Purchase',
-      optimizations: 30, // Updated from 15
+      optimizations: 30, // Updated
       scoreChecks: 30,
-      linkedinMessages: Infinity, // Unlimited
+      linkedinMessages: Infinity, // Updated
       guidedBuilds: 3,
       tag: 'Active job seekers',
       tagColor: 'text-blue-800 bg-blue-100',
@@ -69,7 +69,7 @@ class PaymentService {
       name: '🔥 Pro Resume Kit',
       price: 999,
       duration: 'One-time Purchase',
-      optimizations: 20, // Updated from 10
+      optimizations: 20, // Updated
       scoreChecks: 20,
       linkedinMessages: 100,
       guidedBuilds: 2,
@@ -128,7 +128,7 @@ class PaymentService {
       name: '🎯 Lite Check',
       price: 99,
       duration: 'One-time Purchase',
-      optimizations: 2, // Updated from 1
+      optimizations: 2, // Updated
       scoreChecks: 2,
       linkedinMessages: 10,
       guidedBuilds: 0,
@@ -384,6 +384,7 @@ class PaymentService {
     paymentData: PaymentData,
     userEmail: string,
     userName: string,
+    accessToken: string, // Accept accessToken as a parameter
     couponCode?: string,
     walletDeduction?: number,
     addOnsTotal?: number
@@ -399,23 +400,10 @@ class PaymentService {
       }
       console.log('processPayment: Razorpay script loaded successfully.');
 
-      console.log('processPayment: Attempting to get user session for payment processing...');
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      // NEW LOG: Log the raw result of getSession()
-      console.log('processPayment: Raw getSession result:', { sessionData: session, sessionError: sessionError });
-
-      if (sessionError) {
-        console.error('processPayment: Error getting Supabase session:', sessionError);
-        throw new Error(`Error getting user session: ${sessionError.message}`);
-      }
-
-      if (!session || !session.access_token) {
-        console.error('processPayment: User not authenticated or access token missing. Aborting payment process.');
-        throw new Error('User not authenticated for payment processing. Please log in again.');
-      }
-      const userAccessToken = session.access_token;
-      console.log('processPayment: User session and access token obtained.');
-      console.log('processPayment: User Access Token (first 10 chars):', userAccessToken.substring(0, 10) + '...');
+      // Removed the supabase.auth.getSession() call and related checks
+      // as accessToken is now passed as a parameter.
+      console.log('processPayment: User session and access token obtained from calling component.');
+      console.log('processPayment: User Access Token (first 10 chars):', accessToken.substring(0, 10) + '...');
       
       console.log('processPayment: Calling createOrder to initiate a new Razorpay order...');
       let orderData;
@@ -443,7 +431,7 @@ class PaymentService {
                 response.razorpay_order_id,
                 response.razorpay_payment_id,
                 response.razorpay_signature,
-                userAccessToken
+                accessToken // Use the passed accessToken
               );
               console.log('Verification result from verifyPayment:', verificationResult);
               resolve(verificationResult);
