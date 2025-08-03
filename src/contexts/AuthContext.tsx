@@ -70,7 +70,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const revalidateUserSession = async () => {
     try {
       console.log('AuthContext: Revalidating user session...');
-      const user = await authService.getCurrentUser();
+      // This method will now fetch the full profile directly
+      const user = await authService.getCurrentUser(); // This method is now streamlined in authService
       console.log('AuthContext: User revalidated. User:', user ? user.id : 'none');
       setAuthState(prev => ({
         ...prev,
@@ -102,14 +103,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         if (event === 'SIGNED_IN' && session?.user) {
           try {
-            console.log('AuthContext: SIGNED_IN event. Fetching current user...');
-            const user = await authService.getCurrentUser(); // Fetch full user profile
-            console.log('AuthContext: Current user fetched after SIGNED_IN. User:', user ? user.id : 'none');
-            setAuthState({
-              user,
-              isAuthenticated: !!user,
+            console.log('AuthContext: SIGNED_IN event. Setting basic user info and fetching full profile...');
+            // Set basic user info immediately for faster UI update
+            setAuthState(prev => ({
+              ...prev,
+              user: {
+                id: session.user.id,
+                name: session.user.email?.split('@')[0] || 'User', // Placeholder name
+                email: session.user.email!,
+                isVerified: session.user.email_confirmed_at !== null,
+                createdAt: session.user.created_at || new Date().toISOString(),
+                lastLogin: new Date().toISOString(),
+                // Other fields will be undefined until full profile is fetched
+              },
+              isAuthenticated: true,
               isLoading: false,
-            });
+            }));
+
+            // Now fetch the full user profile from your user_profiles table
+            const fullProfile = await authService.fetchUserProfile(session.user.id);
+            console.log('AuthContext: Full user profile fetched:', fullProfile ? fullProfile.full_name : 'none');
+
+            setAuthState(prev => ({
+              ...prev,
+              user: {
+                ...prev.user!, // Use existing basic user data
+                name: fullProfile?.full_name || prev.user?.name || 'User',
+                email: fullProfile?.email_address || prev.user?.email!,
+                phone: fullProfile?.phone || undefined,
+                linkedin: fullProfile?.linkedin_profile || undefined,
+                github: fullProfile?.wellfound_profile || undefined,
+                username: fullProfile?.username || undefined,
+                referralCode: fullProfile?.referral_code || undefined,
+                hasSeenProfilePrompt: fullProfile?.has_seen_profile_prompt || false,
+              },
+              isAuthenticated: true,
+              isLoading: false,
+            }));
+
             scheduleSessionRefresh();
           } catch (error) {
             console.error('AuthContext: Error getting user after sign in:', error);
