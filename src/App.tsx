@@ -5,7 +5,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Header } from './components/Header';
 import { Navigation } from './components/navigation/Navigation';
 // import { MobileNavBar } from './components/navigation/MobileNavBar'; // <--- REMOVED IMPORT
-import { ResumeOptimizer } from './components/ResumeOptimizer';
+import { ResumeOptimizer } from './components/ResumeOptimizer'; // Import as named export
 import { HomePage } from './components/pages/HomePage';
 import { GuidedResumeBuilder } from './components/GuidedResumeBuilder';
 import { ResumeScoreChecker } from './components/ResumeScoreChecker';
