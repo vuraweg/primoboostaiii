@@ -221,7 +221,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         isAuthenticated: false,
         isLoading: true, // Set loading to true during logout process
       });
-      await authService.logout();
+      authService.logout(); // Removed await here
       console.log('AuthContext: authService.logout completed.');
     } catch (error) {
       console.error('AuthContext: Logout error:', error);
