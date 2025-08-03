@@ -382,7 +382,10 @@ class AuthService {
     console.log('AuthService: Starting ensureValidSession...');
     try {
       console.log('AuthService: Attempting to get session...');
-      const { data: { session }, error } = await supabase.auth.getSession();
+      const { data: { session }, error } = await Promise.race([
+        supabase.auth.getSession(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Supabase getSession timed out after 10 seconds')), 10000))
+      ]);
       console.log('AuthService: getSession call completed. Session object:', session, 'Error object:', error);
 
       if (error) {
@@ -401,7 +404,10 @@ class AuthService {
       const now = Math.floor(Date.now() / 1000);
       if (session.expires_at && session.expires_at < now + 300) {
         console.log('AuthService: Session expiring soon in ensureValidSession, attempting refresh...');
-        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        const { data: refreshData, error: refreshError } = await Promise.race([
+          supabase.auth.refreshSession(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Supabase refreshSession timed out after 10 seconds')), 10000))
+        ]);
         console.log('AuthService: refreshSession call completed. Session object:', refreshData.session, 'Error object:', refreshError);
         if (refreshError || !refreshData.session) {
           console.error('AuthService: Session refresh failed in ensureValidSession:', refreshError);
@@ -434,7 +440,7 @@ class AuthService {
       console.log('AuthService: ensureValidSession completed. Session is valid.');
       return true;
     } catch (error) {
-      console.error('AuthService: Error in ensureValidSession:', error);
+      console.error('AuthService: Error in ensureValidSession (caught by timeout or other issue):', error.message);
       console.log('AuthService: Returning false due to unexpected error in ensureValidSession.');
       return false;
     }
