@@ -384,14 +384,13 @@ class PaymentService {
     paymentData: PaymentData,
     userEmail: string,
     userName: string,
-    accessToken: string, // Accept accessToken as a parameter
+    accessToken: string,
     couponCode?: string,
     walletDeduction?: number,
     addOnsTotal?: number
   ): Promise<{ success: boolean; subscriptionId?: string; error?: string }> {
     console.log('processPayment: Function called with paymentData:', paymentData);
     try {
-      // Load Razorpay script
       console.log('processPayment: Attempting to load Razorpay script...');
       const scriptLoaded = await this.loadRazorpayScript();
       if (!scriptLoaded) {
@@ -400,8 +399,6 @@ class PaymentService {
       }
       console.log('processPayment: Razorpay script loaded successfully.');
 
-      // Removed the supabase.auth.getSession() call and related checks
-      // as accessToken is now passed as a parameter.
       console.log('processPayment: User session and access token obtained from calling component.');
       console.log('processPayment: User Access Token (first 10 chars):', accessToken.substring(0, 10) + '...');
       
@@ -410,6 +407,8 @@ class PaymentService {
       try {
         orderData = await this.createOrder(paymentData.planId, paymentData.amount, addOnsTotal || 0, couponCode, walletDeduction);
         console.log('processPayment: Order created successfully:', orderData.orderId, 'Amount:', orderData.amount);
+        // NEW LOG: Inspect orderData
+        console.log('processPayment: Received orderData from backend:', orderData);
       } catch (createOrderError) {
         console.error('processPayment: Error creating order via backend:', createOrderError);
         throw new Error(`Failed to create payment order: ${createOrderError instanceof Error ? createOrderError.message : String(createOrderError)}`);
@@ -431,7 +430,7 @@ class PaymentService {
                 response.razorpay_order_id,
                 response.razorpay_payment_id,
                 response.razorpay_signature,
-                accessToken // Use the passed accessToken
+                accessToken
               );
               console.log('Verification result from verifyPayment:', verificationResult);
               resolve(verificationResult);
@@ -456,7 +455,13 @@ class PaymentService {
           },
         };
 
+        // NEW LOG: Inspect options object
+        console.log('processPayment: Razorpay options object:', options);
+
         const razorpay = new window.Razorpay(options);
+        // NEW LOG: Inspect razorpay instance
+        console.log('processPayment: Razorpay instance created:', razorpay);
+
         console.log('processPayment: Attempting to open Razorpay modal...');
         razorpay.open();
         console.log('processPayment: Razorpay modal opened (or attempted to open).');
