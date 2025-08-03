@@ -1,3 +1,4 @@
+// src/components/payment/SubscriptionPlans.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Check,
@@ -185,6 +186,16 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
     if (!user || !selectedPlanData) return;
     setIsProcessing(true);
     try {
+      // Get the current session to obtain the access token
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        console.error('Failed to get session for payment:', sessionError);
+        setIsProcessing(false);
+        // Optionally, show an error to the user or redirect to login
+        return;
+      }
+      const accessToken = session.access_token; // Retrieve the access token
+
       if (grandTotal === 0) {
         const result = await paymentService.processFreeSubscription(
           selectedPlan,
@@ -207,6 +218,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
           paymentData,
           user.email,
           user.name,
+          accessToken, // Pass the accessToken here as the fourth argument
           appliedCoupon ? appliedCoupon.code : undefined,
           walletDeduction,
           addOnsTotal
