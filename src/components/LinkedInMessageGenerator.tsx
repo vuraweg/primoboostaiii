@@ -123,6 +123,13 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
       return;
     }
 
+    // Check subscription and LinkedIn message credits
+    if (!userSubscription || (userSubscription.linkedinMessagesTotal - userSubscription.linkedinMessagesUsed) <= 0) {
+      alert('You have used all your LinkedIn messages or do not have an active plan. Please upgrade your plan.');
+      onShowSubscriptionPlans();
+      return;
+    }
+
     if (!formData.recipientFirstName || !formData.messagePurpose) {
       alert('Please fill in the recipient name and message purpose');
       return;

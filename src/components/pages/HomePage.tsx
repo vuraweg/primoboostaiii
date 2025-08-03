@@ -2,39 +2,39 @@ import React from 'react';
 
 import {
 
-  FileText,
+  FileText,
 
-  PlusCircle,
+  PlusCircle,
 
-  Target,
+  Target,
 
-  ArrowRight,
+  ArrowRight,
 
-  Sparkles,
+  Sparkles,
 
-  CheckCircle,
+  CheckCircle,
 
-  TrendingUp,
+  TrendingUp,
 
-  Star,
+  Star,
 
-  Users,
+  Users,
 
-  Zap,
+  Zap,
 
-  Award,
+  Award,
 
-  Crown,
+  Crown,
 
-  MessageCircle,
+  MessageCircle,
 
-  Check,
+  Check,
 
-  Plus,
+  Plus,
 
-  ChevronDown,
+  ChevronDown,
 
-  ChevronUp
+  ChevronUp
 
 } from 'lucide-react';
 
@@ -46,15 +46,15 @@ import { paymentService } from '../../services/paymentService';
 
 interface Feature {
 
-  id: string;
+  id: string;
 
-  title: string;
+  title: string;
 
-  description: string;
+  description: string;
 
-  icon: JSX.Element;
+  icon: JSX.Element;
 
-  requiresAuth: boolean;
+  requiresAuth: boolean;
 
 }
 
@@ -62,15 +62,15 @@ interface Feature {
 
 interface HomePageProps {
 
-  onPageChange: (page: string) => void;
+  onPageChange: (page: string) => void;
 
-  isAuthenticated: boolean;
+  isAuthenticated: boolean;
 
-  onShowAuth: () => void;
+  onShowAuth: () => void;
 
-  onShowSubscriptionPlans: () => void;
+  onShowSubscriptionPlans: () => void;
 
-  userSubscription: any; // New prop for user's subscription status
+  userSubscription: any; // New prop for user's subscription status
 
 }
 
@@ -78,637 +78,622 @@ interface HomePageProps {
 
 export const HomePage: React.FC<HomePageProps> = ({
 
-  onPageChange,
+  onPageChange,
 
-  isAuthenticated,
+  isAuthenticated,
 
-  onShowAuth,
+  onShowAuth,
 
-  onShowSubscriptionPlans,
+  onShowSubscriptionPlans,
 
-  userSubscription // Destructure new prop
+  userSubscription // Destructure new prop
 
 }) => {
 
-  const [showOptimizationDropdown, setShowOptimizationDropdown] = React.useState(false);
+  const [showOptimizationDropdown, setShowOptimizationDropdown] = React.useState(false);
 
-  const [showPlanDetails, setShowPlanDetails] = React.useState(false); // New state for the dropdown
+  const [showPlanDetails, setShowPlanDetails] = React.useState(false); // New state for the dropdown
 
 
 
-  // Helper function to get plan icon based on icon string
+  // Helper function to get plan icon based on icon string
 
-  const getPlanIcon = (iconType: string) => {
+  const getPlanIcon = (iconType: string) => {
 
-    switch (iconType) {
+    switch (iconType) {
 
-      case 'crown': return <Crown className="w-6 h-6" />;
+      case 'crown': return <Crown className="w-6 h-6" />;
 
-      case 'zap': return <Zap className="w-6 h-6" />;
+      case 'zap': return <Zap className="w-6 h-6" />;
 
-      case 'rocket': return <Award className="w-6 h-6" />;
+      case 'rocket': return <Award className="w-6 h-6" />;
 
-      default: return <Sparkles className="w-6 h-6" />;
+      default: return <Sparkles className="w-6 h-6" />;
 
-    }
+    }
 
-  };
+  };
 
 
 
-  // Helper function to check if a feature is available based on subscription
+  // Helper function to check if a feature is available based on subscription
 
-  const isFeatureAvailable = (featureId: string) => {
+  const isFeatureAvailable = (featureId: string) => {
 
-    if (!isAuthenticated) return false; // Must be authenticated to check subscription
+    if (!isAuthenticated) return false; // Must be authenticated to check subscription
 
-    if (!userSubscription) return false; // No active subscription
+    if (!userSubscription) return false; // No active subscription
 
 
 
-    switch (featureId) {
+    switch (featureId) {
 
-      case 'optimizer':
+      case 'optimizer':
 
-        return userSubscription.optimizationsTotal > userSubscription.optimizationsUsed;
+        return userSubscription.optimizationsTotal > userSubscription.optimizationsUsed;
 
-      case 'score-checker':
+      case 'score-checker':
 
-        return userSubscription.scoreChecksTotal > userSubscription.scoreChecksUsed;
+        return userSubscription.scoreChecksTotal > userSubscription.scoreChecksUsed;
 
-      case 'guided-builder':
+      case 'guided-builder':
 
-        return userSubscription.guidedBuildsTotal > userSubscription.guidedBuildsUsed;
+        return userSubscription.guidedBuildsTotal > userSubscription.guidedBuildsUsed;
 
-      case 'linkedin-generator':
+      case 'linkedin-generator':
 
-        return userSubscription.linkedinMessagesTotal > userSubscription.linkedinMessagesUsed;
+        return userSubscription.linkedinMessagesTotal > userSubscription.linkedinMessagesUsed;
 
-      default:
+      default:
 
-        return false;
+        return false;
 
-    }
+    }
 
-  };
+  };
 
 
 
-  const handleFeatureClick = (feature: Feature) => {
+  const handleFeatureClick = (feature: Feature) => {
 
-    console.log('Feature clicked:', feature.id);
+    console.log('Feature clicked:', feature.id);
 
-    console.log('Feature requiresAuth:', feature.requiresAuth);
+    console.log('Feature requiresAuth:', feature.requiresAuth);
 
-    console.log('User isAuthenticated:', isAuthenticated);
+    console.log('User isAuthenticated:', isAuthenticated);
 
-    console.log('User Subscription:', userSubscription);
 
 
+    // If not authenticated, prompt to sign in first
 
-    // If the feature requires an active plan (or credits) and the user doesn't have it
+    if (!isAuthenticated) {
 
-    if (!isFeatureAvailable(feature.id)) {
+      onShowAuth();
 
-      // If not authenticated, prompt to sign in first
+      return;
 
-      if (!isAuthenticated) {
+    }
 
-        onShowAuth();
 
-        return;
 
-      } else {
+    console.log('User is authenticated. Navigating to page.');
 
-        // If authenticated but no credits/plan, show subscription plans
+    onPageChange(feature.id);
 
-        onShowSubscriptionPlans(); // Show subscription plans for upgrade
+  };
 
-        return; // Stop further execution
 
-      }
 
-    }
+  const features: Feature[] = [
 
+    {
 
+      id: 'optimizer',
 
-    console.log('User is authenticated or feature does not require auth. Navigating to page.');
+      title: 'JD-Based Optimizer',
 
-    onPageChange(feature.id);
+      description: 'Upload your resume and a job description to get a perfectly tailored resume.',
 
-  };
+      icon: <Target className="w-6 h-6" />,
 
+      requiresAuth: false
 
+    },
 
-  const features: Feature[] = [
+    {
 
-    {
+      id: 'score-checker',
 
-      id: 'optimizer',
+      title: 'Resume Score Check',
 
-      title: 'JD-Based Optimizer',
+      description: 'Get an instant ATS score with detailed analysis and improvement suggestions.',
 
-      description: 'Upload your resume and a job description to get a perfectly tailored resume.',
+      icon: <TrendingUp className="w-6 h-6" />,
 
-      icon: <Target className="w-6 h-6" />,
+      requiresAuth: true
 
-      requiresAuth: false
+    },
 
-    },
+    {
 
-    {
+      id: 'guided-builder',
 
-      id: 'score-checker',
+      title: 'Guided Resume Builder',
 
-      title: 'Resume Score Check',
+      description: 'Create a professional resume from scratch with our step-by-step AI-powered builder.',
 
-      description: 'Get an instant ATS score with detailed analysis and improvement suggestions.',
+      icon: <PlusCircle className="w-6 h-6" />,
 
-      icon: <TrendingUp className="w-6 h-6" />,
+      requiresAuth: true
 
-      requiresAuth: true
+    },
 
-    },
+    
 
-    {
+    {
 
-      id: 'guided-builder',
+      id: 'linkedin-generator',
 
-      title: 'Guided Resume Builder',
+      title: 'LinkedIn Message Generator',
 
-      description: 'Create a professional resume from scratch with our step-by-step AI-powered builder.',
+      description: 'Generate personalized messages for connection requests and cold outreach.',
 
-      icon: <PlusCircle className="w-6 h-6" />,
+      icon: <MessageCircle className="w-6 h-6" />,
 
-      requiresAuth: true
+      requiresAuth: true
 
-    },
+    }
 
-    
+  ];
 
-    {
 
-      id: 'linkedin-generator',
 
-      title: 'LinkedIn Message Generator',
+  const stats = [
 
-      description: 'Generate personalized messages for connection requests and cold outreach.',
+    { number: '50,000+', label: 'Resumes Created', icon: <FileText className="w-5 h-5" /> },
 
-      icon: <MessageCircle className="w-6 h-6" />,
+    { number: '95%', label: 'Success Rate', icon: <TrendingUp className="w-5 h-5" /> },
 
-      requiresAuth: true
+    { number: '4.9/5', label: 'User Rating', icon: <Star className="w-5 h-5" /> },
 
-    }
+    { number: '24/7', label: 'AI Support', icon: <Sparkles className="w-5 h-5" /> }
 
-  ];
+  ];
 
 
 
-  const stats = [
+  return (
 
-    { number: '50,000+', label: 'Resumes Created', icon: <FileText className="w-5 h-5" /> },
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 font-inter">
 
-    { number: '95%', label: 'Success Rate', icon: <TrendingUp className="w-5 h-5" /> },
+      {/* Hero Section */}
 
-    { number: '4.9/5', label: 'User Rating', icon: <Star className="w-5 h-5" /> },
+      <div className="relative overflow-hidden">
 
-    { number: '24/7', label: 'AI Support', icon: <Sparkles className="w-5 h-5" /> }
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-purple-600/5"></div>
 
-  ];
+        <div className="relative container-responsive py-12 sm:py-16 lg:py-20">
 
+          <div className="text-center max-w-4xl mx-auto">
 
+            {/* Logo and Brand */}
 
-  return (
+            <div className="flex items-center justify-center mb-6">
 
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 font-inter">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden shadow-xl mr-4">
 
-      {/* Hero Section */}
+                <img
 
-      <div className="relative overflow-hidden">
+                  src="https://res.cloudinary.com/dlkovvlud/image/upload/w_1000,c_fill,ar_1:1,g_auto,r_max,bo_5px_solid_red,b_rgb:262c35/v1751536902/a-modern-logo-design-featuring-primoboos_XhhkS8E_Q5iOwxbAXB4CqQ_HnpCsJn4S1yrhb826jmMDw_nmycqj.jpg"
 
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-purple-600/5"></div>
+                  alt="PrimoBoost AI Logo"
 
-        <div className="relative container-responsive py-12 sm:py-16 lg:py-20">
+                  className="w-full h-full object-cover"
 
-          <div className="text-center max-w-4xl mx-auto">
+                />
 
-            {/* Logo and Brand */}
+              </div>
 
-            <div className="flex items-center justify-center mb-6">
+              <div className="text-left">
 
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden shadow-xl mr-4">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">
 
-                <img
+                  PrimoBoost AI
 
-                  src="https://res.cloudinary.com/dlkovvlud/image/upload/w_1000,c_fill,ar_1:1,g_auto,r_max,bo_5px_solid_red,b_rgb:262c35/v1751536902/a-modern-logo-design-featuring-primoboos_XhhkS8E_Q5iOwxbAXB4CqQ_HnpCsJn4S1yrhb826jmMDw_nmycqj.jpg"
+                </h1>
 
-                  alt="PrimoBoost AI Logo"
+                <p className="text-sm sm:text-base text-gray-600">Resume Intelligence</p>
 
-                  className="w-full h-full object-cover"
+              </div>
 
-                />
+            </div>
 
-              </div>
 
-              <div className="text-left">
 
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">
+            {/* Main Headline */}
 
-                  PrimoBoost AI
+            <h2 className="text-3xl sm:text-4xl lg:text-6xl font-bold text-gray-900 mb-6 leading-tight">
 
-                </h1>
+              Your Dream Job Starts with a
 
-                <p className="text-sm sm:text-base text-gray-600">Resume Intelligence</p>
+              <span className="block bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
 
-              </div>
+                Perfect Resume
 
-            </div>
+              </span>
 
+            </h2>
 
 
-            {/* Main Headline */}
 
-            <h2 className="text-3xl sm:text-4xl lg:text-6xl font-bold text-gray-900 mb-6 leading-tight">
+            <p className="text-lg sm:text-xl text-gray-600 mb-8 leading-relaxed max-w-3xl mx-auto">
 
-              Your Dream Job Starts with a
+              Choose your path to success. Whether you're building from scratch, optimizing for specific jobs, or just want to check your current resume score - we've got you covered.
 
-              <span className="block bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            </p>
 
-                Perfect Resume
 
-              </span>
 
-            </h2>
+            {/* Quick Stats */}
 
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-12">
 
+              {stats.map((stat, index) => (
 
-            <p className="text-lg sm:text-xl text-gray-600 mb-8 leading-relaxed max-w-3xl mx-auto">
+                <div
 
-              Choose your path to success. Whether you're building from scratch, optimizing for specific jobs, or just want to check your current resume score - we've got you covered.
+                  key={index}
 
-            </p>
+                  className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 sm:p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 border border-white/50"
 
+                >
 
+                  <div className="flex items-center justify-center mb-3">
 
-            {/* Quick Stats */}
+                    <div className="bg-gradient-to-r from-blue-500 to-purple-500 text-white p-2 sm:p-3 rounded-full">
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-12">
+                      {stat.icon}
 
-              {stats.map((stat, index) => (
+                    </div>
 
-                <div
+                  </div>
 
-                  key={index}
+                  <div className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">
 
-                  className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 sm:p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 border border-white/50"
+                    {stat.number}
 
-                >
+                  </div>
 
-                  <div className="flex items-center justify-center mb-3">
+                  <div className="text-xs sm:text-sm text-gray-600 font-medium">
 
-                    <div className="bg-gradient-to-r from-blue-500 to-purple-500 text-white p-2 sm:p-3 rounded-full">
+                    {stat.label}
 
-                      {stat.icon}
+                  </div>
 
-                    </div>
+                </div>
 
-                  </div>
+              ))}
 
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">
+            </div>
 
-                    {stat.number}
+          </div>
 
-                  </div>
+        </div>
 
-                  <div className="text-xs sm:text-sm text-gray-600 font-medium">
+      </div>
 
-                    {stat.label}
 
-                  </div>
 
-                </div>
+      {/* Main Features Section - Now with a consolidated frame */}
 
-              ))}
+      <div className="container-responsive py-12 sm:py-16 bg-primary-50">
 
-            </div>
+        <div className="mb-12">
 
-          </div>
+          <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4  text-center">
 
-        </div>
+            Choose Your Resume Journey
 
-      </div>
+          </h3>
 
+        </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-      {/* Main Features Section - Now with a consolidated frame */}
+          {features.map((feature) => (
 
-      <div className="container-responsive py-12 sm:py-16 bg-primary-50">
+            <button
 
-        <div className="mb-12">
+              key={feature.id}
 
-          <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4  text-center">
+              onClick={() => handleFeatureClick(feature)} // Pass the full feature object
 
-            Choose Your Resume Journey
+              className={`card-hover p-6 flex flex-col items-start sm:flex-row sm:items-center justify-between transition-all duration-300 bg-gradient-to-br from-white to-primary-50 border border-secondary-100 shadow-lg hover:shadow-xl group rounded-2xl ${feature.requiresAuth && !isAuthenticated ? 'opacity-70 cursor-not-allowed' : ''}`}
 
-          </h3>
+            >
 
-        </div>
+              <div className="flex items-center space-x-4">
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-primary-100 rounded-xl p-3 group-hover:bg-primary-600 group-hover:text-white transition-all duration-300 shadow-sm flex-shrink-0 group-hover:scale-110">
 
-          {features.map((feature) => (
+                  {React.cloneElement(feature.icon, { className: "w-8 h-8" })}
 
-            <button
+                </div>
 
-              key={feature.id}
+                <div>
 
-              onClick={() => handleFeatureClick(feature)} // Pass the full feature object
+                  <span className="text-lg font-bold text-secondary-900">{feature.title}</span>
 
-              className={`card-hover p-6 flex flex-col items-start sm:flex-row sm:items-center justify-between transition-all duration-300 bg-gradient-to-br from-white to-primary-50 border border-secondary-100 shadow-lg hover:shadow-xl group rounded-2xl ${feature.requiresAuth && !isAuthenticated ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  <p className="text-sm text-secondary-700">{feature.description}</p>
 
-            >
+                </div>
 
-              <div className="flex items-center space-x-4">
+              </div>
 
-                <div className="bg-primary-100 rounded-xl p-3 group-hover:bg-primary-600 group-hover:text-white transition-all duration-300 shadow-sm flex-shrink-0 group-hover:scale-110">
+              <ArrowRight className={`w-6 h-6 text-secondary-400 group-hover:text-primary-600 group-hover:translate-x-1 transition-transform duration-300 flex-shrink-0 ${feature.requiresAuth && !isAuthenticated ? 'opacity-50' : ''}`} />
 
-                  {React.cloneElement(feature.icon, { className: "w-8 h-8" })}
+            </button>
 
-                </div>
+          ))}
 
-                <div>
+        </div>
 
-                  <span className="text-lg font-bold text-secondary-900">{feature.title}</span>
+      </div>
 
-                  <p className="text-sm text-secondary-700">{feature.description}</p>
 
-                </div>
 
-              </div>
+      {/* Minimalist Plans Section */}
 
-              <ArrowRight className={`w-6 h-6 text-secondary-400 group-hover:text-primary-600 group-hover:translate-x-1 transition-transform duration-300 flex-shrink-0 ${feature.requiresAuth && !isAuthenticated ? 'opacity-50' : ''}`} />
+      {isAuthenticated && (
 
-            </button>
+        <div className="bg-white py-16">
 
-          ))}
+          <div className="container-responsive">
 
-        </div>
+            {/* New Dropdown for User's Plan Status */}
 
-      </div>
+            <div className="max-w-2xl mx-auto mb-10">
 
+              <div className="relative inline-block text-left w-full">
 
+                <button
 
-      {/* Minimalist Plans Section */}
+                  onClick={() => setShowPlanDetails(!showPlanDetails)}
 
-      {isAuthenticated && (
+                  className="w-full bg-slate-100 text-slate-800 font-semibold py-3 px-6 rounded-xl flex items-center justify-between shadow-sm hover:bg-slate-200 transition-colors"
 
-        <div className="bg-white py-16">
+                >
 
-          <div className="container-responsive">
+                  <span className="flex items-center">
 
-            {/* New Dropdown for User's Plan Status */}
+                    <Sparkles className="w-5 h-5 text-indigo-500 mr-2" />
 
-            <div className="max-w-2xl mx-auto mb-10">
+                    {userSubscription ? (
 
-              <div className="relative inline-block text-left w-full">
+                      <span>
 
-                <button
+                        Optimizations Left:{' '}
 
-                  onClick={() => setShowPlanDetails(!showPlanDetails)}
+                        <span className="font-bold">
 
-                  className="w-full bg-slate-100 text-slate-800 font-semibold py-3 px-6 rounded-xl flex items-center justify-between shadow-sm hover:bg-slate-200 transition-colors"
+                          {userSubscription.optimizationsTotal - userSubscription.optimizationsUsed}
 
-                >
+                        </span>
 
-                  <span className="flex items-center">
+                      </span>
 
-                    <Sparkles className="w-5 h-5 text-indigo-500 mr-2" />
+                    ) : (
 
-                    {userSubscription ? (
+                      <span>No Active Plan. Upgrade to use all features.</span>
 
-                      <span>
+                    )}
 
-                        Optimizations Left:{' '}
+                  </span>
 
-                        <span className="font-bold">
+                  {showPlanDetails ? <ChevronUp className="w-5 h-5 ml-2" /> : <ChevronDown className="w-5 h-5 ml-2" />}
 
-                          {userSubscription.optimizationsTotal - userSubscription.optimizationsUsed}
+                </button>
 
-                        </span>
+                {showPlanDetails && (
 
-                      </span>
+                  <div className="absolute z-10 mt-2 w-full origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
 
-                    ) : (
+                    <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
 
-                      <span>No Active Plan. Upgrade to use all features.</span>
+                      {userSubscription ? (
 
-                    )}
+                        <>
 
-                  </span>
+                          <div className="block px-4 py-2 text-sm text-gray-700">
 
-                  {showPlanDetails ? <ChevronUp className="w-5 h-5 ml-2" /> : <ChevronDown className="w-5 h-5 ml-2" />}
+                            <p className="font-semibold">{userSubscription.name} Plan</p>
 
-                </button>
+                            <p className="text-xs text-gray-500">Details for your current subscription.</p>
 
-                {showPlanDetails && (
+                          </div>
 
-                  <div className="absolute z-10 mt-2 w-full origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                          <hr className="my-1 border-gray-100" />
 
-                    <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                          <div className="px-4 py-2 text-sm text-gray-700 space-y-1">
 
-                      {userSubscription ? (
+                            <div className="flex justify-between items-center">
 
-                        <>
+                              <span>Optimizations:</span>
 
-                          <div className="block px-4 py-2 text-sm text-gray-700">
+                              <span className="font-medium">{userSubscription.optimizationsTotal - userSubscription.optimizationsUsed} / {userSubscription.optimizationsTotal}</span>
 
-                            <p className="font-semibold">{userSubscription.name} Plan</p>
+                            </div>
 
-                            <p className="text-xs text-gray-500">Details for your current subscription.</p>
+                            <div className="flex justify-between items-center">
 
-                          </div>
+                              <span>Score Checks:</span>
 
-                          <hr className="my-1 border-gray-100" />
+                              <span className="font-medium">{userSubscription.scoreChecksTotal - userSubscription.scoreChecksUsed} / {userSubscription.scoreChecksTotal}</span>
 
-                          <div className="px-4 py-2 text-sm text-gray-700 space-y-1">
+                            </div>
 
-                            <div className="flex justify-between items-center">
+                            <div className="flex justify-between items-center">
 
-                              <span>Optimizations:</span>
+                              <span>Guided Builds:</span>
 
-                              <span className="font-medium">{userSubscription.optimizationsTotal - userSubscription.optimizationsUsed} / {userSubscription.optimizationsTotal}</span>
+                              <span className="font-medium">{userSubscription.guidedBuildsTotal - userSubscription.guidedBuildsUsed} / {userSubscription.guidedBuildsTotal}</span>
 
-                            </div>
+                            </div>
 
-                            <div className="flex justify-between items-center">
+                          </div>
 
-                              <span>Score Checks:</span>
+                        </>
 
-                              <span className="font-medium">{userSubscription.scoreChecksTotal - userSubscription.scoreChecksUsed} / {userSubscription.scoreChecksTotal}</span>
+                      ) : (
 
-                            </div>
+                        <div className="block px-4 py-2 text-sm text-gray-700">
 
-                            <div className="flex justify-between items-center">
+                          You currently don't have an active subscription.
 
-                              <span>Guided Builds:</span>
+                        </div>
 
-                              <span className="font-medium">{userSubscription.guidedBuildsTotal - userSubscription.guidedBuildsUsed} / {userSubscription.guidedBuildsTotal}</span>
+                      )}
 
-                            </div>
+                      <div className="p-4 border-t border-gray-100">
 
-                          </div>
+                        <button
 
-                        </>
+                          onClick={onShowSubscriptionPlans}
 
-                      ) : (
+                          className="w-full btn-primary py-2"
 
-                        <div className="block px-4 py-2 text-sm text-gray-700">
+                        >
 
-                          You currently don't have an active subscription.
+                          {userSubscription ? 'Upgrade Plan' : 'Choose Your Plan'}
 
-                        </div>
+                        </button>
 
-                      )}
+                      </div>
 
-                      <div className="p-4 border-t border-gray-100">
+                    </div>
 
-                        <button
+                  </div>
 
-                          onClick={onShowSubscriptionPlans}
+                )}
 
-                          className="w-full btn-primary py-2"
+              </div>
 
-                        >
+            </div>
 
-                          {userSubscription ? 'Upgrade Plan' : 'Choose Your Plan'}
+            
 
-                        </button>
+            
 
-                      </div>
+            <div className="text-center mt-12">
 
-                    </div>
+              <button
 
-                  </div>
+                onClick={onShowSubscriptionPlans}
 
-                )}
+                className="btn-secondary px-8 py-3"
 
-              </div>
+              >
 
-            </div>
+                View All Plans & Add-ons
 
-            
+              </button>
 
-            
+            </div>
 
-            <div className="text-center mt-12">
+          </div>
 
-              <button
+        </div>
 
-                onClick={onShowSubscriptionPlans}
+      )}
 
-                className="btn-secondary px-8 py-3"
 
-              >
 
-                View All Plans & Add-ons
+      {/* Additional Features Teaser */}
 
-              </button>
+      <div className="bg-gradient-to-r from-gray-900 to-blue-900 text-white py-16 px-4 sm:px-0">
 
-            </div>
+        <div className="container-responsive text-left">
 
-          </div>
+          <div className="max-w-3xl mx-auto">
 
-        </div>
+            <h3 className="text-2xl sm:text-3xl font-bold mb-4">
 
-      )}
+              Powered by Advanced AI Technology
 
+            </h3>
 
+            <p className="text-lg text-blue-100 mb-8">
 
-      {/* Additional Features Teaser */}
+              Our intelligent system understands ATS requirements, job market trends, and recruiter preferences to give you the competitive edge.
 
-      <div className="bg-gradient-to-r from-gray-900 to-blue-900 text-white py-16 px-4 sm:px-0">
+            </p>
 
-        <div className="container-responsive text-left">
+            
 
-          <div className="max-w-3xl mx-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 mt-12">
 
-            <h3 className="text-2xl sm:text-3xl font-bold mb-4">
+              <div className="text-center">
 
-              Powered by Advanced AI Technology
+                <div className="bg-blue-500/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
 
-            </h3>
+                  <Zap className="w-8 h-8 text-yellow-400" />
 
-            <p className="text-lg text-blue-100 mb-8">
+                </div>
 
-              Our intelligent system understands ATS requirements, job market trends, and recruiter preferences to give you the competitive edge.
+                <h4 className="font-semibold mb-3 text-lg">AI-Powered Analysis</h4>
 
-            </p>
+                <p className="text-blue-200 leading-relaxed">Advanced algorithms analyze and optimize your resume</p>
 
-            
+              </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 mt-12">
+              
 
-              <div className="text-center">
+              <div className="text-center">
 
-                <div className="bg-blue-500/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <div className="bg-blue-500/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
 
-                  <Zap className="w-8 h-8 text-yellow-400" />
+                  <Award className="w-8 h-8 text-green-400" />
 
-                </div>
+                </div>
 
-                <h4 className="font-semibold mb-3 text-lg">AI-Powered Analysis</h4>
+                <h4 className="font-semibold mb-3 text-lg">ATS Optimization</h4>
 
-                <p className="text-blue-200 leading-relaxed">Advanced algorithms analyze and optimize your resume</p>
+                <p className="text-blue-200 leading-relaxed">Ensure your resume passes all screening systems</p>
 
-              </div>
+              </div>
 
-              
+              
 
-              <div className="text-center">
+              <div className="text-center">
 
-                <div className="bg-blue-500/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <div className="bg-blue-500/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
 
-                  <Award className="w-8 h-8 text-green-400" />
+                  <Users className="w-8 h-8 text-purple-400" />
 
-                </div>
+                </div>
 
-                <h4 className="font-semibold mb-3 text-lg">ATS Optimization</h4>
+                <h4 className="font-semibold mb-3 text-lg">Expert Approved</h4>
 
-                <p className="text-blue-200 leading-relaxed">Ensure your resume passes all screening systems</p>
+                <p className="text-blue-200 leading-relaxed">Formats trusted by recruiters worldwide</p>
 
-              </div>
+              </div>
 
-              
+            </div>
 
-              <div className="text-center">
+          </div>
 
-                <div className="bg-blue-500/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+        </div>
 
-                  <Users className="w-8 h-8 text-purple-400" />
+      </div>
 
-                </div>
 
-                <h4 className="font-semibold mb-3 text-lg">Expert Approved</h4>
 
-                <p className="text-blue-200 leading-relaxed">Formats trusted by recruiters worldwide</p>
+      {/* CTA Section */}
 
-              </div>
+      
 
-            </div>
+    </div>
 
-          </div>
+  );
 
-        </div>
-
-      </div>
-
-
-
-      {/* CTA Section */}
-
-      
-
-    </div>
-
-  );
 };

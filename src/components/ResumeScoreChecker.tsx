@@ -51,6 +51,13 @@ export const ResumeScoreChecker: React.FC<ResumeScoreCheckerProps> = ({
       return;
     }
 
+    // Check subscription and score check credits
+    if (!userSubscription || (userSubscription.scoreChecksTotal - userSubscription.scoreChecksUsed) <= 0) {
+      alert('You have used all your score checks or do not have an active plan. Please upgrade your plan.');
+      onShowSubscriptionPlans();
+      return;
+    }
+
     if (!resumeText.trim()) {
       alert('Please upload your resume first');
       return;
