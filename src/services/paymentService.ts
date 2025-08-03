@@ -23,7 +23,7 @@ class PaymentService {
       name: '💎 Career Pro Max',
       price: 1999,
       duration: 'One-time Purchase',
-      optimizations: 30,
+      optimizations: 50,
       scoreChecks: 50,
       linkedinMessages: Infinity, // Unlimited
       guidedBuilds: 5,
@@ -33,7 +33,7 @@ class PaymentService {
       icon: 'crown',
       features: [
         '✅ 3 Months LinkedIn Premium',
-        '✅ 30 JD-Based Optimizations',
+        '✅ 50 JD-Based Optimizations',
         '✅ 5 Guided Resume Builds',
         '✅ 50 Resume Score Checks',
         '✅ Unlimited LinkedIn Messages (1 Month)',
@@ -47,7 +47,7 @@ class PaymentService {
       name: '⭐ Career Boost+',
       price: 1499,
       duration: 'One-time Purchase',
-      optimizations: 15,
+      optimizations: 30,
       scoreChecks: 30,
       linkedinMessages: Infinity, // Unlimited
       guidedBuilds: 3,
@@ -56,7 +56,7 @@ class PaymentService {
       gradient: 'from-blue-500 to-cyan-500',
       icon: 'zap',
       features: [
-        '✅ 15 JD-Based Optimizations',
+        '✅ 30 JD-Based Optimizations',
         '✅ 3 Guided Resume Builds',
         '✅ 30 Resume Score Checks',
         '✅ Unlimited LinkedIn Messages (1 Month)',
@@ -68,7 +68,7 @@ class PaymentService {
       name: '🔥 Pro Resume Kit',
       price: 999,
       duration: 'One-time Purchase',
-      optimizations: 10,
+      optimizations: 20,
       scoreChecks: 20,
       linkedinMessages: 100,
       guidedBuilds: 2,
@@ -77,7 +77,7 @@ class PaymentService {
       gradient: 'from-orange-500 to-red-500',
       icon: 'rocket',
       features: [
-        '✅ 10 JD-Based Optimizations',
+        '✅ 20 JD-Based Optimizations',
         '✅ 2 Guided Resume Builds',
         '✅ 20 Resume Score Checks',
         '✅ 100 LinkedIn Messages'
@@ -88,7 +88,7 @@ class PaymentService {
       name: '⚡ Smart Apply Pack',
       price: 499,
       duration: 'One-time Purchase',
-      optimizations: 5,
+      optimizations: 10,
       scoreChecks: 10,
       linkedinMessages: 50,
       guidedBuilds: 1,
@@ -97,7 +97,7 @@ class PaymentService {
       gradient: 'from-green-500 to-emerald-500',
       icon: 'target',
       features: [
-        '✅ 5 JD-Based Optimizations',
+        '✅ 10 JD-Based Optimizations',
         '✅ 2 Guided Resume Build',
         '✅ 10 Resume Score Checks',
         '✅ 50 LinkedIn Messages'
@@ -108,7 +108,7 @@ class PaymentService {
       name: '🛠 Resume Fix Pack',
       price: 199,
       duration: 'One-time Purchase',
-      optimizations: 2,
+      optimizations: 5,
       scoreChecks: 2,
       linkedinMessages: 0,
       guidedBuilds: 0,
@@ -117,7 +117,7 @@ class PaymentService {
       gradient: 'from-gray-500 to-gray-700',
       icon: 'wrench',
       features: [
-        '✅ 2 JD-Based Optimizations',
+        '✅ 5 JD-Based Optimizations',
         '✅ 2 Resume Score Checks',
         '✅ 1 Guided Resume Build'
       ]
@@ -127,7 +127,7 @@ class PaymentService {
       name: '🎯 Lite Check',
       price: 99,
       duration: 'One-time Purchase',
-      optimizations: 1,
+      optimizations: 2,
       scoreChecks: 2,
       linkedinMessages: 10,
       guidedBuilds: 0,
@@ -136,27 +136,9 @@ class PaymentService {
       gradient: 'from-teal-500 to-blue-500',
       icon: 'check_circle',
       features: [
-        '✅ 1 JD-Based Optimization',
+        '✅ 2 JD-Based Optimizations',
         '✅ 2 Resume Score Checks',
         '✅ 10 LinkedIn Messages'
-      ]
-    },
-    {
-      id: 'free_trial',
-      name: '🧪 Free Trial',
-      price: 0,
-      duration: 'One-time Use',
-      optimizations: 0, // No JD-based optimizations
-      scoreChecks: 2,
-      linkedinMessages: 5,
-      guidedBuilds: 0,
-      tag: 'New users just exploring',
-      tagColor: 'text-yellow-800 bg-yellow-100',
-      gradient: 'from-yellow-500 to-orange-500',
-      icon: 'gift',
-      features: [
-        '✅ 2 Resume Score Checks',
-        '✅ 5 LinkedIn Messages'
       ]
     }
   ];
@@ -749,9 +731,8 @@ class PaymentService {
         return { success: false, error: 'User already has an active subscription' };
       }
 
-      // Create free trial subscription
-      const result = await this.processFreeSubscription('free_trial', userId);
-      return result;
+      // Free trial no longer available
+      return { success: false, error: 'Free trial is no longer available. Please choose a paid plan.' };
     } catch (error) {
       console.error('Error activating free trial:', error);
       return { success: false, error: 'Failed to activate free trial' };
