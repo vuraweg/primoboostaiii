@@ -1,3 +1,4 @@
+// src/components/ResumeOptimizer.tsx
 import React, { useState, useEffect } from 'react';
 
 // CORRECTED IMPORT STATEMENT:
@@ -59,7 +60,8 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
   const [githubUrl, setGithubUrl] = useState('');      // Retained for form data structure, but marked as deprecated in optimizeResume call
   const [userType, setUserType] = useState<UserType>('fresher');
   const [optimizedResume, setOptimizedResume] = useState<ResumeData | null>(null);
-  const [activeTab, setActiveTab] = ('resume' | 'analysis'); // NEW: Added activeTab state
+  // CORRECTED LINE: Provide a default string value and apply the type annotation
+  const [activeTab, setActiveTab] = useState<'resume' | 'analysis'>('resume'); 
 
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [showProjectMismatch, setShowProjectMismatch] = useState(false);
