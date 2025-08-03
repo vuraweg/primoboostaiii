@@ -400,7 +400,7 @@ class PaymentService {
       console.log('processPayment: Razorpay script loaded successfully.');
 
       console.log('processPayment: User session and access token obtained from calling component.');
-      console.log('processPayment: User Access Token (first 10 chars):', accessToken.substring(0, 10) + '...');
+      console.log('processPayment: User Access Token (first 10 chars):', accessToken ? accessToken.substring(0, 10) + '...' : 'N/A (undefined/null)');
       
       console.log('processPayment: Calling createOrder to initiate a new Razorpay order...');
       let orderData;
