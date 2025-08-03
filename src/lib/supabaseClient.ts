@@ -1,11 +1,16 @@
+// src/lib/supabaseClient.ts
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('SupabaseClient: Missing Supabase environment variables. VITE_SUPABASE_URL:', supabaseUrl, 'VITE_SUPABASE_ANON_KEY:', supabaseAnonKey);
   throw new Error('Missing Supabase environment variables. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.');
 }
+
+console.log('SupabaseClient: Initializing client with VITE_SUPABASE_URL:', supabaseUrl ? 'Found' : 'Not Found');
+console.log('SupabaseClient: Initializing client with VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? 'Found' : 'Not Found');
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -14,6 +19,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true
   }
 });
+
+console.log('SupabaseClient: Supabase client initialized successfully.');
 
 // Database types for better TypeScript support - Updated for new table structure
 interface Database {
