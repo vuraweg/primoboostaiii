@@ -1,3 +1,4 @@
+// src/components/payment/SubscriptionPlans.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Check,
@@ -138,7 +139,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
   };
 
   const goToSlide = (index: number) => {
-    setCurrentSlide(index);
+    goToSlide(index);
   };
 
   const handleApplyCoupon = () => {
@@ -185,6 +186,19 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
     if (!user || !selectedPlanData) return;
     setIsProcessing(true);
     try {
+      // Retrieve the session and access token
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !session || !session.access_token) {
+        console.error('SubscriptionPlans: No active session found for payment:', sessionError);
+        // Optionally, show an error message to the user or redirect to login
+        alert('Please log in to complete your purchase.');
+        setIsProcessing(false);
+        return;
+      }
+
+      const accessToken = session.access_token;
+
       if (grandTotal === 0) {
         const result = await paymentService.processFreeSubscription(
           selectedPlan,
@@ -207,6 +221,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
           paymentData,
           user.email,
           user.name,
+          accessToken, // Pass the access token here
           appliedCoupon ? appliedCoupon.code : undefined,
           walletDeduction,
           addOnsTotal
@@ -327,20 +342,20 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
                 onClick={prevSlide}
                 className="absolute left-1 sm:left-2 top-1/2 transform -translate-y-1/2 bg-white/90 hover:bg-white text-gray-700 p-2 rounded-full shadow-lg transition-all duration-200 z-10 min-w-[44px] min-h-[44px] flex items-center justify-center"
               >
-                <ChevronLeft className="w-4 h-4 sm:w-6 sm:h-6" />
+                <ChevronLeft className="w-4 h-4 sm:w-6 h-6" />
               </button>
               <button
                 onClick={nextSlide}
                 className="absolute right-1 sm:right-2 top-1/2 transform -translate-y-1/2 bg-white/90 hover:bg-white text-gray-700 p-2 rounded-full shadow-lg transition-all duration-200 z-10 min-w-[44px] min-h-[44px] flex items-center justify-center"
               >
-                <ChevronRight className="w-4 h-4 sm:w-6 sm:h-6" />
+                <ChevronRight className="w-4 h-4 sm:w-6 h-6" />
               </button>
               <div className="flex justify-center space-x-2 mt-3 sm:mt-6">
                 {plans.map((_, idx) => (
                   <button
                     key={idx}
                     onClick={() => goToSlide(idx)}
-                    className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full transition-all duration-200 ${
+                    className={`w-2 h-2 sm:w-3 h-3 rounded-full transition-all duration-200 ${
                       idx === currentSlide ? 'bg-indigo-600 scale-125' : 'bg-gray-300 hover:bg-gray-400'
                     }`}
                   />
@@ -371,7 +386,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
                 <div className="p-3 lg:p-6">
                   <div className="text-center mb-3 lg:mb-6">
                     <div
-                      className={`bg-gradient-to-r ${plan.gradient || ''} w-10 h-10 lg:w-16 lg:h-16 rounded-lg lg:rounded-2xl flex items-center justify-center mx-auto mb-2 lg:mb-4 text-white shadow-lg`}
+                      className={`bg-gradient-to-r ${plan.gradient || ''} w-10 h-10 lg:w-16 h-16 rounded-lg lg:rounded-2xl flex items-center justify-center mx-auto mb-2 lg:mb-4 text-white shadow-lg`}
                     >
                       {getPlanIcon(plan.icon || '')}
                     </div>
@@ -397,7 +412,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
                   <ul className="space-y-1 lg:space-y-3 mb-3 lg:mb-6 max-h-24 lg:max-h-none overflow-y-auto lg:overflow-visible">
                     {plan.features.slice(0, 4).map((feature: string, index: number) => (
                       <li key={index} className="flex items-start">
-                        <Check className="w-3 h-3 lg:w-5 lg:h-5 text-emerald-500 mr-1 lg:mr-3 mt-0.5 flex-shrink-0" />
+                        <Check className="w-3 h-3 lg:w-5 h-5 text-emerald-500 mr-1 lg:mr-3 mt-0.5 flex-shrink-0" />
                         <span className="text-gray-700 text-xs lg:text-sm break-words">{feature}</span>
                       </li>
                     ))}
@@ -411,7 +426,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
                   >
                     {selectedPlan === plan.id ? (
                       <span className="flex items-center justify-center">
-                        <Check className="w-3 h-3 lg:w-5 lg:h-5 mr-1 lg:mr-2" />
+                        <Check className="w-3 h-3 lg:w-5 h-5 mr-1 lg:mr-2" />
                         Selected
                       </span>
                     ) : (
@@ -427,7 +442,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
           <div className="max-w-2xl mx-auto mt-4 sm:mt-6">
             <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-lg sm:rounded-2xl p-3 sm:p-6 mb-3 sm:mb-6 border border-gray-200">
               <h3 className="text-base sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4 flex items-center">
-                <Crown className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-indigo-600" />
+                <Crown className="w-4 h-4 sm:w-5 h-5 mr-2 text-indigo-600" />
                 Payment Summary
               </h3>
               <div className="space-y-2 sm:space-y-3 text-sm sm:text-base">
@@ -553,7 +568,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
             <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg sm:rounded-2xl p-3 sm:p-6 mb-3 sm:mb-6 border border-blue-200">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base sm:text-xl font-semibold text-gray-900 flex items-center">
-                  <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-blue-600" />
+                  <Plus className="w-4 h-4 sm:w-5 h-5 mr-2 text-blue-600" />
                   🛒 Add-Ons (Optional)
                 </h3>
                 <button
@@ -614,21 +629,21 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
               >
                 {isProcessing ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 sm:h-6 sm:w-6 border-2 border-white border-t-transparent" />
+                    <div className="animate-spin rounded-full h-4 w-4 sm:h-6 h-6 border-2 border-white border-t-transparent" />
                     <span className="break-words">Processing Payment...</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-4 h-4 sm:w-6 sm:h-6 flex-shrink-0" />
+                    <Sparkles className="w-4 h-4 sm:w-6 h-6 flex-shrink-0" />
                     <span className="break-words text-center">
                       {grandTotal === 0 ? 'Get Free Plan' : `Pay ₹${grandTotal.toFixed(2)} - Start Optimizing`}
                     </span>
-                    <ArrowRight className="w-3 h-3 sm:w-5 sm:h-5 flex-shrink-0" />
+                    <ArrowRight className="w-3 h-3 sm:w-5 h-5 flex-shrink-0" />
                   </>
                 )}
               </button>
               <p className="text-gray-500 text-xs sm:text-sm mt-3 sm:mt-4 flex items-center justify-center break-words px-4">
-                <Info className="w-3 h-3 sm:w-4 sm:h-4 mr-1 flex-shrink-0" />
+                <Info className="w-3 h-3 sm:w-4 h-4 mr-1 flex-shrink-0" />
                 <span>Secure payment powered by Razorpay • 256-bit SSL encryption</span>
               </p>
             </div>
