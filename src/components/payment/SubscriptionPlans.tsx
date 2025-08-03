@@ -195,14 +195,22 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
     try {
       // NEW LOG: Before getSession
       console.log('handlePayment: Attempting to get Supabase session...');
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      // Add a timeout to the getSession call
+      const sessionPromise = supabase.auth.getSession();
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Supabase session retrieval timed out')), 5000) // 5 seconds timeout
+      );
+
+      const { data: { session }, error: sessionError } = await Promise.race([sessionPromise, timeoutPromise]);
+
       // NEW LOG: After getSession
       console.log('handlePayment: Supabase session result - session:', session, 'error:', sessionError);
       if (sessionError || !session) {
         // NEW LOG: If session is invalid
         console.error('handlePayment: Failed to get session for payment, returning early.');
         setIsProcessing(false);
-        // Optionally, show an error to the user or redirect to login
+        alert(`Payment process failed: ${sessionError ? sessionError.message : 'No active session found.'}`); // Alert on error
         return;
       }
       const accessToken = session.access_token;
@@ -242,17 +250,14 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
         }
       }
     } catch (error) {
-      console.error('Payment process error:', error);
+      // Catch any errors from the try block, including the timeout error
+      console.error('handlePayment: Error during session retrieval or payment process:', error);
+      setIsProcessing(false); // Ensure loading state is reset on error
+      // Optionally, display an error message to the user
+      alert(`Payment process failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setIsProcessing(false);
     }
-  };
-
-  const handleAddOnQuantityChange = (addOnId: string, quantity: number) => {
-    setSelectedAddOns((prev) => ({
-      ...prev,
-      [addOnId]: Math.max(0, quantity),
-    }));
   };
 
   return (
