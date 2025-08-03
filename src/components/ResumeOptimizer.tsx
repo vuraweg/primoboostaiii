@@ -141,6 +141,7 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
   const handleOptimize = async () => {
     console.log('ResumeOptimizer: Starting handleOptimize function.');
     // Session validation before any API call
+    console.log('ResumeOptimizer: Checking supabase object:', supabase);
     console.log('ResumeOptimizer: Getting Supabase session...');
     const { data: { session } } = await supabase.auth.getSession();
     console.log('ResumeOptimizer: Supabase session obtained. Session exists:', !!session);
@@ -698,6 +699,9 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
                 handleOptimize={handleOptimize}
                 isAuthenticated={isAuthenticated}
                 onShowAuth={onShowAuth}
+                user={user}
+                onShowProfile={onShowProfile}
+                isOptimizing={isOptimizing}
                 currentStep={currentStep}
                 setCurrentStep={setCurrentStep}
               />
