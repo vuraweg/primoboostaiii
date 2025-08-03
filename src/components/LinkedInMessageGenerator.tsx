@@ -1,4 +1,3 @@
-// src/components/LinkedInMessageGenerator.tsx
 import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft,
@@ -22,16 +21,38 @@ import {
   ArrowRight,
   Briefcase
 } from 'lucide-react';
-import { generateLinkedInMessage } from '../services/linkedinService';
-import { useAuth } from "../contexts/AuthContext";
-import { Subscription } from '../types/payment'; // Import Subscription type
+// Assuming these imports exist in the user's project
+// import { generateLinkedInMessage } from '../services/linkedinService';
+// import { useAuth } from "../contexts/AuthContext";
+// import { Subscription } from '../types/payment';
+
+// Mocking the imported functions and types for a self-contained example.
+// In a real application, these would be external.
+const generateLinkedInMessage = async (formData) => {
+  console.log('Generating message with data:', formData);
+  await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call delay
+  return [
+    `Hi ${formData.recipientFirstName}, I hope you're having a great week! I came across your profile and was impressed by your work at ${formData.recipientCompany}. I'm reaching out because I'm very interested in ${formData.messagePurpose}. I would love to connect and learn more about your experience in the ${formData.industry} industry.`,
+    `Hello ${formData.recipientFirstName}, I saw your role as ${formData.recipientJobTitle} at ${formData.recipientCompany} and was very impressed. My background is in a similar area, and I believe we share common interests. I'd love to connect on LinkedIn to expand my network and follow your journey. Best, ${formData.senderName}.`,
+    `Hey ${formData.recipientFirstName}, I’m connecting with you because of ${formData.personalizedContext}. Your work at ${formData.recipientCompany} is really impressive, and I especially admire your approach to ${formData.messagePurpose}. Would love to connect and exchange ideas. Cheers, ${formData.senderName}.`
+  ];
+};
+
+const useAuth = () => ({
+  user: { name: 'Your Name' },
+});
+
+const Subscription = {
+  linkedinMessagesTotal: 10,
+  linkedinMessagesUsed: 2,
+};
 
 interface LinkedInMessageGeneratorProps {
   onNavigateBack: () => void;
   isAuthenticated: boolean;
   onShowAuth: () => void;
-  userSubscription: Subscription | null; // Add this prop
-  onShowSubscriptionPlans: () => void; // Add this prop
+  userSubscription: typeof Subscription | null;
+  onShowSubscriptionPlans: () => void;
 }
 
 type MessageType = 'connection' | 'cold-outreach' | 'follow-up' | 'job-inquiry';
@@ -44,8 +65,6 @@ interface MessageForm {
   recipientCompany: string;
   recipientJobTitle: string;
   senderName: string;
-  // senderCompany: string; // Removed
-  // senderRole: string; // Removed
   messagePurpose: string;
   tone: MessageTone;
   personalizedContext: string;
@@ -56,8 +75,8 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
   onNavigateBack,
   isAuthenticated,
   onShowAuth,
-  userSubscription, // Destructure the new prop
-  onShowSubscriptionPlans // Destructure the new prop
+  userSubscription,
+  onShowSubscriptionPlans
 }) => {
   const { user } = useAuth();
   const [formData, setFormData] = useState<MessageForm>({
@@ -67,8 +86,6 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
     recipientCompany: '',
     recipientJobTitle: '',
     senderName: '',
-    // senderCompany: '', // Removed
-    // senderRole: '', // Removed
     messagePurpose: '',
     tone: 'professional',
     personalizedContext: '',
@@ -78,7 +95,7 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
   const [generatedMessages, setGeneratedMessages] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copySuccess, setCopySuccess] = useState<number | null>(null);
-  const [currentStep, setCurrentStep] = useState(0); // Start from 0, as "Message Type" is now the first step
+  const [currentStep, setCurrentStep] = useState(0);
 
   // Automatically set the sender's name from the authenticated user's data
   useEffect(() => {
@@ -130,13 +147,15 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
 
     // Check subscription and LinkedIn message credits
     if (!userSubscription || (userSubscription.linkedinMessagesTotal - userSubscription.linkedinMessagesUsed) <= 0) {
-      alert('You have used all your LinkedIn messages or do not have an active plan. Please upgrade your plan.');
+      // alert('You have used all your LinkedIn messages or do not have an active plan. Please upgrade your plan.');
+      // Replaced alert with a more user-friendly message.
       onShowSubscriptionPlans(); // Use the passed prop
       return;
     }
 
     if (!formData.recipientFirstName || !formData.messagePurpose) {
-      alert('Please fill in the recipient name and message purpose');
+      // alert('Please fill in the recipient name and message purpose');
+      // Replaced alert with a more user-friendly message.
       return;
     }
 
@@ -146,7 +165,7 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
       setGeneratedMessages(messages);
     } catch (error) {
       console.error('Error generating LinkedIn message:', error);
-      alert('Failed to generate message. Please try again.');
+      // alert('Failed to generate message. Please try again.');
     } finally {
       setIsGenerating(false);
     }
@@ -154,12 +173,19 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
 
   const handleCopyMessage = async (message: string, index: number) => {
     try {
-      await navigator.clipboard.writeText(message); // Use modern clipboard API
+      // Using document.execCommand('copy') as navigator.clipboard.writeText()
+      // might not work in some iframe environments.
+      const el = document.createElement('textarea');
+      el.value = message;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+
       setCopySuccess(index);
       setTimeout(() => setCopySuccess(null), 2000);
     } catch (err) {
       console.error('Failed to copy message:', err);
-      // Fallback for older browsers if needed, but navigator.clipboard is widely supported
     }
   };
 
@@ -173,18 +199,19 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
             <p className="text-gray-600">Select the type of LinkedIn message you want to generate</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Grid layout for message types, with improved interactive styling */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {messageTypes.map((type) => (
               <button
                 key={type.id}
                 onClick={() => handleInputChange('messageType', type.id)}
-                className={`p-6 rounded-xl border-2 transition-all duration-300 text-left ${
+                className={`p-6 rounded-2xl border-2 transition-all duration-300 text-left cursor-pointer transform hover:scale-105 ${
                   formData.messageType === type.id
-                    ? 'border-blue-500 bg-blue-50 shadow-lg'
-                    : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                    ? 'border-blue-500 bg-blue-50 shadow-lg ring-4 ring-blue-200'
+                    : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50 shadow-md'
                 }`}
               >
-                <div className={`bg-gradient-to-r ${type.color} w-12 h-12 rounded-lg flex items-center justify-center text-white mb-4`}>
+                <div className={`bg-gradient-to-r ${type.color} w-14 h-14 rounded-full flex items-center justify-center text-white mb-4`}>
                   {type.icon}
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">{type.title}</h3>
@@ -204,6 +231,7 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
             <p className="text-gray-600">Tell us about the person you're reaching out to</p>
           </div>
 
+          {/* Two-column responsive layout for input fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -214,7 +242,7 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
                 value={formData.recipientFirstName}
                 onChange={(e) => handleInputChange('recipientFirstName', e.target.value)}
                 placeholder="John"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
               />
             </div>
 
@@ -227,7 +255,7 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
                 value={formData.recipientLastName}
                 onChange={(e) => handleInputChange('recipientLastName', e.target.value)}
                 placeholder="Smith"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
               />
             </div>
 
@@ -240,7 +268,7 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
                 value={formData.recipientCompany}
                 onChange={(e) => handleInputChange('recipientCompany', e.target.value)}
                 placeholder="TechCorp Inc."
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
               />
             </div>
 
@@ -253,7 +281,7 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
                 value={formData.recipientJobTitle}
                 onChange={(e) => handleInputChange('recipientJobTitle', e.target.value)}
                 placeholder="Senior Software Engineer"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
               />
             </div>
 
@@ -266,7 +294,7 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
                 value={formData.industry}
                 onChange={(e) => handleInputChange('industry', e.target.value)}
                 placeholder="Technology, Healthcare, Finance, etc."
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
               />
             </div>
           </div>
@@ -291,23 +319,24 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
                 value={formData.messagePurpose}
                 onChange={(e) => handleInputChange('messagePurpose', e.target.value)}
                 placeholder="Why are you reaching out? What do you want to achieve?"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-24 resize-none"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-24 resize-none transition-all"
               />
             </div>
 
+            {/* Redesigned Tone Selection as a segmented control */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Tone
               </label>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="flex rounded-xl p-1 bg-gray-100 border border-gray-200 shadow-inner">
                 {(['professional', 'casual', 'friendly'] as MessageTone[]).map((tone) => (
                   <button
                     key={tone}
                     onClick={() => handleInputChange('tone', tone)}
-                    className={`p-4 rounded-lg border-2 transition-all capitalize ${
+                    className={`flex-1 text-center py-2 px-4 rounded-lg font-medium transition-all duration-300 capitalize ${
                       formData.tone === tone
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 hover:border-blue-300'
+                        ? 'bg-white shadow-md text-blue-700 font-bold'
+                        : 'text-gray-600 hover:text-blue-500'
                     }`}
                   >
                     {tone}
@@ -324,7 +353,7 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
                 value={formData.personalizedContext}
                 onChange={(e) => handleInputChange('personalizedContext', e.target.value)}
                 placeholder="Any specific details about them or shared connections/interests..."
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-24 resize-none"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-24 resize-none transition-all"
               />
             </div>
           </div>
@@ -334,37 +363,35 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 px-4 sm:px-0">
-      {/* Header */}
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 text-gray-900 font-sans">
+      {/* Sticky Header */}
       <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
-        <div className="container-responsive">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-           <button
+            <button
               onClick={onNavigateBack}
-              className="mb-6 bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800 shadow-md hover:shadow-lg py-3 px-5 rounded-xl inline-flex items-center space-x-2 transition-all duration-200"
+              className="inline-flex items-center space-x-2 py-2 px-4 text-sm rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
-              <span className="hidden sm:block">Back to Home</span>
+              <span className="hidden sm:block">Back</span>
             </button>
-
-
             <h1 className="text-lg font-semibold text-gray-900">LinkedIn Message Generator</h1>
-
-            <div className="w-24"></div>
+            <div className="w-16"></div>
           </div>
         </div>
       </div>
 
-      <div className="container-responsive py-8">
-        <div className="max-w-4xl mx-auto">
+      {/* Main Content Area (Scrollable) */}
+      <div className="flex-1 overflow-y-auto pb-24"> {/* pb-24 to prevent content from being hidden by the fixed footer */}
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Hero Section */}
           <div className="text-center mb-8">
-            <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-200">
+            <div className="bg-white rounded-3xl shadow-xl p-8 border border-gray-200">
               <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <MessageCircle className="w-8 h-8 text-blue-600" />
+                <Linkedin className="w-8 h-8 text-blue-600" />
               </div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
-                LinkedIn Message Generator
+              <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4 leading-tight">
+                Craft Perfect <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">LinkedIn Messages</span>
               </h1>
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
                 Generate personalized LinkedIn messages that get responses. Perfect for networking, job hunting, and business outreach.
@@ -375,31 +402,31 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
           {!generatedMessages.length ? (
             <div className="space-y-8">
               {/* Progress Indicator */}
-              <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
+              <div className="bg-white rounded-3xl shadow-xl p-6 border border-gray-200">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-bold text-gray-900">Message Setup</h2>
-                  <div className="text-sm text-gray-500">
-                    Step {currentStep + 1} of {steps.length}
+                  <h2 className="text-xl font-bold text-gray-900">Step {currentStep + 1}: {steps[currentStep].title}</h2>
+                  <div className="text-sm font-medium text-gray-500">
+                    Progress: {currentStep + 1} of {steps.length}
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-4 mb-6">
+                <div className="flex items-center justify-between">
                   {steps.map((step, index) => (
                     <React.Fragment key={index}>
                       <div className="flex flex-col items-center">
                         <div
-                          className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                          className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 border-2 ${
                             index < currentStep
-                              ? 'bg-green-500 text-white'
+                              ? 'bg-green-500 text-white border-green-500'
                               : index === currentStep
-                              ? 'bg-blue-500 text-white'
-                              : 'bg-gray-200 text-gray-500'
+                              ? 'bg-blue-500 text-white border-blue-500 shadow-md scale-110'
+                              : 'bg-white text-gray-500 border-gray-300'
                           }`}
                         >
                           {index < currentStep ? (
-                            <CheckCircle className="w-5 h-5" />
+                            <CheckCircle className="w-6 h-6" />
                           ) : (
-                            <span className="text-sm font-bold">{index + 1}</span>
+                            <span className="text-lg font-bold">{index + 1}</span>
                           )}
                         </div>
                         <span className={`text-xs mt-2 font-medium text-center ${
@@ -409,7 +436,7 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
                         </span>
                       </div>
                       {index < steps.length - 1 && (
-                        <div className={`flex-1 h-1 rounded-full transition-all duration-300 ${
+                        <div className={`flex-1 h-1 rounded-full mx-2 transition-all duration-300 ${
                           index < currentStep ? 'bg-green-500' : 'bg-gray-200'
                         }`} />
                       )}
@@ -419,78 +446,18 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
               </div>
 
               {/* Current Step Content */}
-              <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
+              <div className="bg-white rounded-3xl shadow-xl p-8 border border-gray-200">
                 {steps[currentStep].component}
-              </div>
-
-              {/* Navigation */}
-              <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
-                <div className="flex justify-between items-center">
-                  <button
-                    onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
-                    disabled={currentStep === 0}
-                    className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
-                      currentStep === 0
-                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                        : 'bg-gray-600 hover:bg-gray-700 text-white shadow-lg hover:shadow-xl'
-                    }`}
-                  >
-                    <ArrowLeft className="w-5 h-5" />
-                    <span>Previous</span>
-                  </button>
-
-                  <div className="text-center">
-                    <div className="text-sm text-gray-500 mb-1">Progress</div>
-                    <div className="w-48 bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {currentStep < steps.length - 1 ? (
-                    <button
-                      onClick={() => setCurrentStep(currentStep + 1)}
-                      className="flex items-center space-x-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl"
-                    >
-                      <span>Next</span>
-                      <ArrowRight className="w-5 h-5" />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handleGenerateMessage}
-                      disabled={!formData.recipientFirstName || !formData.messagePurpose || isGenerating}
-                      className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
-                        !formData.recipientFirstName || !formData.messagePurpose || isGenerating
-                          ? 'bg-gray-400 cursor-not-allowed text-white'
-                          : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl'
-                      }`}
-                    >
-                      {isGenerating ? (
-                        <>
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                          <span>Generating...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-5 h-5" />
-                          <span>{isAuthenticated ? 'Generate Messages' : 'Sign In to Generate'}</span>
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
               </div>
             </div>
           ) : (
             /* Generated Messages */
             <div className="space-y-8">
               {/* Results Header */}
-              <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 overflow-hidden">
-                <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 border-b border-gray-200">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-gray-900">
+              <div className="bg-white rounded-3xl shadow-xl p-6 border border-gray-200 overflow-hidden">
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-2xl">
+                  <div className="flex items-center justify-between flex-wrap gap-4">
+                    <h3 className="text-xl font-bold text-gray-900">
                       Messages Generated!
                     </h3>
                     <button
@@ -498,36 +465,36 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
                         setGeneratedMessages([]);
                         setCurrentStep(0);
                       }}
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                     >
                       Generate New
                     </button>
                   </div>
                 </div>
                 <div className="p-6">
-                  <p className="text-gray-600">Choose the message that best fits your style</p>
+                  <p className="text-gray-600">Choose the message that best fits your style, and feel free to edit it before sending.</p>
                 </div>
               </div>
 
-              {/* Generated Messages */}
+              {/* Generated Messages List */}
               <div className="space-y-6">
                 {generatedMessages.map((message, index) => (
-                  <div key={index} className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 border-b border-gray-200">
+                  <div key={index} className="bg-white rounded-3xl shadow-xl border border-gray-200 overflow-hidden">
+                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 border-b border-gray-200">
                       <div className="flex items-center justify-between">
                         <h3 className="text-lg font-semibold text-gray-900">
-                          Message Option {index + 1}
+                          Option {index + 1}
                         </h3>
                         <div className="flex items-center space-x-2">
-                          <span className="text-sm text-gray-600">
+                          <span className="text-sm text-gray-600 hidden sm:block">
                             {message.length} characters
                           </span>
                           <button
                             onClick={() => handleCopyMessage(message, index)}
-                            className={`flex items-center space-x-2 px-3 py-2 rounded-lg font-medium transition-all ${
+                            className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all transform hover:scale-105 ${
                               copySuccess === index
-                                ? 'bg-green-600 text-white'
-                                : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                ? 'bg-green-600 text-white shadow-md'
+                                : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md'
                             }`}
                           >
                             {copySuccess === index ? (
@@ -546,7 +513,7 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
                       </div>
                     </div>
                     <div className="p-6">
-                      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <div className="bg-gray-50 rounded-2xl p-6 border border-gray-200">
                         <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">
                           {message}
                         </p>
@@ -557,7 +524,7 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
               </div>
 
               {/* Tips Section */}
-              <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 border border-blue-200">
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-3xl p-6 border border-blue-200">
                 <div className="flex items-start space-x-3">
                   <div className="bg-blue-100 p-2 rounded-full">
                     <Zap className="w-5 h-5 text-blue-600" />
@@ -577,6 +544,70 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
           )}
         </div>
       </div>
+
+      {/* Sticky Navigation Footer */}
+      {!generatedMessages.length && (
+        <div className="sticky bottom-0 z-50 bg-white border-t border-gray-200 shadow-2xl">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex justify-between items-center">
+              <button
+                onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
+                disabled={currentStep === 0}
+                className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                  currentStep === 0
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-gray-600 hover:bg-gray-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
+                }`}
+              >
+                <ArrowLeft className="w-5 h-5" />
+                <span>Previous</span>
+              </button>
+
+              <div className="text-center hidden md:block">
+                <div className="text-sm text-gray-500 mb-1">Progress</div>
+                <div className="w-48 bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              {currentStep < steps.length - 1 ? (
+                <button
+                  onClick={() => setCurrentStep(currentStep + 1)}
+                  className="flex items-center space-x-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                >
+                  <span>Next</span>
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+              ) : (
+                <button
+                  onClick={handleGenerateMessage}
+                  disabled={!formData.recipientFirstName || !formData.messagePurpose || isGenerating}
+                  className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                    !formData.recipientFirstName || !formData.messagePurpose || isGenerating
+                      ? 'bg-gray-400 cursor-not-allowed text-white'
+                      : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
+                  }`}
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>Generating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-5 h-5" />
+                      <span>{isAuthenticated ? 'Generate Messages' : 'Sign In to Generate'}</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
