@@ -57,7 +57,7 @@ class AuthService {
     }
 
     // After login, we don't need to fetch the profile here.
-    // The AuthContext will handle fetching the full profile after the SIGNED_IN event.
+    // The AuthContext will handle fetching the full profile after the SIGNED_IN_ event.
     // We return a minimal User object based on the Supabase auth user.
     const userResult: User = {
       id: data.user.id,
@@ -368,11 +368,13 @@ class AuthService {
 
       if (error) {
         console.error('AuthService: Session check failed in ensureValidSession:', error);
+        console.log('AuthService: Returning false due to getSession error.'); // NEW LOG
         return false;
       }
 
       if (!session) {
         console.log('AuthService: No active session found in ensureValidSession.');
+        console.log('AuthService: Returning false because no session was found.'); // NEW LOG
         return false;
       }
       console.log('AuthService: Session found in ensureValidSession. User ID:', session.user.id);
@@ -384,6 +386,7 @@ class AuthService {
         console.log('AuthService: refreshSession result - session:', refreshData.session ? 'exists' : 'null', 'error:', refreshError); // ADDED LOG
         if (refreshError || !refreshData.session) {
           console.error('AuthService: Session refresh failed in ensureValidSession:', refreshError);
+          console.log('AuthService: Returning false due to refreshSession error or no refreshed session.'); // NEW LOG
           return false;
         }
         console.log('AuthService: ✅ Session refreshed successfully in ensureValidSession.');
@@ -392,6 +395,7 @@ class AuthService {
       return true;
     } catch (error) {
       console.error('AuthService: Error in ensureValidSession:', error);
+      console.log('AuthService: Returning false due to unexpected error in ensureValidSession.'); // NEW LOG
       return false;
     }
   }
