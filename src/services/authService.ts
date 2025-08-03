@@ -249,6 +249,11 @@ class AuthService {
 
   async logout(): Promise<void> {
     console.log('AuthService: Starting logout process...');
+    // Capture session info BEFORE signing out
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id;
+    const accessToken = session?.access_token;
+
     console.log('AuthService: Calling supabase.auth.signOut() first for immediate UI feedback.');
     const { error } = await supabase.auth.signOut();
     
@@ -259,22 +264,21 @@ class AuthService {
 
     console.log('AuthService: supabase.auth.signOut() completed. Now handling device tracking.');
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        console.log('AuthService: Previous session found, attempting to log logout activity.');
-        const deviceId = await deviceTrackingService.registerDevice(session.user.id);
+      if (userId && accessToken) {
+        console.log('AuthService: Previous session info captured, attempting to log logout activity.');
+        const deviceId = await deviceTrackingService.registerDevice(userId); // Use captured userId
         if (deviceId) {
-          await deviceTrackingService.logActivity(session.user.id, 'logout', {
+          await deviceTrackingService.logActivity(userId, 'logout', { // Use captured userId
             logoutMethod: 'manual',
             timestamp: new Date().toISOString()
           }, deviceId);
           console.log('AuthService: Logout activity logged. Ending session via device tracking service.');
-          await deviceTrackingService.endSession(session.access_token, 'logout');
+          await deviceTrackingService.endSession(accessToken, 'logout'); // Use captured accessToken
         } else {
           console.warn('AuthService: Device ID not obtained, skipping device tracking session end.');
         }
       } else {
-        console.log('AuthService: No active session found to log for device tracking after sign out.');
+        console.log('AuthService: No active session info to log for device tracking after sign out.');
       }
     } catch (deviceError) {
       console.warn('AuthService: Failed to log logout activity or end session via device tracking:', deviceError);
