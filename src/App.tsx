@@ -1,7 +1,7 @@
 // src/App.tsx
 import React, { useState, useEffect } from 'react';
 import { Menu, X, Home, Info, BookOpen, Phone, FileText, LogIn, LogOut, User, Wallet } from 'lucide-react';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { useAuth } from './contexts/AuthContext';
 import { Header } from './components/Header';
 import { Navigation } from './components/navigation/Navigation';
 // import { MobileNavBar } from './components/navigation/MobileNavBar'; // <--- REMOVED IMPORT
