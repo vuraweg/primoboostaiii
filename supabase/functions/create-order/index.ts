@@ -10,8 +10,8 @@ interface OrderRequest {
   planId: string
   couponCode?: string
   walletDeduction?: number
-  addOnsTotal?: number // This value is what's causing the issue
-  amount: number // Add this field to the interface to explicitly accept the final amount from the frontend
+  addOnsTotal?: number
+  amount: number
 }
 
 interface PlanConfig {
@@ -32,9 +32,9 @@ const plans: PlanConfig[] = [
     name: 'Career Pro Max',
     price: 1999,
     duration: 'One-time Purchase',
-    optimizations: 30,
+    optimizations: 50, // Updated
     scoreChecks: 50,
-    linkedinMessages: 999999,
+    linkedinMessages: Infinity, // Updated
     guidedBuilds: 5,
     durationInHours: 24 * 365 * 10
   },
@@ -43,9 +43,9 @@ const plans: PlanConfig[] = [
     name: 'Career Boost+',
     price: 1499,
     duration: 'One-time Purchase',
-    optimizations: 15,
+    optimizations: 30, // Updated
     scoreChecks: 30,
-    linkedinMessages: 999999,
+    linkedinMessages: Infinity, // Updated
     guidedBuilds: 3,
     durationInHours: 24 * 365 * 10
   },
@@ -54,7 +54,7 @@ const plans: PlanConfig[] = [
     name: 'Pro Resume Kit',
     price: 999,
     duration: 'One-time Purchase',
-    optimizations: 10,
+    optimizations: 20, // Updated
     scoreChecks: 20,
     linkedinMessages: 100,
     guidedBuilds: 2,
@@ -65,7 +65,7 @@ const plans: PlanConfig[] = [
     name: 'Smart Apply Pack',
     price: 499,
     duration: 'One-time Purchase',
-    optimizations: 5,
+    optimizations: 10,
     scoreChecks: 10,
     linkedinMessages: 50,
     guidedBuilds: 1,
@@ -76,7 +76,7 @@ const plans: PlanConfig[] = [
     name: 'Resume Fix Pack',
     price: 199,
     duration: 'One-time Purchase',
-    optimizations: 2,
+    optimizations: 5,
     scoreChecks: 2,
     linkedinMessages: 0,
     guidedBuilds: 0,
@@ -87,20 +87,9 @@ const plans: PlanConfig[] = [
     name: 'Lite Check',
     price: 99,
     duration: 'One-time Purchase',
-    optimizations: 1,
+    optimizations: 2, // Updated
     scoreChecks: 2,
     linkedinMessages: 10,
-    guidedBuilds: 0,
-    durationInHours: 24 * 365 * 10
-  },
-  {
-    id: 'free_trial',
-    name: 'Free Trial',
-    price: 0,
-    duration: 'One-time Use',
-    optimizations: 0,
-    scoreChecks: 2,
-    linkedinMessages: 5,
     guidedBuilds: 0,
     durationInHours: 24 * 365 * 10
   }
@@ -154,12 +143,20 @@ serve(async (req) => {
     if (couponCode) {
       const normalizedCoupon = couponCode.toLowerCase().trim()
       
-      if (normalizedCoupon === 'first100' && planId === 'starter') {
+      // NEW: full_support coupon - free career_pro_max plan
+      if (normalizedCoupon === 'fullsupport' && planId === 'career_pro_max') {
+        finalAmount = 0
+        discountAmount = plan.price
+        appliedCoupon = 'fullsupport'
+      }
+      // first100 coupon - free lite_check plan only
+      else if (normalizedCoupon === 'first100' && planId === 'lite_check') { // Updated planId
         finalAmount = 0
         discountAmount = plan.price
         appliedCoupon = 'first100'
       }
-      else if (normalizedCoupon === 'worthyone') {
+      // worthyone coupon - 50% off career_pro_max plan only
+      else if (normalizedCoupon === 'worthyone' && planId === 'career_pro_max') { // Updated planId
         discountAmount = Math.floor(plan.price * 0.5)
         finalAmount = plan.price - discountAmount
         appliedCoupon = 'worthyone'
@@ -250,3 +247,4 @@ serve(async (req) => {
     )
   }
 })
+
