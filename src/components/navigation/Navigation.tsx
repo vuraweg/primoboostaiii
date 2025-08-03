@@ -67,7 +67,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChang
             className="flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 hover:bg-primary-50 hover:text-primary-700 text-gray-700"
           >
             <Zap className="w-4 h-4" />
-            <span>AI Tools</span>
+            <span>PRIMO Tools</span>
             <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showAIToolsDropdown ? 'rotate-180' : ''}`} />
           </button>
           
