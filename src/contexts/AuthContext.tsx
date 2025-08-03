@@ -33,7 +33,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
-    isLoading: true,
+    isLoading: true, // Start as loading
   });
 
   const [sessionRefreshTimer, setSessionRefreshTimer] = useState<NodeJS.Timeout | null>(null);
@@ -86,6 +86,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     let mounted = true;
+    let initialLoadProcessed = false; // Flag to ensure isLoading is set to false only once initially
 
     // Use onAuthStateChange to handle all auth state transitions, including initial load
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -93,15 +94,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (!mounted) return;
         console.log('AuthContext: Auth state changed event:', event, 'Session:', session ? session.user?.id : 'none');
 
-        // Set isLoading to false after the first event, whether there's a user or not
-        if (authState.isLoading) {
+        // This block ensures isLoading is set to false after the very first auth state check
+        if (!initialLoadProcessed) {
           setAuthState(prev => ({ ...prev, isLoading: false }));
+          initialLoadProcessed = true;
         }
 
         if (event === 'SIGNED_IN' && session?.user) {
           try {
             console.log('AuthContext: SIGNED_IN event. Fetching current user...');
-            const user = await authService.getCurrentUser();
+            const user = await authService.getCurrentUser(); // Fetch full user profile
             console.log('AuthContext: Current user fetched after SIGNED_IN. User:', user ? user.id : 'none');
             setAuthState({
               user,
@@ -127,13 +129,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           if (sessionRefreshTimer) clearTimeout(sessionRefreshTimer);
         } else if (event === 'TOKEN_REFRESHED' && session?.user) {
           console.log('AuthContext: ✅ Token refreshed automatically.');
+          // No need to fetch current user again here, as the session is just refreshed
           setAuthState(prev => ({
             ...prev,
             isLoading: false,
           }));
         } else if (event === 'USER_UPDATED' && session?.user) {
           console.log('AuthContext: USER_UPDATED event. Revalidating user session...');
-          revalidateUserSession();
+          revalidateUserSession(); // Revalidate to get updated user profile
         }
       }
     );
@@ -144,16 +147,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       subscription.unsubscribe();
       console.log('AuthContext: AuthProvider unmounted. Cleaned up timers and subscriptions.');
     };
-  }, []);
+  }, []); // Empty dependency array ensures this effect runs only once on mount
 
   const login = async (credentials: LoginCredentials) => {
     try {
       console.log('AuthContext: Calling authService.login...');
+      // authService.login will handle Supabase signInWithPassword
       await authService.login(credentials);
       console.log('AuthContext: authService.login completed.');
+      // The onAuthStateChange listener will pick up the SIGNED_IN event and update state
     } catch (error) {
       console.error('AuthContext: Login failed:', error);
-      setAuthState(prev => ({ ...prev, isLoading: false }));
+      setAuthState(prev => ({ ...prev, isLoading: false })); // Ensure loading is off on error
       throw error;
     }
   };
@@ -163,15 +168,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('AuthContext: Calling authService.signup...');
       const result = await authService.signup(credentials);
       console.log('AuthContext: authService.signup completed. Needs verification:', result.needsVerification);
-      if (!result.needsVerification) {
-        // auto-logged in, useEffect will handle state update
-      } else {
-        setAuthState(prev => ({ ...prev, isLoading: false }));
+      // The onAuthStateChange listener will pick up the SIGNED_IN event if auto-signed in
+      if (result.needsVerification) {
+        setAuthState(prev => ({ ...prev, isLoading: false })); // Ensure loading is off if verification is needed
       }
       return result;
     } catch (error) {
       console.error('AuthContext: Signup failed:', error);
-      setAuthState(prev => ({ ...prev, isLoading: false }));
+      setAuthState(prev => ({ ...prev, isLoading: false })); // Ensure loading is off on error
       throw error;
     }
   };
