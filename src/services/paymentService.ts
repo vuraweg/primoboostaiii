@@ -401,6 +401,7 @@ class PaymentService {
 
       console.log('processPayment: Attempting to get user session for payment processing...');
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      // NEW LOG: Log the raw result of getSession()
       console.log('processPayment: Raw getSession result:', { sessionData: session, sessionError: sessionError });
 
       if (sessionError) {
