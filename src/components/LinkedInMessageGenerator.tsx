@@ -322,7 +322,7 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 px-4 sm:px-0">
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
         <div className="container-responsive">

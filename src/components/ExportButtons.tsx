@@ -384,7 +384,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ resumeData, userTy
       )}
       
       {/* Mobile-specific instructions */}
-      <div className="mt-4 lg:hidden">
+      <div className="mt-6 lg:hidden">
         <div className="p-3 bg-primary-50 border border-primary-200 rounded-lg">
           <div className="flex items-start space-x-2">
             <div className="w-2 h-2 bg-primary-500 rounded-full mt-2 flex-shrink-0"></div>
@@ -399,7 +399,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ resumeData, userTy
       </div>
       
       {/* PDF Quality Notice */}
-      <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+      <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
         <div className="flex items-start space-x-2">
           <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
           <div className="text-fluid-sm text-green-800">

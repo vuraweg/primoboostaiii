@@ -207,9 +207,9 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
           paymentData,
           user.email,
           user.name,
-          appliedCoupon ? appliedCoupon.code : undefined, // Correctly passing couponCode
-          walletDeduction,                               // Correctly passing walletDeduction
-          addOnsTotal                                    // Correctly passing addOnsTotal
+          appliedCoupon ? appliedCoupon.code : undefined,
+          walletDeduction,
+          addOnsTotal
         );
         if (result.success) {
           onSubscriptionSuccess();

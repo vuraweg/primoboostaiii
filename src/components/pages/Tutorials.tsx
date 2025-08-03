@@ -24,7 +24,7 @@ import {
 export const Tutorials: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [showOverlay, setShowOverlay] = useState(true);
+  const [showOverlay, setShowOverlay] = useState(false);
 
   const categories = [
     { id: 'all', name: 'All Tutorials', count: 1 },

@@ -16,6 +16,7 @@
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
   }
   
   /* Fluid typography for semantic headings */
@@ -69,7 +70,7 @@
 @layer components {
   /* Container with responsive padding */
   .container-responsive {
-    @apply w-full max-w-10xl mx-auto px-4 sm:px-6 lg:px-4;
+    @apply w-full max-w-10xl mx-auto px-4 sm:px-6 lg:px-8;
   }
   
   /* Button base styles */
@@ -91,7 +92,7 @@
   }
   
   .card-hover {
-    @apply card transition-all duration-300 hover:shadow-lg hover:scale-[1.02];
+    @apply card transition-all duration-300 hover:shadow-lg hover:scale-[1.02] cursor-pointer;
   }
   
   /* Input styles */

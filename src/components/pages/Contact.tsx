@@ -134,7 +134,7 @@ export const Contact: React.FC = () => {
       </div>
 
       {/* Contact Info Cards */}
-      <div className="py-16 bg-white">
+      <div className="py-16 bg-white px-4 sm:px-0">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-12">
@@ -142,10 +142,10 @@ export const Contact: React.FC = () => {
               <p className="text-xl text-gray-600">Choose the method that works best for you</p>
             </div>
             
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {contactInfo.map((info, index) => (
                 <div key={index} className="group">
-                  <div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-2xl p-6 h-full border border-gray-100 hover:shadow-xl transition-all duration-300 hover:scale-105">
+                  <div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-2xl p-8 h-full border border-gray-100 hover:shadow-xl transition-all duration-300 hover:scale-105">
                     <div className={`bg-gradient-to-r ${info.color} w-12 h-12 rounded-xl flex items-center justify-center text-white mb-4 group-hover:scale-110 transition-transform duration-300`}>
                       {info.icon}
                     </div>

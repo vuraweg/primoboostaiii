@@ -194,7 +194,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             {/* Mobile Menu Button */}
-            <div className="md:hidden">
+            <div className="lg:hidden">
               <button
                 onClick={onMobileMenuToggle}
                 className="min-w-touch min-h-touch p-2 text-secondary-600 hover:text-secondary-900 hover:bg-secondary-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500"

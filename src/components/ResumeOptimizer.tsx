@@ -651,7 +651,7 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 pb-16">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 pb-16 px-4 sm:px-0">
       <div className="w-90vh max-w-7xl mx-auto px-0 sm:px-6 lg:px-8 py-8">
         {!optimizedResume ? ( // Conditional rendering: show input form OR results tabs
           <>
