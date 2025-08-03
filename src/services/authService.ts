@@ -381,8 +381,9 @@ class AuthService {
   async ensureValidSession(): Promise<boolean> {
     console.log('AuthService: Starting ensureValidSession...');
     try {
+      console.log('AuthService: Attempting to get session...');
       const { data: { session }, error } = await supabase.auth.getSession();
-      console.log('AuthService: getSession result - session:', session ? 'exists' : 'null', 'error:', error);
+      console.log('AuthService: getSession call completed. Session:', session ? 'exists' : 'null', 'Error:', error);
 
       if (error) {
         console.error('AuthService: Session check failed in ensureValidSession:', error);
@@ -399,9 +400,9 @@ class AuthService {
 
       const now = Math.floor(Date.now() / 1000);
       if (session.expires_at && session.expires_at < now + 300) {
-        console.log('AuthService: Session expiring soon in ensureValidSession, refreshing...');
+        console.log('AuthService: Session expiring soon in ensureValidSession, attempting refresh...');
         const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-        console.log('AuthService: refreshSession result - session:', refreshData.session ? 'exists' : 'null', 'error:', refreshError);
+        console.log('AuthService: refreshSession call completed. Session:', refreshData.session ? 'exists' : 'null', 'Error:', refreshError);
         if (refreshError || !refreshData.session) {
           console.error('AuthService: Session refresh failed in ensureValidSession:', refreshError);
           console.log('AuthService: Returning false due to refreshSession error or no refreshed session.');
@@ -476,4 +477,3 @@ class AuthService {
 }
 
 export const authService = new AuthService();
-
