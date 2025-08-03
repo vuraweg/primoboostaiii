@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Menu, Home, Info, Phone, BookOpen, FileText, LogIn, LogOut, MessageCircle, ChevronDown, Target, TrendingUp, PlusCircle, Zap } from 'lucide-react';
+import { Home, Info, Phone, BookOpen, FileText, LogIn, LogOut, MessageCircle, ChevronDown, Target, TrendingUp, PlusCircle, Zap } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface NavigationProps {
@@ -8,7 +8,6 @@ interface NavigationProps {
 }
 
 export const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChange }) => {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showAIToolsDropdown, setShowAIToolsDropdown] = useState(false);
   const { user, logout } = useAuth();
 
@@ -27,8 +26,8 @@ export const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChang
   ];
 
   const handlePageChange = (pageId: string) => {
+    // This is the simplified function. The mobile menu closing logic is now handled in the parent component.
     onPageChange(pageId);
-    setIsMobileMenuOpen(false);
     setShowAIToolsDropdown(false);
   };
 
@@ -37,7 +36,6 @@ export const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChang
       logout();
     } else {
       onPageChange('signin');
-      setIsMobileMenuOpen(false);
     }
   };
 
@@ -88,68 +86,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentPage, onPageChang
         </div>
       </nav>
 
-      {/* Mobile Menu Toggle */}
-      <button
-        onClick={() => {
-          setIsMobileMenuOpen(!isMobileMenuOpen);
-          setShowAIToolsDropdown(false);
-        }}
-        className="lg:hidden p-2 text-gray-700 min-w-touch min-h-touch rounded-lg hover:bg-gray-100 transition-colors"
-      >
-        {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-      </button>
-
-      {/* Mobile Menu */}
-      {isMobileMenuOpen && (
-        <div className="absolute top-12 left-0 right-0 bg-white border-t border-gray-200 shadow-md lg:hidden rounded-b-xl mx-4">
-          {navigationItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => handlePageChange(item.id)}
-              className={`w-full flex items-center px-6 py-4 text-sm font-medium transition-colors min-h-touch ${
-                currentPage === item.id
-                  ? 'bg-primary-100 text-primary-700'
-                  : 'text-gray-700 hover:bg-primary-50 hover:text-primary-700'
-              }`}
-            >
-              {item.icon}
-              <span className="ml-2">{item.label}</span>
-            </button>
-          ))}
-          
-          {/* AI Tools Section in Mobile Menu */}
-          <div className="border-t border-gray-200 pt-2">
-            <div className="px-6 py-2">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">PRIMO Tools</span>
-            </div>
-            {aiTools.map((tool) => (
-              <button
-                key={tool.id}
-                onClick={() => handlePageChange(tool.id)}
-                className={`w-full flex items-center px-8 py-3 text-sm font-medium transition-colors min-h-touch ${
-                  currentPage === tool.id
-                    ? 'bg-primary-100 text-primary-700'
-                    : 'text-gray-600 hover:bg-primary-50 hover:text-primary-700'
-                }`}
-              >
-                {tool.icon}
-                <span className="ml-2">{tool.label}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Sign In / Sign Out Button */}
-          <div className="border-t border-gray-200 pt-2">
-          <button
-            onClick={handleAuthAction}
-              className="w-full flex items-center px-6 py-4 text-sm font-medium text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors min-h-touch"
-          >
-            {user ? <LogOut className="w-4 h-4" /> : <LogIn className="w-4 h-4" />}
-            <span className="ml-2">{user ? 'Sign Out' : 'Sign In'}</span>
-          </button>
-          </div>
-        </div>
-      )}
+      {/* The mobile menu and toggle button have been removed from this component */}
     </>
   );
 };
