@@ -251,13 +251,20 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
       }
     } catch (error) {
       // Catch any errors from the try block, including the timeout error
-      console.error('handlePayment: Error during session retrieval or payment process:', error);
+      console.error('handlePayment: Error during session retrieval or payment process:', error); // Log the full error object
       setIsProcessing(false); // Ensure loading state is reset on error
-      // Optionally, display an error message to the user
+      // Display a more informative error message to the user
       alert(`Payment process failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleAddOnQuantityChange = (addOnId: string, quantity: number) => {
+    setSelectedAddOns((prev) => ({
+      ...prev,
+      [addOnId]: Math.max(0, quantity),
+    }));
   };
 
   return (
