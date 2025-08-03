@@ -28,6 +28,7 @@ import { SubscriptionPlan } from '../../types/payment';
 import { paymentService } from '../../services/paymentService';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
+import { authService } from '../../services/authService'; // Ensure authService is imported
 
 interface SubscriptionPlansProps {
   isOpen: boolean;
@@ -193,27 +194,28 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
     }
     setIsProcessing(true);
     try {
-      // NEW LOG: Before getSession
-      console.log('handlePayment: Attempting to get Supabase session...');
-      
-      // Add a timeout to the getSession call
-      const sessionPromise = supabase.auth.getSession();
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Supabase session retrieval timed out')), 5000) // 5 seconds timeout
-      );
+      // Step 1: Ensure the user's session is valid and refreshed
+      console.log('handlePayment: Ensuring valid Supabase session...');
+      const isSessionValid = await authService.ensureValidSession();
 
-      const { data: { session }, error: sessionError } = await Promise.race([sessionPromise, timeoutPromise]);
-
-      // NEW LOG: After getSession
-      console.log('handlePayment: Supabase session result - session:', session, 'error:', sessionError);
-      if (sessionError || !session) {
-        // NEW LOG: If session is invalid
-        console.error('handlePayment: Failed to get session for payment, returning early.');
+      if (!isSessionValid) {
+        console.error('handlePayment: Session is not valid, prompting user to sign in.');
         setIsProcessing(false);
-        alert(`Payment process failed: ${sessionError ? sessionError.message : 'No active session found.'}`); // Alert on error
+        alert('Your session has expired or is invalid. Please sign in again.');
+        return;
+      }
+
+      // Step 2: Retrieve the session (should be fast now that it's ensured valid)
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !session) {
+        console.error('handlePayment: Failed to retrieve session after validation:', sessionError);
+        setIsProcessing(false);
+        alert(`Payment process failed: ${sessionError ? sessionError.message : 'Could not retrieve active session.'}`);
         return;
       }
       const accessToken = session.access_token;
+
       if (grandTotal === 0) {
         const result = await paymentService.processFreeSubscription(
           selectedPlan,
@@ -232,7 +234,6 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
           amount: grandTotal,
           currency: 'INR',
         };
-        // NEW LOG: Before calling processPayment
         console.log('handlePayment: Calling paymentService.processPayment...');
         const result = await paymentService.processPayment(
           paymentData,
@@ -250,10 +251,8 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
         }
       }
     } catch (error) {
-      // Catch any errors from the try block, including the timeout error
-      console.error('handlePayment: Error during session retrieval or payment process:', error); // Log the full error object
-      setIsProcessing(false); // Ensure loading state is reset on error
-      // Display a more informative error message to the user
+      console.error('handlePayment: Error during session retrieval or payment process:', error);
+      setIsProcessing(false);
       alert(`Payment process failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setIsProcessing(false);
@@ -674,3 +673,4 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
     </div>
   );
 };
+
