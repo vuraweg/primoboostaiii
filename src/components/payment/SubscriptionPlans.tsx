@@ -1,4 +1,3 @@
-// src/components/payment/SubscriptionPlans.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Check,
@@ -28,7 +27,6 @@ import { SubscriptionPlan } from '../../types/payment';
 import { paymentService } from '../../services/paymentService';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
-import { authService } from '../../services/authService'; // Ensure authService is imported
 
 interface SubscriptionPlansProps {
   isOpen: boolean;
@@ -184,38 +182,9 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
   const grandTotal = finalPlanPrice + addOnsTotal;
 
   const handlePayment = async () => {
-    console.log('handlePayment: Function triggered.');
-    console.log('handlePayment: user:', user);
-    console.log('handlePayment: selectedPlanData:', selectedPlanData);
-    console.log('handlePayment: grandTotal:', grandTotal);
-    if (!user || !selectedPlanData) {
-      console.log('handlePayment: User or selectedPlanData is missing, returning early.');
-      return;
-    }
+    if (!user || !selectedPlanData) return;
     setIsProcessing(true);
     try {
-      // Step 1: Ensure the user's session is valid and refreshed
-      console.log('handlePayment: Ensuring valid Supabase session...');
-      const isSessionValid = await authService.ensureValidSession();
-
-      if (!isSessionValid) {
-        console.error('handlePayment: Session is not valid, prompting user to sign in.');
-        setIsProcessing(false);
-        alert('Your session has expired or is invalid. Please sign in again.');
-        return;
-      }
-
-      // Step 2: Retrieve the session (should be fast now that it's ensured valid)
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-      if (sessionError || !session) {
-        console.error('handlePayment: Failed to retrieve session after validation:', sessionError);
-        setIsProcessing(false);
-        alert(`Payment process failed: ${sessionError ? sessionError.message : 'Could not retrieve active session.'}`);
-        return;
-      }
-      const accessToken = session.access_token;
-
       if (grandTotal === 0) {
         const result = await paymentService.processFreeSubscription(
           selectedPlan,
@@ -234,12 +203,10 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
           amount: grandTotal,
           currency: 'INR',
         };
-        console.log('handlePayment: Calling paymentService.processPayment...');
         const result = await paymentService.processPayment(
           paymentData,
           user.email,
           user.name,
-          accessToken,
           appliedCoupon ? appliedCoupon.code : undefined,
           walletDeduction,
           addOnsTotal
@@ -251,9 +218,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
         }
       }
     } catch (error) {
-      console.error('handlePayment: Error during session retrieval or payment process:', error);
-      setIsProcessing(false);
-      alert(`Payment process failed: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Payment process error:', error);
     } finally {
       setIsProcessing(false);
     }
@@ -673,4 +638,3 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
     </div>
   );
 };
-
