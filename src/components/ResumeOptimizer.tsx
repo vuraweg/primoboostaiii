@@ -172,7 +172,7 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
     const { data: { session } } = await supabase.auth.getSession(); // Get session here
     console.log('handleOptimize: Supabase session fetched:', session ? 'exists' : 'null');
     const sessionValid = await authService.ensureValidSession();
-    console.log('ResumeOptimizer: ensureValidSession returned:', sessionValid); // ADDED LOG
+    console.log('ResumeOptimizer: authService.ensureValidSession() returned:', sessionValid); // ADDED LOG
     if (!sessionValid || !session?.access_token) { // Check for access_token too
       console.log('ResumeOptimizer: Session is not valid or access token missing, showing auth modal.'); // ADDED LOG
       alert('Your session has expired. Please sign in again.');
