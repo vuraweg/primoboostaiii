@@ -67,51 +67,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const revalidateUserSession = async () => {
+    try {
+      console.log('AuthContext: Revalidating user session...');
+      const user = await authService.getCurrentUser();
+      console.log('AuthContext: User revalidated. User:', user ? user.id : 'none');
+      setAuthState(prev => ({
+        ...prev,
+        user,
+        isAuthenticated: !!user,
+        isLoading: false, // Ensure isLoading is false after revalidation
+      }));
+    } catch (error) {
+      console.error('AuthContext: Error revalidating user session:', error);
+      setAuthState(prev => ({ ...prev, isLoading: false })); // Ensure isLoading is false on error
+    }
+  };
+
   useEffect(() => {
     let mounted = true;
-    let initialLoadComplete = false;
 
-    const getInitialSession = async () => {
-      try {
-        console.log('AuthContext: Starting getInitialSession...');
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Initial load timeout')), 45000) // Consider increasing this if network is slow
-        );
-
-        const userPromise = authService.getCurrentUser();
-        const user = await Promise.race([userPromise, timeoutPromise]) as User | null;
-
-        if (mounted && !initialLoadComplete) {
-          console.log('AuthContext: Initial session loaded. User:', user ? user.id : 'none');
-          setAuthState({
-            user,
-            isAuthenticated: !!user,
-            isLoading: false,
-          });
-          if (user) {
-            scheduleSessionRefresh();
-          }
-          initialLoadComplete = true;
-        }
-      } catch (error) {
-        console.error('AuthContext: Initial session error:', error);
-        if (mounted && !initialLoadComplete) {
-          setAuthState({
-            user: null,
-            isAuthenticated: false,
-            isLoading: false,
-          });
-          initialLoadComplete = true;
-        }
-      }
-    };
-
-    getInitialSession();
-
+    // Use onAuthStateChange to handle all auth state transitions, including initial load
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return;
         console.log('AuthContext: Auth state changed event:', event, 'Session:', session ? session.user?.id : 'none');
+
+        // Set isLoading to false after the first event, whether there's a user or not
+        if (authState.isLoading) {
+          setAuthState(prev => ({ ...prev, isLoading: false }));
+        }
 
         if (event === 'SIGNED_IN' && session?.user) {
           try {
@@ -153,20 +138,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     );
 
-    const fallbackTimeout = setTimeout(() => {
-      if (mounted && !initialLoadComplete) {
-        console.log('AuthContext: Fallback: Setting loading to false after 50s.');
-        setAuthState(prev => ({
-          ...prev,
-          isLoading: false,
-        }));
-        initialLoadComplete = true;
-      }
-    }, 50000);
-
     return () => {
       mounted = false;
-      clearTimeout(fallbackTimeout);
       if (sessionRefreshTimer) clearTimeout(sessionRefreshTimer);
       subscription.unsubscribe();
       console.log('AuthContext: AuthProvider unmounted. Cleaned up timers and subscriptions.');
@@ -236,23 +209,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     console.log('AuthContext: Calling authService.resetPassword...');
     await authService.resetPassword(newPassword);
     console.log('AuthContext: authService.resetPassword completed.');
-  };
-
-  const revalidateUserSession = async () => {
-    try {
-      console.log('AuthContext: Revalidating user session...');
-      const user = await authService.getCurrentUser();
-      console.log('AuthContext: User revalidated. User:', user ? user.id : 'none');
-      setAuthState(prev => ({
-        ...prev,
-        user,
-        isAuthenticated: !!user,
-        isLoading: false, // Ensure isLoading is false after revalidation
-      }));
-    } catch (error) {
-      console.error('AuthContext: Error revalidating user session:', error);
-      setAuthState(prev => ({ ...prev, isLoading: false })); // Ensure isLoading is false on error
-    }
   };
 
   const markProfilePromptSeen = async () => {
