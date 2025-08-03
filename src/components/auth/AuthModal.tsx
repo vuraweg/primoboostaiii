@@ -49,23 +49,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       isAuthenticated &&
       user &&
       isOpen &&
-      currentView !== 'postSignupPrompt' && // Do not auto-close if showing post-signup prompt
-      currentView !== 'success' // Do not auto-close if showing a generic success message that needs to be seen
-      // You might add other views here that should NOT trigger auto-close
+      currentView !== 'postSignupPrompt' &&
+      currentView !== 'success'
     ) {
-      console.log('User signed in, checking if profile needs update or closing AuthModal...');
-      if (user.hasSeenProfilePrompt === false) { // Assuming false means profile not filled/prompt not seen
-        console.log('User needs to fill profile. Prompting...');
+      console.log('AuthModal useEffect: User is authenticated and modal is open. Checking profile prompt status.');
+      console.log('AuthModal useEffect: user.hasSeenProfilePrompt:', user.hasSeenProfilePrompt);
+      if (user.hasSeenProfilePrompt === false) {
+        console.log('AuthModal useEffect: User needs to fill profile. Calling onProfileFillRequest.');
         timer = setTimeout(() => {
-          onProfileFillRequest('profile'); // Call the prop function, directing to profile
-          onClose(); // Close AuthModal
-        }, 300); // Short delay to ensure state updates
+          onProfileFillRequest('profile');
+          onClose();
+        }, 300);
       } else {
-        console.log('User profile is complete or prompt seen. Closing AuthModal...');
+        console.log('AuthModal useEffect: User profile is complete or prompt seen. Closing AuthModal.');
         timer = setTimeout(() => {
-          onClose(); // Close the modal
-        }, 300); // Short delay for smoother transition
+          onClose();
+        }, 300);
       }
+    } else {
+      console.log('AuthModal useEffect: Conditions not met for profile prompt check. isAuthenticated:', isAuthenticated, 'user:', !!user, 'isOpen:', isOpen, 'currentView:', currentView);
     }
     return () => {
       if (timer) clearTimeout(timer);
@@ -223,7 +225,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <p className="text-sm sm:text-base text-gray-600 leading-relaxed px-4">
                     A verification email has been sent to **{signupEmail}**. Please check your inbox to activate your account.
                   </p>
-               ) : (
+                ) : (
                 <p className="text-sm sm:text-base text-gray-600 leading-relaxed px-4">
                   Password reset email sent. Check your inbox!
                 </p>
