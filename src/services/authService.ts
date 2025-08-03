@@ -2,7 +2,6 @@
 import { User, LoginCredentials, SignupCredentials, ForgotPasswordData } from '../types/auth';
 import { supabase } from '../lib/supabaseClient';
 import { deviceTrackingService } from './deviceTrackingService';
-import { paymentService } from './paymentService';
 
 class AuthService {
   private isValidGmail(email: string): boolean {
@@ -365,6 +364,7 @@ class AuthService {
     console.log('AuthService: Starting ensureValidSession...');
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
+      console.log('AuthService: getSession result - session:', session ? 'exists' : 'null', 'error:', error); // ADDED LOG
 
       if (error) {
         console.error('AuthService: Session check failed in ensureValidSession:', error);
@@ -381,6 +381,7 @@ class AuthService {
       if (session.expires_at && session.expires_at < now + 300) {
         console.log('AuthService: Session expiring soon in ensureValidSession, refreshing...');
         const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        console.log('AuthService: refreshSession result - session:', refreshData.session ? 'exists' : 'null', 'error:', refreshError); // ADDED LOG
         if (refreshError || !refreshData.session) {
           console.error('AuthService: Session refresh failed in ensureValidSession:', refreshError);
           return false;
@@ -432,3 +433,4 @@ class AuthService {
 }
 
 export const authService = new AuthService();
+
