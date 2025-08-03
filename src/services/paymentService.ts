@@ -391,6 +391,7 @@ class PaymentService {
     console.log('processPayment: Function called with paymentData:', paymentData);
     try {
       // Load Razorpay script
+      console.log('processPayment: Attempting to load Razorpay script...');
       const scriptLoaded = await this.loadRazorpayScript();
       if (!scriptLoaded) {
         console.error('processPayment: Failed to load payment gateway script.');
@@ -399,8 +400,13 @@ class PaymentService {
       console.log('processPayment: Razorpay script loaded successfully.');
 
       console.log('processPayment: Attempting to get user session for payment processing...');
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log('processPayment: Raw getSession result:', { sessionData: session });
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      console.log('processPayment: Raw getSession result:', { sessionData: session, sessionError: sessionError });
+
+      if (sessionError) {
+        console.error('processPayment: Error getting Supabase session:', sessionError);
+        throw new Error(`Error getting user session: ${sessionError.message}`);
+      }
 
       if (!session || !session.access_token) {
         console.error('processPayment: User not authenticated or access token missing. Aborting payment process.');
@@ -408,13 +414,17 @@ class PaymentService {
       }
       const userAccessToken = session.access_token;
       console.log('processPayment: User session and access token obtained.');
+      console.log('processPayment: User Access Token (first 10 chars):', userAccessToken.substring(0, 10) + '...');
       
-      // New logging added here
       console.log('processPayment: Calling createOrder to initiate a new Razorpay order...');
-
-      // Create order via backend, now passing grandTotal and addOnsTotal
-      const orderData = await this.createOrder(paymentData.planId, paymentData.amount, addOnsTotal || 0, couponCode, walletDeduction);
-      console.log('processPayment: Order created successfully:', orderData.orderId, 'Amount:', orderData.amount);
+      let orderData;
+      try {
+        orderData = await this.createOrder(paymentData.planId, paymentData.amount, addOnsTotal || 0, couponCode, walletDeduction);
+        console.log('processPayment: Order created successfully:', orderData.orderId, 'Amount:', orderData.amount);
+      } catch (createOrderError) {
+        console.error('processPayment: Error creating order via backend:', createOrderError);
+        throw new Error(`Failed to create payment order: ${createOrderError instanceof Error ? createOrderError.message : String(createOrderError)}`);
+      }
 
       return new Promise((resolve) => {
         const options: RazorpayOptions = {
@@ -458,11 +468,12 @@ class PaymentService {
         };
 
         const razorpay = new window.Razorpay(options);
+        console.log('processPayment: Attempting to open Razorpay modal...');
         razorpay.open();
-        console.log('processPayment: Razorpay modal opened.');
+        console.log('processPayment: Razorpay modal opened (or attempted to open).');
       });
     } catch (error) {
-      console.error('Payment processing error in processPayment:', error);
+      console.error('Payment processing error in processPayment (outer catch block):', error);
       return { success: false, error: error instanceof Error ? error.message : 'Payment processing failed' };
     }
   }
