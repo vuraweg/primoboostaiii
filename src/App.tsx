@@ -80,6 +80,28 @@ function App() {
     console.log('App.tsx: handleShowProfile called. showProfileManagement set to true.');
   };
 
+  // REMOVED handleProfileCompleted function entirely
+  // const handleProfileCompleted = async () => {
+  //   setShowProfileManagement(false);
+  //   setCurrentPage('new-home');
+  //   setSuccessMessage('Profile updated successfully!');
+  //   setShowSuccessNotification(true);
+  //   setTimeout(() => {
+  //     setShowSuccessNotification(false);
+  //     setSuccessMessage('');
+  //   }, 3000);
+    
+  //   if (isPostSignupProfileFlow) {
+  //     console.log('App.tsx: Post-signup profile flow detected. Closing AuthModal.');
+  //     setShowAuthModal(false);
+  //     setIsPostSignupProfileFlow(false);
+  //   }
+    
+  //   if (user) {
+  //     await markProfilePromptSeen();
+  //   }
+  // };
+
   const handleNavigateHome = () => {
     setCurrentPage('new-home');
   };
@@ -365,6 +387,7 @@ function App() {
           isOpen={showSubscriptionPlans}
           onNavigateBack={() => setShowSubscriptionPlans(false)}
           onSubscriptionSuccess={handleSubscriptionSuccess}
+          onShowAlert={handleShowAlert} {/* ADDED: Pass handleShowAlert here */}
         />
       )}
       <AlertModal
