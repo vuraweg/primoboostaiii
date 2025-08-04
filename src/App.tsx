@@ -19,7 +19,7 @@ import { paymentService } from './services/paymentService';
 import { AlertModal } from './components/AlertModal'; // Import AlertModal
 
 function App() {
-  const { isAuthenticated, user, markProfilePromptSeen } = useAuth();
+  const { isAuthenticated, user, markProfilePromptSeen, isLoading } = useAuth(); // Destructure isLoading
 
   const [currentPage, setCurrentPage] = useState('new-home');
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -149,29 +149,34 @@ function App() {
 
   // NEW useEffect to manage AuthModal visibility based on user profile status
   useEffect(() => {
-    console.log('App.tsx useEffect: isAuthenticated:', isAuthenticated, 'user:', user?.id, 'hasSeenProfilePrompt:', user?.hasSeenProfilePrompt);
+    console.log('App.tsx useEffect: isAuthenticated:', isAuthenticated, 'user:', user?.id, 'hasSeenProfilePrompt:', user?.hasSeenProfilePrompt, 'isLoadingAuth:', isLoading);
+
+    // Wait until authentication state and user profile are fully loaded
+    if (isLoading) {
+      console.log('App.tsx useEffect: AuthContext is still loading, deferring AuthModal logic.');
+      return;
+    }
 
     if (isAuthenticated && user) {
-      // User is authenticated and user object is loaded
+      // User is authenticated
       // Check if hasSeenProfilePrompt is explicitly false
       if (user.hasSeenProfilePrompt === false) {
-        console.log('App.tsx useEffect: User profile incomplete, opening AuthModal to prompt for profile.');
+        console.log('App.tsx useEffect: User authenticated and profile incomplete, opening AuthModal to prompt.');
         setAuthModalInitialView('postSignupPrompt');
         setShowAuthModal(true);
       } else {
-        // If hasSeenProfilePrompt is true, or still undefined/null (meaning loading),
-        // ensure the AuthModal is closed. It should only be open for postSignupPrompt.
-        console.log('App.tsx useEffect: User authenticated, ensuring AuthModal is closed unless explicitly needing prompt.');
+        // User authenticated and profile is complete (hasSeenProfilePrompt is true)
+        console.log('App.tsx useEffect: User authenticated and profile complete, ensuring AuthModal is closed.');
         setShowAuthModal(false);
-        setAuthModalInitialView('login'); // Reset to default view
+        setAuthModalInitialView('login'); // Reset to default view for next time
       }
     } else {
-      // User is not authenticated, ensure modal is closed
+      // User is not authenticated
       console.log('App.tsx useEffect: User not authenticated, ensuring AuthModal is closed.');
       setShowAuthModal(false);
       setAuthModalInitialView('login'); // Reset to default view
     }
-  }, [isAuthenticated, user, user?.hasSeenProfilePrompt]); // Dependencies remain the same
+  }, [isAuthenticated, user, user?.hasSeenProfilePrompt, isLoading]); // Add isLoading to dependencies
 
   const renderCurrentPage = (isAuthenticatedProp: boolean) => {
     // Define props for HomePage once to ensure consistency
@@ -353,7 +358,8 @@ function App() {
         isOpen={showAuthModal}
         onClose={() => {
           setShowAuthModal(false);
-          setAuthModalInitialView('login'); // Reset initial view on close
+          // IMPORTANT: Do NOT reset authModalInitialView here.
+          // The useEffect in App.tsx will correctly set it based on user.hasSeenProfilePrompt.
           console.log('AuthModal closed, showAuthModal set to false');
         }}
         onProfileFillRequest={handleShowProfile} // Passed handleShowProfile here
@@ -364,7 +370,8 @@ function App() {
             markProfilePromptSeen();
           }
           setShowAuthModal(false); // Close the modal
-          setAuthModalInitialView('login'); // Reset initial view
+          // IMPORTANT: Do NOT reset authModalInitialView here.
+          // The useEffect in App.tsx will correctly set it based on user.hasSeenProfilePrompt.
         }}
       />
 
