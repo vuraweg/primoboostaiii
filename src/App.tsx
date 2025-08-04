@@ -276,14 +276,10 @@ function App() {
       )}
 
       {/* Auth Modal */}
-      <AuthModal
+       <AuthModal
         isOpen={showAuthModal}
-        onClose={() => {
-          setShowAuthModal(false);
-          console.log('AuthModal closed, showAuthModal set to false');
-        }}
-        onProfileFillRequest={handleShowProfile}
-        onPromptDismissed={markProfilePromptSeen}
+        onClose={() => setShowAuthModal(false)}
+        onProfileFillRequest={handleShowProfile} // Passed handleShowProfile here
       />
 
       {/* Profile Management Modal */}
