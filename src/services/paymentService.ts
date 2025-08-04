@@ -241,8 +241,8 @@ class PaymentService {
         .from('payment_transactions')
         .select('id')
         .eq('user_id', userId)
+        .in('status', ['success', 'failed']) // MODIFIED: Check for both 'success' and 'failed' statuses
         .eq('coupon_code', normalizedCoupon)
-        .eq('status', 'success') // Only count successful uses
         .limit(1);
 
       if (error) {
