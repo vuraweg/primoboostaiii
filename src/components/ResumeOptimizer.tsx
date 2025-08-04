@@ -1,4 +1,4 @@
-/ src/components/ResumeOptimizer.tsx
+
 import React, { useState, useEffect } from 'react';
 
 // Supabase client and auth context
