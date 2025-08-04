@@ -7,7 +7,7 @@ import { Navigation } from './components/navigation/Navigation';
 import ResumeOptimizer from './components/ResumeOptimizer';
 import { HomePage } from './components/pages/HomePage';
 import { GuidedResumeBuilder } from './components/GuidedResumeBuilder';
-import { ResumeScoreChecker } = './components/ResumeScoreChecker';
+import { ResumeScoreChecker } from './components/ResumeScoreChecker'; // CORRECTED LINE
 import { LinkedInMessageGenerator } from './components/LinkedInMessageGenerator';
 import { AboutUs } from './components/pages/AboutUs';
 import { Contact } from './components/pages/Contact';
