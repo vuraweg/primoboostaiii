@@ -1,3 +1,4 @@
+// src/services/paymentService.ts
 import { SubscriptionPlan, PaymentData, RazorpayOptions, RazorpayResponse, Subscription } from '../types/payment';
 import { supabase } from '../lib/supabaseClient';
 
@@ -226,13 +227,44 @@ class PaymentService {
   }
 
   // Apply coupon code
-  applyCoupon(planId: string, couponCode: string): { finalAmount: number; discountAmount: number; couponApplied: string | null } {
+  async applyCoupon(planId: string, couponCode: string, userId: string | null): Promise<{ finalAmount: number; discountAmount: number; couponApplied: string | null; error?: string }> {
     const plan = this.getPlanById(planId);
     if (!plan) {
-      return { finalAmount: 0, discountAmount: 0, couponApplied: null };
+      return { finalAmount: 0, discountAmount: 0, couponApplied: null, error: 'Plan not found.' };
     }
 
     const normalizedCoupon = couponCode.toLowerCase().trim();
+
+    // Check if user has already used this coupon (frontend check)
+    if (userId) {
+      const { data, error } = await supabase
+        .from('payment_transactions')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('coupon_code', normalizedCoupon)
+        .eq('status', 'success') // Only count successful uses
+        .limit(1);
+
+      if (error) {
+        console.error('Error checking coupon usage on frontend:', error);
+        // Continue without applying coupon if there's a database error
+        return {
+          finalAmount: plan.price,
+          discountAmount: 0,
+          couponApplied: null,
+          error: 'Failed to verify coupon usage. Please try again.'
+        };
+      }
+
+      if (data && data.length > 0) {
+        return {
+          finalAmount: plan.price,
+          discountAmount: 0,
+          couponApplied: null,
+          error: 'This coupon has already been used by your account.'
+        };
+      }
+    }
 
     // NEW: full_support coupon - free career_pro_max plan
     if (normalizedCoupon === this.COUPON_FULL_SUPPORT_CODE && planId === 'career_pro_max') {
@@ -512,7 +544,7 @@ class PaymentService {
           guided_builds_used: 0,
           guided_builds_total: plan.guidedBuilds,
           payment_id: null,
-          coupon_used: couponCode || null,
+          coupon_used: couponCode, // Pass couponCode here
           created_at: now.toISOString(),
           updated_at: now.toISOString(),
         })
@@ -815,3 +847,4 @@ class PaymentService {
 }
 
 export const paymentService = new PaymentService();
+
