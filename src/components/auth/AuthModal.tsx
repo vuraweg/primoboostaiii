@@ -41,39 +41,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   }, [isOpen, currentView, onPromptDismissed]);
 
   // NEW useEffect: Auto-close modal on successful authentication
-  useEffect(() => {
-    let timer: NodeJS.Timeout | null = null;
-    // Check if authenticated, user object is loaded, modal is open,
-    // AND we are not currently showing the needs-email-verification or post-signup-prompt view
-    if (
-      isAuthenticated &&
-      user &&
-      isOpen &&
-      currentView !== 'postSignupPrompt' &&
-      currentView !== 'success'
-    ) {
-      console.log('AuthModal useEffect: User is authenticated and modal is open. Checking profile prompt status.');
-      console.log('AuthModal useEffect: user.hasSeenProfilePrompt:', user.hasSeenProfilePrompt);
-      if (user.hasSeenProfilePrompt === false) {
-        console.log('AuthModal useEffect: User needs to fill profile. Calling onProfileFillRequest.');
-        timer = setTimeout(() => {
-          onProfileFillRequest('profile');
-          onClose();
-        }, 300);
-      } else {
-        console.log('AuthModal useEffect: User profile is complete or prompt seen. Closing AuthModal.');
-        timer = setTimeout(() => {
-          onClose();
-        }, 300);
+ useEffect(() => {
+    console.log('App.tsx useEffect: isAuthenticated:', isAuthenticated, 'user:', user?.id, 'hasSeenProfilePrompt:', user?.hasSeenProfilePrompt);
+    // Only proceed if user object is fully loaded and isAuthenticated is true
+    if (isAuthenticated && user && (user.hasSeenProfilePrompt !== null && user.hasSeenProfilePrompt !== undefined)) {
+      // If user has seen the profile prompt, and the AuthModal is currently open, close it.
+      if (user.hasSeenProfilePrompt === true && showAuthModal) {
+        console.log('App.tsx useEffect: User profile complete, closing AuthModal.');
+        setShowAuthModal(false);
+        setAuthModalInitialView('login'); // Reset initial view
       }
-    } else {
-      console.log('AuthModal useEffect: Conditions not met for profile prompt check. isAuthenticated:', isAuthenticated, 'user:', !!user, 'isOpen:', isOpen, 'currentView:', currentView);
+      // If user has NOT seen the profile prompt, open it to prompt for profile completion.
+      // REMOVED: `&& !showAuthModal` condition
+      else if (user.hasSeenProfilePrompt === false) {
+        console.log('App.tsx useEffect: User profile incomplete, opening AuthModal to prompt for profile.');
+        setAuthModalInitialView('postSignupPrompt'); // Set view to profile prompt
+        setShowAuthModal(true); // Open the AuthModal
+      }
     }
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [isAuthenticated, user, isOpen, currentView, onClose, onProfileFillRequest]);
-
+    // If user logs out, ensure AuthModal is closed
+    if (!isAuthenticated && showAuthModal) {
+      console.log('App.tsx useEffect: User logged out, closing AuthModal.');
+      setShowAuthModal(false);
+      setAuthModalInitialView('login'); // Reset initial view
+    }
+  }, [isAuthenticated, user, user?.hasSeenProfilePrompt, showAuthModal]); // Depend on isAuthenticated and user.hasSeenProfilePrompt
 
   // --- CONDITIONAL RETURN IS NOW AFTER ALL HOOKS ---
   if (!isOpen) {
