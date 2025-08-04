@@ -54,19 +54,17 @@ type ProfileFormData = z.infer<typeof profileSchema>;
 interface UserProfileManagementProps {
   isOpen: boolean;
   onClose: () => void;
-  onProfileCompleted?: () => void;
   viewMode?: 'profile' | 'wallet';
-  walletRefreshKey?: number; // NEW: Accept walletRefreshKey as a prop
+  walletRefreshKey?: number;
 }
 
 export const UserProfileManagement: React.FC<UserProfileManagementProps> = ({
   isOpen,
   onClose,
-  onProfileCompleted,
   viewMode = 'profile',
-  walletRefreshKey // NEW: Destructure the prop
+  walletRefreshKey
 }) => {
-  const { user, revalidateUserSession } = useAuth();
+  const { user, revalidateUserSession, markProfilePromptSeen } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -83,6 +81,42 @@ export const UserProfileManagement: React.FC<UserProfileManagementProps> = ({
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [redeemSuccess, setRedeemSuccess] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+
+  // Function to fetch wallet data from Supabase
+  const fetchWalletData = async () => {
+    if (!user) return;
+    console.log('Fetching wallet data for user ID:', user.id);
+
+    try {
+      const { data: transactions, error } = await supabase
+        .from('wallet_transactions')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error fetching wallet data:', error);
+        return;
+      }
+      console.log('Raw fetched transactions:', transactions);
+
+      const completedTransactions = transactions?.filter(t => t.status === 'completed') || [];
+      console.log('Filtered completed transactions (for balance):', completedTransactions);
+
+      const balance = completedTransactions.reduce((sum, transaction) => sum + parseFloat(transaction.amount), 0);
+      setWalletBalance(Math.max(0, balance));
+      console.log('Calculated wallet balance:', balance);
+
+      const pendingTransactions = transactions?.filter(t => t.status === 'pending' && parseFloat(t.amount) > 0) || [];
+      console.log('Filtered pending transactions (for earnings):', pendingTransactions);
+
+      const pending = pendingTransactions.reduce((sum, transaction) => sum + parseFloat(transaction.amount), 0);
+      setPendingEarnings(pending);
+      console.log('Calculated pending earnings:', pending);
+
+    } catch (err) {
+      console.error('Error fetching wallet data:', err);
+    }
+  };
 
   // Function to handle copying referral code to clipboard
   const handleCopyReferralCode = async () => {
@@ -102,48 +136,6 @@ export const UserProfileManagement: React.FC<UserProfileManagementProps> = ({
         setCopySuccess(true);
         setTimeout(() => setCopySuccess(false), 2000);
       }
-    }
-  };
-
-  // Function to fetch wallet data from Supabase
-  const fetchWalletData = async () => {
-    if (!user) return;
-    // --- ADDED CONSOLE.LOG HERE ---
-    console.log('Fetching wallet data for user ID:', user.id);
-
-    try {
-      const { data: transactions, error } = await supabase
-        .from('wallet_transactions')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (error) {
-        console.error('Error fetching wallet data:', error);
-        return;
-      }
-      // --- ADDED CONSOLE.LOG FOR ALL RAW TRANSACTIONS ---
-      console.log('Raw fetched transactions:', transactions);
-
-      const completedTransactions = transactions?.filter(t => t.status === 'completed') || [];
-      // --- ADDED CONSOLE.LOG FOR FILTERED COMPLETED TRANSACTIONS ---
-      console.log('Filtered completed transactions (for balance):', completedTransactions);
-
-      const balance = completedTransactions.reduce((sum, transaction) => sum + parseFloat(transaction.amount), 0);
-      setWalletBalance(Math.max(0, balance));
-      // --- ADDED CONSOLE.LOG FOR CALCULATED BALANCE ---
-      console.log('Calculated wallet balance:', balance);
-
-      const pendingTransactions = transactions?.filter(t => t.status === 'pending' && parseFloat(t.amount) > 0) || [];
-      // --- ADDED CONSOLE.LOG FOR FILTERED PENDING TRANSACTIONS ---
-      console.log('Filtered pending transactions (for earnings):', pendingTransactions);
-
-      const pending = pendingTransactions.reduce((sum, transaction) => sum + parseFloat(transaction.amount), 0);
-      setPendingEarnings(pending);
-      // --- ADDED CONSOLE.LOG FOR PENDING EARNINGS ---
-      console.log('Calculated pending earnings:', pending);
-
-    } catch (err) {
-      console.error('Error fetching wallet data:', err);
     }
   };
 
@@ -256,15 +248,13 @@ export const UserProfileManagement: React.FC<UserProfileManagementProps> = ({
       });
 
       await revalidateUserSession();
+      await markProfilePromptSeen();
 
       setSuccess(true);
-      if (onProfileCompleted) {
-        onProfileCompleted();
-      }
+      
+      // Close the modal after successful update and state synchronization
+      onClose();
 
-      setTimeout(() => {
-        setSuccess(false);
-      }, 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update profile');
     } finally {
@@ -743,7 +733,7 @@ export const UserProfileManagement: React.FC<UserProfileManagementProps> = ({
                           type="button" // Important: Prevent form submission if inside a form
                           onClick={() => setRedeemMethod('bank_transfer')}
                           className={`p-3 rounded-lg border-2 transition-all ${
-                            redeemMethod === 'bank_transfer' // Corrected from redeeemMethod
+                            redeemMethod === 'bank_transfer'
                               ? 'border-green-500 bg-green-50 text-green-700'
                               : 'border-gray-300 hover:border-green-300'
                           }`}
