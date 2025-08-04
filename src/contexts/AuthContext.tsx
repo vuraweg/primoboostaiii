@@ -147,7 +147,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []); // Empty dependency array ensures this effect runs only once on mount
 
   // ... (rest of the AuthContext component)
-};
+
 
   const login = async (credentials: LoginCredentials) => {
     try {
