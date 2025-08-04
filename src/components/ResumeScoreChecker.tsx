@@ -20,7 +20,7 @@ import {
   Briefcase, // For Project & Work Relevance
   LayoutDashboard, // For Structure & Flow
   Bug, // For Critical Fixes & Red Flags
-  ArrowRight, // <--- ADD THIS LINE
+  ArrowRight,
 } from 'lucide-react';
 import { FileUpload } from './FileUpload';
 import { getDetailedResumeScore } from '../services/scoringService';
@@ -61,7 +61,6 @@ export const ResumeScoreChecker: React.FC<ResumeScoreCheckerProps> = ({
 
     // Check subscription and score check credits
     if (!userSubscription || (userSubscription.scoreChecksTotal - userSubscription.scoreChecksUsed) <= 0) {
-      // Removed the alert() call
       onShowSubscriptionPlans(); // Directly show the subscription plans modal
       return;
     }
@@ -80,7 +79,24 @@ export const ResumeScoreChecker: React.FC<ResumeScoreCheckerProps> = ({
         jd,
         setIsAnalyzing
       );
-      setScoreResult(result);
+
+      // Dynamically calculate the total score and grade from the breakdown
+      let totalScore = 0;
+      let totalMaxScore = 0;
+      Object.values(result.breakdown).forEach(item => {
+        totalScore += item.score;
+        totalMaxScore += item.maxScore;
+      });
+
+      const calculatedTotalScore = Math.round((totalScore / totalMaxScore) * 100);
+      
+      // Update the result object with the new calculated scores
+      const updatedResult = {
+        ...result,
+        totalScore: calculatedTotalScore,
+      };
+
+      setScoreResult(updatedResult);
     } catch (error) {
       console.error('Error analyzing resume:', error);
       alert('Failed to analyze resume. Please try again.');
@@ -149,7 +165,7 @@ export const ResumeScoreChecker: React.FC<ResumeScoreCheckerProps> = ({
       <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
         <div className="container-responsive">
           <div className="flex items-center justify-between h-16">
-             <button
+            <button
               onClick={onNavigateBack}
               className="mb-6 bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800 shadow-md hover:shadow-lg py-3 px-5 rounded-xl inline-flex items-center space-x-2 transition-all duration-200"
             >
