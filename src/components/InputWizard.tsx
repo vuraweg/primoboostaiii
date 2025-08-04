@@ -9,12 +9,12 @@ import {
   ArrowRight,
   Sparkles,
   CheckCircle,
-  Edit3
+  Edit3 // Added for profile update button
 } from 'lucide-react';
 import { FileUpload } from './FileUpload';
 import { InputSection } from './InputSection';
 import { UserType } from '../types/resume';
-import { User as AuthUser } from '../types/auth';
+import { User as AuthUser } from '../types/auth'; // Import User type from auth
 
 interface InputWizardProps {
   resumeText: string;
@@ -28,10 +28,8 @@ interface InputWizardProps {
   handleOptimize: () => void;
   isAuthenticated: boolean;
   onShowAuth: () => void;
-  user: AuthUser | null;
-  onShowProfile: (mode?: 'profile' | 'wallet') => void;
-  currentStep: number; // Added currentStep prop
-  setCurrentStep: (step: number) => void; // Added setCurrentStep prop
+  user: AuthUser | null; // Added user prop
+  onShowProfile: (mode?: 'profile' | 'wallet') => void; // Added onShowProfile prop
 }
 
 export const InputWizard: React.FC<InputWizardProps> = ({
@@ -46,12 +44,10 @@ export const InputWizard: React.FC<InputWizardProps> = ({
   handleOptimize,
   isAuthenticated,
   onShowAuth,
-  user,
-  onShowProfile,
-  currentStep, // Destructure currentStep
-  setCurrentStep // Destructure setCurrentStep
+  user, // Destructure user
+  onShowProfile // Destructure onShowProfile
 }) => {
-  // const [currentStep, setCurrentStep] = useState(0); // Removed local state, now controlled by prop
+  const [currentStep, setCurrentStep] = useState(0);
 
   const steps = [
     {
@@ -125,9 +121,10 @@ export const InputWizard: React.FC<InputWizardProps> = ({
                   </p>
                 </div>
               </div>
+              {/* Updated button condition */}
               {isAuthenticated && user && (
                 <button
-                  onClick={() => onShowProfile('profile')}
+                  onClick={() => onShowProfile('profile')} // Explicitly pass 'profile' mode
                   className="mt-4 w-full flex items-center justify-center space-x-2 btn-primary py-2 px-4 rounded-lg text-sm"
                 >
                   <Edit3 className="w-4 h-4" />
@@ -138,7 +135,7 @@ export const InputWizard: React.FC<InputWizardProps> = ({
           </div>
         </div>
       ),
-      isValid: true
+      isValid: true // Optional step, always valid
     },
     {
       id: 'experience',
@@ -191,7 +188,7 @@ export const InputWizard: React.FC<InputWizardProps> = ({
           </div>
         </div>
       ),
-      isValid: true
+      isValid: true // Always valid since userType has a default value
     },
     {
       id: 'optimize',
@@ -244,7 +241,7 @@ export const InputWizard: React.FC<InputWizardProps> = ({
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log('InputWizard: Optimize button clicked. isAuthenticated:', isAuthenticated, 'resumeText length:', resumeText.length, 'jobDescription length:', jobDescription.length);
+                console.log('InputWizard: Optimize button clicked. isAuthenticated:', isAuthenticated, 'resumeText length:', resumeText.length, 'jobDescription length:', jobDescription.length); // ADDED LOG
                 if (isAuthenticated) {
                   handleOptimize();
                 } else {
@@ -320,7 +317,7 @@ export const InputWizard: React.FC<InputWizardProps> = ({
         </div>
 
         {/* Step Progress Bar - Carousel Effect */}
-        <div className="relative overflow-x-auto overflow-hidden w-full mx-auto md:w-auto"> {/* Changed w-[320px] to w-full */}
+        <div className="relative overflow-x-auto overflow-hidden w-[320px] mx-auto md:w-auto">
           <div
             className="flex items-center space-x-4 mb-6 transition-transform duration-300"
             style={{ transform: `translateX(${translateX}px)` }}
@@ -412,4 +409,3 @@ export const InputWizard: React.FC<InputWizardProps> = ({
     </div>
   );
 };
-
