@@ -26,6 +26,7 @@ import {
 // import { generateLinkedInMessage } from '../services/linkedinService';
 // import { useAuth } from "../contexts/AuthContext";
 // import { Subscription } from '../types/payment';
+import { paymentService } from '../services/paymentService'; // Import paymentService to get plan details
 
 // Mocking the imported functions and types for a self-contained example.
 // In a real application, these would be external.
@@ -54,6 +55,7 @@ interface LinkedInMessageGeneratorProps {
   onShowAuth: () => void;
   userSubscription: typeof Subscription | null;
   onShowSubscriptionPlans: () => void;
+  onShowAlert: (title: string, message: string, type?: 'info' | 'success' | 'warning' | 'error', actionText?: string, onAction?: () => void) => void; // Add this prop
 }
 
 type MessageType = 'connection' | 'cold-outreach' | 'follow-up' | 'job-inquiry';
@@ -77,7 +79,8 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
   isAuthenticated,
   onShowAuth,
   userSubscription,
-  onShowSubscriptionPlans
+  onShowSubscriptionPlans,
+  onShowAlert // Destructure
 }) => {
   const { user } = useAuth();
   const [formData, setFormData] = useState<MessageForm>({
@@ -142,21 +145,28 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
 
   const handleGenerateMessage = async () => {
     if (!isAuthenticated) {
-      onShowAuth();
+      onShowAlert('Authentication Required', 'Please sign in to generate LinkedIn messages.', 'error', 'Sign In', onShowAuth);
       return;
     }
 
     // Check subscription and LinkedIn message credits
     if (!userSubscription || (userSubscription.linkedinMessagesTotal - userSubscription.linkedinMessagesUsed) <= 0) {
-      // alert('You have used all your LinkedIn messages or do not have an active plan. Please upgrade your plan.');
-      // Replaced alert with a more user-friendly message.
-      onShowSubscriptionPlans(); // Use the passed prop
+      const planDetails = paymentService.getPlanById(userSubscription?.planId);
+      const planName = planDetails?.name || 'your current plan';
+      const linkedinMessagesTotal = planDetails?.linkedinMessages || 0;
+
+      onShowAlert(
+        'LinkedIn Message Credits Exhausted',
+        `You have used all your ${linkedinMessagesTotal} LinkedIn Message generations from ${planName}. Please upgrade your plan to continue generating messages.`,
+        'warning',
+        'Upgrade Plan',
+        onShowSubscriptionPlans
+      );
       return;
     }
 
     if (!formData.recipientFirstName || !formData.messagePurpose) {
-      // alert('Please fill in the recipient name and message purpose');
-      // Replaced alert with a more user-friendly message.
+      onShowAlert('Missing Information', 'Please fill in the recipient name and message purpose.', 'warning');
       return;
     }
 
@@ -166,7 +176,7 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
       setGeneratedMessages(messages);
     } catch (error) {
       console.error('Error generating LinkedIn message:', error);
-      // alert('Failed to generate message. Please try again.');
+      onShowAlert('Generation Failed', `Failed to generate message: ${error.message || 'Unknown error'}. Please try again.`, 'error');
     } finally {
       setIsGenerating(false);
     }
@@ -641,4 +651,3 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
     </div>
   );
 };
-
