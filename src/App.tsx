@@ -1,4 +1,3 @@
-// src/App.tsx
 import React, { useState, useEffect } from 'react';
 import { Menu, X, Home, Info, BookOpen, Phone, FileText, LogIn, LogOut, User, Wallet } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
@@ -19,7 +18,7 @@ import { paymentService } from './services/paymentService';
 import { AlertModal } from './components/AlertModal'; // Import AlertModal
 
 function App() {
-  const { isAuthenticated, user, markProfilePromptSeen, isLoading } = useAuth(); // Destructure isLoading
+  const { isAuthenticated, user, markProfilePromptSeen, isLoading } = useAuth();
 
   const [currentPage, setCurrentPage] = useState('new-home');
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -38,24 +37,24 @@ function App() {
   const [alertType, setAlertType] = useState<'info' | 'success' | 'warning' | 'error'>('info');
   const [alertActionText, setAlertActionText] = useState<string | undefined>(undefined);
   const [alertActionCallback, setAlertActionCallback] = useState<(() => void) | undefined>(undefined);
-
+  
   // NEW state for AuthModal's initial view
   const [authModalInitialView, setAuthModalInitialView] = useState<'login' | 'signup' | 'forgot-password' | 'success' | 'postSignupPrompt'>('login');
+  
+  // NEW: State to track if we're in the post-signup profile flow
+  const [isPostSignupProfileFlow, setIsPostSignupProfileFlow] = useState(false);
 
-
-  // Handle mobile menu toggle
   const handleMobileMenuToggle = () => {
     setShowMobileMenu(!showMobileMenu);
   };
 
   const logoImage = "https://res.cloudinary.com/dlkovvlud/image/upload/w_1000,c_fill,ar_1:1,g_auto,r_max,bo_5px_solid_red,b_rgb:262c35/v1751536902/a-modern-logo-design-featuring-primoboos_XhhkS8E_Q5iOwxbAXB4CqQ_HnpCsJn4S1yrhb826jmMDw_nmycqj.jpg";
 
-  // Handle page change from mobile nav
   const handlePageChange = (page: string) => {
     if (page === 'menu') {
       handleMobileMenuToggle();
     } else if (page === 'profile') {
-      handleShowProfile(); // Defaults to 'profile' mode
+      handleShowProfile();
       setShowMobileMenu(false);
     } else {
       setCurrentPage(page);
@@ -63,46 +62,74 @@ function App() {
     }
   };
 
-  // Handle showing auth modal
   const handleShowAuth = () => {
     console.log('handleShowAuth called in App.tsx');
     setShowAuthModal(true);
-    setAuthModalInitialView('login'); // Ensure it opens to login by default
+    setAuthModalInitialView('login');
     console.log('showAuthModal set to true');
     setShowMobileMenu(false);
   };
 
-  // UPDATED: Handle showing profile modal with an optional mode
-  const handleShowProfile = (mode: 'profile' | 'wallet' = 'profile') => {
+  // UPDATED: handleShowProfile now takes an optional `isPostSignup` flag
+  const handleShowProfile = (mode: 'profile' | 'wallet' = 'profile', isPostSignup: boolean = false) => {
     setProfileViewMode(mode);
     setShowProfileManagement(true);
     setShowMobileMenu(false);
+    setIsPostSignupProfileFlow(isPostSignup); // Set the new state
     console.log('App.tsx: handleShowProfile called. showProfileManagement set to true.');
   };
 
-  // Handle profile completion
+  // UPDATED: handleProfileCompleted now uses the new state variable
   const handleProfileCompleted = () => {
     setShowProfileManagement(false);
-    setCurrentPage('new-home'); // Redirect to home or a dashboard after profile update
+    setCurrentPage('new-home');
     setSuccessMessage('Profile updated successfully!');
     setShowSuccessNotification(true);
     setTimeout(() => {
       setShowSuccessNotification(false);
       setSuccessMessage('');
     }, 3000);
+    
+    // Correctly close the AuthModal if this was part of the post-signup flow
+    if (isPostSignupProfileFlow) {
+      console.log('App.tsx: Post-signup profile flow detected. Closing AuthModal.');
+      setShowAuthModal(false);
+      setIsPostSignupProfileFlow(false); // Reset the state
+    }
   };
 
-  // New function to navigate back to the home page
   const handleNavigateHome = () => {
     setCurrentPage('new-home');
   };
 
-  // New prop handler for showing subscription plans
   const handleShowSubscriptionPlans = () => {
     setShowSubscriptionPlans(true);
   };
 
-  // New function to show generic alert modal
+  const handleSubscriptionSuccess = async () => {
+    setShowSubscriptionPlans(false);
+    setSuccessMessage('Subscription activated successfully!');
+    setShowSuccessNotification(true);
+    setTimeout(() => {
+      setShowSuccessNotification(false);
+      setSuccessMessage('');
+    }, 3000);
+    await fetchSubscription();
+  };
+
+  const fetchSubscription = async () => {
+    if (isAuthenticated && user) {
+      const sub = await paymentService.getUserSubscription(user.id);
+      setUserSubscription(sub);
+    } else {
+      setUserSubscription(null);
+    }
+  };
+
+  useEffect(() => {
+    fetchSubscription();
+  }, [isAuthenticated, user]);
+
   const handleShowAlert = (
     title: string,
     message: string,
@@ -114,87 +141,59 @@ function App() {
     setAlertMessage(message);
     setAlertType(type);
     setAlertActionText(actionText);
-    setAlertActionCallback(() => { // Wrap in a function to prevent immediate execution
+    setAlertActionCallback(() => {
       if (onAction) onAction();
-      setShowAlertModal(false); // Close modal after action
+      setShowAlertModal(false);
     });
     setShowAlertModal(true);
   };
 
-
-  // Fetch user subscription on auth state change
-  useEffect(() => {
-    const fetchSubscription = async () => {
-      if (isAuthenticated && user) {
-        const sub = await paymentService.getUserSubscription(user.id);
-        setUserSubscription(sub);
-      } else {
-        setUserSubscription(null);
-      }
-    };
-    fetchSubscription();
-  }, [isAuthenticated, user]);
-
-  // Close mobile menu on window resize
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= 768) { // 768px is typically md breakpoint
+      if (window.innerWidth >= 768) {
         setShowMobileMenu(false);
       }
     };
-
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // NEW useEffect to manage AuthModal visibility based on user profile status
   useEffect(() => {
     console.log('App.tsx useEffect: isAuthenticated:', isAuthenticated, 'user:', user?.id, 'hasSeenProfilePrompt:', user?.hasSeenProfilePrompt, 'isLoadingAuth:', isLoading);
-
-    // Wait until authentication state and user profile are fully loaded
     if (isLoading) {
       console.log('App.tsx useEffect: AuthContext is still loading, deferring AuthModal logic.');
       return;
     }
-
     if (isAuthenticated && user) {
-      // CRITICAL: Only proceed if hasSeenProfilePrompt is explicitly true or false, not undefined
       if (user.hasSeenProfilePrompt === undefined) {
         console.log('App.tsx useEffect: user.hasSeenProfilePrompt is undefined, waiting for full profile load.');
-        return; // Wait for the next render cycle when it's defined
+        return;
       }
-
-      // User is authenticated
-      // Check if hasSeenProfilePrompt is explicitly false
       if (user.hasSeenProfilePrompt === false) {
         console.log('App.tsx useEffect: User authenticated and profile incomplete, opening AuthModal to prompt.');
         setAuthModalInitialView('postSignupPrompt');
         setShowAuthModal(true);
       } else {
-        // User authenticated and profile is complete (hasSeenProfilePrompt is true)
         console.log('App.tsx useEffect: User authenticated and profile complete, ensuring AuthModal is closed.');
         setShowAuthModal(false);
-        setAuthModalInitialView('login'); // Reset to default view for next time
+        setAuthModalInitialView('login');
       }
     } else {
-      // User is not authenticated
       console.log('App.tsx useEffect: User not authenticated, ensuring AuthModal is closed.');
       setShowAuthModal(false);
-      setAuthModalInitialView('login'); // Reset to default view
+      setAuthModalInitialView('login');
     }
-  }, [isAuthenticated, user, user?.hasSeenProfilePrompt, isLoading]); // Add isLoading to dependencies
+  }, [isAuthenticated, user, user?.hasSeenProfilePrompt, isLoading]);
 
   const renderCurrentPage = (isAuthenticatedProp: boolean) => {
-    // Define props for HomePage once to ensure consistency
     const homePageProps = {
       onPageChange: setCurrentPage,
       isAuthenticated: isAuthenticatedProp,
       onShowAuth: handleShowAuth,
-      onShowSubscriptionPlans: handleShowSubscriptionPlans, // This is the corrected line
+      onShowSubscriptionPlans: handleShowSubscriptionPlans,
       userSubscription: userSubscription,
-      onShowAlert: handleShowAlert // Pass handleShowAlert
+      onShowAlert: handleShowAlert
     };
-
     switch (currentPage) {
       case 'new-home':
         return <HomePage {...homePageProps} />;
@@ -203,16 +202,16 @@ function App() {
           onNavigateBack={() => setCurrentPage('new-home')}
           userSubscription={userSubscription}
           onShowSubscriptionPlans={handleShowSubscriptionPlans}
-          onShowAlert={handleShowAlert} // Pass handleShowAlert
+          onShowAlert={handleShowAlert}
         />;
       case 'score-checker':
         return <ResumeScoreChecker
           onNavigateBack={() => setCurrentPage('new-home')}
           isAuthenticated={isAuthenticatedProp}
           onShowAuth={handleShowAuth}
-          userSubscription={userSubscription} // Pass userSubscription
-          onShowSubscriptionPlans={handleShowSubscriptionPlans} // Pass onShowSubscriptionPlans
-          onShowAlert={handleShowAlert} // Pass handleShowAlert
+          userSubscription={userSubscription}
+          onShowSubscriptionPlans={handleShowSubscriptionPlans}
+          onShowAlert={handleShowAlert}
         />;
       case 'optimizer':
         return (
@@ -222,8 +221,8 @@ function App() {
               onShowAuth={handleShowAuth}
               onShowProfile={handleShowProfile}
               onNavigateBack={handleNavigateHome}
-              onShowSubscriptionPlans={handleShowSubscriptionPlans} // Pass onShowSubscriptionPlans
-              onShowAlert={handleShowAlert} // Pass handleShowAlert
+              onShowSubscriptionPlans={handleShowSubscriptionPlans}
+              onShowAlert={handleShowAlert}
             />
           </main>
         );
@@ -238,35 +237,26 @@ function App() {
           onNavigateBack={() => setCurrentPage('new-home')}
           isAuthenticated={isAuthenticatedProp}
           onShowAuth={handleShowAuth}
-          userSubscription={userSubscription} // Pass userSubscription
-          onShowSubscriptionPlans={handleShowSubscriptionPlans} // Pass onShowSubscriptionPlans
-          onShowAlert={handleShowAlert} // Pass handleShowAlert
+          userSubscription={userSubscription}
+          onShowSubscriptionPlans={handleShowSubscriptionPlans}
+          onShowAlert={handleShowAlert}
         />;
       default:
-        // Pass all props here as a fallback
         return <HomePage {...homePageProps} />;
     }
   };
 
-
   return (
     <div className="min-h-screen pb-safe-bottom safe-area">
-      {/* Global Success Notification */}
       {showSuccessNotification && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 p-3 bg-green-500 text-white rounded-lg shadow-lg animate-fade-in-down">
           {successMessage}
         </div>
       )}
-
-      {/* Always render the Header component */}
       <Header onMobileMenuToggle={handleMobileMenuToggle} showMobileMenu={showMobileMenu} onShowProfile={handleShowProfile}>
         <Navigation currentPage={currentPage} onPageChange={setCurrentPage} />
       </Header>
-
-      {/* Render the current page content below the header */}
       {renderCurrentPage(isAuthenticated)}
-
-      {/* Mobile Menu Overlay */}
       {showMobileMenu && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div
@@ -293,7 +283,6 @@ function App() {
                   <X className="w-6 h-6" />
                 </button>
               </div>
-
               <div className="border-t border-secondary-200 pt-4">
                 <nav className="flex flex-col space-y-4">
                   {[
@@ -301,14 +290,13 @@ function App() {
                     { id: 'about', label: 'About Us', icon: <Info className="w-5 h-5" /> },
                     { id: 'tutorials', label: 'Tutorials', icon: <BookOpen className="w-5 h-5" /> },
                     { id: 'contact', label: 'Contact', icon: <Phone className="w-5 h-5" /> },
-                    // Conditionally render the 'referral' item
                     ...(isAuthenticated ? [{ id: 'referral', label: 'Referral', icon: <Wallet className="w-5 h-5" /> }] : []),
                   ].map((item) => (
                     <button
                       key={item.id}
                       onClick={() => {
                         if (item.id === 'referral') {
-                          handleShowProfile('wallet'); // Pass 'wallet' mode here
+                          handleShowProfile('wallet');
                           setShowMobileMenu(false);
                         } else {
                           setCurrentPage(item.id);
@@ -327,16 +315,14 @@ function App() {
                   ))}
                 </nav>
               </div>
-
               <div className="border-t border-secondary-200 pt-4">
                 <AuthButtons
                   onPageChange={setCurrentPage}
                   onClose={() => setShowMobileMenu(false)}
                   onShowAuth={handleShowAuth}
-                  onShowProfile={handleShowProfile} // onShowProfile passed directly
+                  onShowProfile={handleShowProfile}
                 />
               </div>
-
               <div className="mt-auto pt-4 border-t border-secondary-200">
                 <div className="bg-gradient-to-r from-primary-50 to-accent-50 rounded-xl p-4">
                   <p className="text-sm text-secondary-700 mb-2">
@@ -358,55 +344,36 @@ function App() {
           </div>
         </div>
       )}
-
-      {/* Auth Modal */}
       <AuthModal
         isOpen={showAuthModal}
         onClose={() => {
           setShowAuthModal(false);
-          // IMPORTANT: Do NOT reset authModalInitialView here.
-          // The useEffect in App.tsx will correctly set it based on user.hasSeenProfilePrompt.
+          setAuthModalInitialView('login');
           console.log('AuthModal closed, showAuthModal set to false');
         }}
-        onProfileFillRequest={handleShowProfile} // Passed handleShowProfile here
-        initialView={authModalInitialView} // Pass the initial view
+        onProfileFillRequest={handleShowProfile}
+        initialView={authModalInitialView}
         onPromptDismissed={() => {
-          // When user dismisses the prompt, mark it as seen so it doesn't reappear immediately
           if (user) {
             markProfilePromptSeen();
           }
-          setShowAuthModal(false); // Close the modal
-          // IMPORTANT: Do NOT reset authModalInitialView here.
-          // The useEffect in App.tsx will correctly set it based on user.hasSeenProfilePrompt.
+          setShowAuthModal(false);
+          setAuthModalInitialView('login');
         }}
       />
-
-      {/* Profile Management Modal */}
       <UserProfileManagement
         isOpen={showProfileManagement}
         onClose={() => setShowProfileManagement(false)}
         onProfileCompleted={handleProfileCompleted}
         viewMode={profileViewMode}
       />
-
-      {/* Subscription Plans Modal */}
       {showSubscriptionPlans && (
         <SubscriptionPlans
           isOpen={showSubscriptionPlans}
           onNavigateBack={() => setShowSubscriptionPlans(false)}
-          onSubscriptionSuccess={() => {
-            setShowSubscriptionPlans(false);
-            setSuccessMessage('Subscription activated successfully!');
-            setShowSuccessNotification(true);
-            setTimeout(() => {
-              setShowSuccessNotification(false);
-              setSuccessMessage('');
-            }, 3000);
-          }}
+          onSubscriptionSuccess={handleSubscriptionSuccess}
         />
       )}
-
-      {/* Generic Alert Modal */}
       <AlertModal
         isOpen={showAlertModal}
         onClose={() => setShowAlertModal(false)}
@@ -419,8 +386,6 @@ function App() {
     </div>
   );
 }
-
-// Authentication Buttons Component (moved inside App.tsx for AuthProvider context access)
 const AuthButtons: React.FC<{
   onPageChange: (page: string) => void;
   onClose: () => void;
@@ -429,26 +394,23 @@ const AuthButtons: React.FC<{
 }> = ({ onPageChange, onClose, onShowAuth, onShowProfile }) => {
   const { user, isAuthenticated, logout } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
       await logout();
-      onClose(); // Close mobile menu after logout
+      onClose();
     } catch (error) {
       console.error('Logout failed:', error);
     } finally {
       setIsLoggingOut(false);
     }
   };
-
   const handleLogin = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     console.log('Sign in button clicked - calling onShowAuth');
-    onShowAuth(); // This should show the auth modal and close the mobile menu
+    onShowAuth();
   };
-
   return (
     <div>
       <h3 className="text-sm font-semibold text-secondary-500 mb-3">Account</h3>
@@ -464,7 +426,7 @@ const AuthButtons: React.FC<{
             </div>
           </div>
           <button
-            onClick={() => onShowProfile('profile')} // Pass 'profile' mode explicitly
+            onClick={() => onShowProfile('profile')}
             className="w-full flex items-center space-x-3 min-h-touch px-4 py-3 rounded-xl font-medium transition-all duration-200 text-secondary-700 hover:text-primary-600 hover:bg-primary-50"
           >
             <User className="w-5 h-5" />
@@ -499,5 +461,4 @@ const AuthButtons: React.FC<{
     </div>
   );
 };
-
 export default App;
