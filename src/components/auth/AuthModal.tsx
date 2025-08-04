@@ -1,3 +1,4 @@
+// src/components/auth/AuthModal.tsx
 import React, { useState, useEffect } from 'react';
 import { X, CheckCircle, Sparkles, Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, User as UserIcon, UserPlus } from 'lucide-react';
 import { LoginForm } from './LoginForm';
@@ -39,7 +40,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   }, [isOpen, currentView, onPromptDismissed]);
 
   useEffect(() => {
-    let timer: NodeJS.Timeout | null = null;
+    // Removed `timer` variable as `setTimeout` will be removed
     console.log('AuthModal useEffect: Running. isAuthenticated:', isAuthenticated, 'user:', user, 'isOpen:', isOpen, 'currentView:', currentView);
 
     // Wait until authentication state and user profile are fully loaded
@@ -54,24 +55,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       // Call onProfileFillRequest to open the UserProfileManagement modal
       onProfileFillRequest('profile');
       // Immediately close this AuthModal as its job of prompting is done
-      timer = setTimeout(() => {
-        onClose(); // This will also reset authModalInitialView to 'login'
-      }, 300);
+      onClose(); // Removed setTimeout
     } else if (isAuthenticated && user && user.hasSeenProfilePrompt === true && isOpen) {
       // If user is authenticated and profile is complete, ensure AuthModal is closed
       console.log('AuthModal useEffect: User authenticated and profile complete, ensuring AuthModal is closed.');
-      timer = setTimeout(() => {
-        onClose(); // This will also reset authModalInitialView to 'login'
-      }, 300);
+      onClose(); // Removed setTimeout
     } else if (!isAuthenticated && isOpen) {
       // If user is not authenticated and modal is open, ensure it's in a login/signup state
       console.log('AuthModal useEffect: User not authenticated and modal is open. Ensuring login/signup view.');
       // No explicit action needed here, as initialView is already set by App.tsx
     }
 
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
+    // No cleanup for `timer` needed if `setTimeout` is removed
   }, [isAuthenticated, user, isOpen, onClose, onProfileFillRequest]); // Removed currentView from dependencies
 
   if (!isOpen) {
@@ -195,7 +190,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <h2 className="text-lg sm:text-2xl font-bold text-gray-900 mb-3">All Set!</h2>
               {signupEmail ? (
                   <p className="text-sm sm:text-base text-gray-600 leading-relaxed px-4">
-                    A verification email has been sent to **{signupEmail}**. Please check your inbox to activate your account.
+                    A verification email has been sent to <br />
+                    <strong className="text-gray-900">{signupEmail}</strong>
                   </p>
                 ) : (
                 <p className="text-sm sm:text-base text-gray-600 leading-relaxed px-4">
@@ -248,4 +244,3 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     </div>
   );
 };
-
