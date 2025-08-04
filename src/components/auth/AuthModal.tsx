@@ -52,15 +52,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
 
     // If user is authenticated, modal is open, and profile prompt status is known:
-    // If user has NOT seen profile prompt AND current view is NOT already the prompt
-    if (user.hasSeenProfilePrompt === false && currentView !== 'postSignupPrompt') {
-      console.log('AuthModal useEffect: User needs to fill profile. Setting view to postSignupPrompt.');
-      setCurrentView('postSignupPrompt');
+    // If user has seen the profile prompt, and the AuthModal is currently open, close it.
+    if (user.hasSeenProfilePrompt === true && showAuthModal) {
+      console.log('App.tsx useEffect: User profile complete, closing AuthModal.');
+      // Removed the else if block that automatically opened AuthModal if hasSeenProfilePrompt was false.
+      // This prevents the modal from showing on every refresh.
     }
-    // The AuthModal itself should not call onClose() here.
-    // The parent (App.tsx) will re-render and decide to close the modal if user.hasSeenProfilePrompt is true.
-    // Removed the else if block that called onClose()
-  }, [isAuthenticated, user, isOpen, currentView]);
+    // If user logs out, ensure AuthModal is closed
+    if (!isAuthenticated && showAuthModal) {
+      console.log('App.tsx useEffect: User logged out, closing AuthModal.');
+      // Removed the else if block that automatically opened AuthModal if hasSeenProfilePrompt was false.
+      // This prevents the modal from showing on every refresh.
+    }
+  }, [isAuthenticated, user, user?.hasSeenProfilePrompt, showAuthModal]);
 
 
   // If the modal is not open, don't render anything
@@ -216,8 +220,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <div className="flex flex-col sm:flex-row gap-3 px-4">
                 <button
                   onClick={() => {
-                    onProfileFillRequest();
-                    onClose();
+                    onProfileFillRequest(); // Call this first
+                    // Introduce a small delay before closing the AuthModal
+                    setTimeout(() => {
+                      onClose();
+                    }, 50); // 50ms delay should be sufficient
                   }}
                   className="w-full btn-primary py-3 px-4 rounded-xl font-semibold text-sm transition-colors"
                 >
@@ -226,7 +233,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <button
                   onClick={() => {
                     onPromptDismissed();
-                    onCl
+                    // Introduce a small delay before closing the AuthModal
+                    setTimeout(() => {
+                      onClose();
+                    }, 50); // 50ms delay
                   }}
                   className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-3 px-4 rounded-xl text-sm transition-colors"
                 >
