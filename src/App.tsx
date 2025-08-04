@@ -52,12 +52,19 @@ function App() {
     }
   };
 
+  // Handle showing auth modal
+  const handleShowAuth = () => {
+    console.log('handleShowAuth called in App.tsx');
+    setShowAuthModal(true);
+    console.log('showAuthModal set to true');
+    setShowMobileMenu(false);
+  };
+
   // UPDATED: Handle showing profile modal with an optional mode
   const handleShowProfile = (mode: 'profile' | 'wallet' = 'profile') => {
     setProfileViewMode(mode);
     setShowProfileManagement(true);
     setShowMobileMenu(false);
-    console.log('App.tsx: handleShowProfile called. showProfileManagement set to true.'); // ADDED LOG
   };
 
   // Handle profile completion
