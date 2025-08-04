@@ -1,7 +1,6 @@
-// src/components/ExportButtons.tsx
 import React, { useState } from 'react';
-import { Download, FileText, Loader2, CheckCircle, AlertCircle, Share2 } from 'lucide-react';
-import { ResumeData, UserType } from '../types/resume';
+import { Download, FileText, Loader2, CheckCircle, AlertCircle, Share2, ArrowDown } from 'lucide-react';
+import { ResumeData, UserType } from '../types/resume'; // Ensure UserType is imported if used
 import { exportToPDF, exportToWord } from '../utils/exportUtils';
 import { ExportOptionsModal } from './ExportOptionsModal';
 import { ExportOptions, defaultExportOptions } from '../types/export';
@@ -18,7 +17,7 @@ interface ExportButtonsProps {
 export const ExportButtons: React.FC<ExportButtonsProps> = ({ resumeData, userType = 'experienced', targetRole }) => {
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [isExportingWord, setIsExportingWord] = useState(false);
-  // Removed: const [showShareOptions, setShowShareOptions] = useState(false);
+  const [showShareOptions, setShowShareOptions] = useState(false);
   const [showExportOptionsModal, setShowExportOptionsModal] = useState(false);
   const [exportStatus, setExportStatus] = useState<{
     type: 'pdf' | 'word' | null;
@@ -29,12 +28,12 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ resumeData, userTy
   const handleExportPDF = async () => {
     // Prevent double clicks if an export is already in progress
     if (isExportingPDF || isExportingWord) return;
-
+    
     // Open the modal for PDF export options
     setShowExportOptionsModal(true);
-
+    
     // Debugging: Log the state change immediately after setting it
-    console.log('showExportOptionsModal state after click:', true);
+    console.log('showExportOptionsModal state after click:', true); 
   };
 
   const handleExportWithCustomOptions = async (options: ExportOptions) => {
@@ -43,8 +42,8 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ resumeData, userTy
     // Set PDF exporting status to true
     setIsExportingPDF(true);
     // Clear any previous export status messages
-    setExportStatus({ type: null, status: null, message: '' });
-
+    setExportStatus({ type: null, status: null, message: '' }); 
+    
     try {
       // Call the utility function to export the resume to PDF with custom options
       await exportToPDF(resumeData, userType, options);
@@ -54,7 +53,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ resumeData, userTy
         status: 'success',
         message: 'PDF exported successfully!'
       });
-
+      
       // Clear success message after 3 seconds for user feedback
       setTimeout(() => {
         setExportStatus({ type: null, status: null, message: '' });
@@ -67,7 +66,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ resumeData, userTy
         status: 'error',
         message: 'PDF export failed. Please try again.'
       });
-
+      
       // Clear error message after 5 seconds
       setTimeout(() => {
         setExportStatus({ type: null, status: null, message: '' });
@@ -80,23 +79,23 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ resumeData, userTy
 
   const handleExportWord = async () => {
     // Prevent double clicks if an export is already in progress
-    if (isExportingWord || isExportingPDF) return;
-
+    if (isExportingWord || isExportingPDF) return; 
+    
     // Set Word exporting status to true
     setIsExportingWord(true);
     // Clear any previous export status messages
-    setExportStatus({ type: null, status: null, message: '' });
-
+    setExportStatus({ type: null, status: null, message: '' }); 
+    
     try {
       // Call the utility function to export the resume to Word (does not take options)
-      exportToWord(resumeData, userType);
+      exportToWord(resumeData, userType); 
       // Set success status
       setExportStatus({
         type: 'word',
         status: 'success',
         message: 'Word document exported successfully!'
       });
-
+      
       // Clear success message after 3 seconds
       setTimeout(() => {
         setExportStatus({ type: null, status: null, message: '' });
@@ -109,7 +108,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ resumeData, userTy
         status: 'error',
         message: 'Word export failed. Please try again.'
       });
-
+      
       // Clear error message after 5 seconds
       setTimeout(() => {
         setExportStatus({ type: null, status: null, message: '' });
@@ -120,9 +119,13 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ resumeData, userTy
     }
   };
 
-  // Removed: const toggleShareOptions = (e: React.MouseEvent) => { ... };
+  const toggleShareOptions = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation(); // Prevents click from bubbling to parent elements
+    setShowShareOptions(!showShareOptions);
+  };
 
-  const handleShare = async (type: 'pdf' | 'word') => {
+  const shareFile = async (type: 'pdf' | 'word') => {
     try {
       // In a real implementation, you'd generate the blob/file content first
       // and then use navigator.share. This currently triggers an export for demonstration.
@@ -134,7 +137,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ resumeData, userTy
         // For Word, also reusing exportToWord
         await handleExportWord(); // This function already handles the word export and its state
       }
-
+      
       // This part depends on actual file handling and Web Share API capabilities
       if (navigator.share) {
         // Ideally, you'd get the actual file blob/URL here and pass it to share
@@ -180,81 +183,131 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ resumeData, userTy
             <Download className="w-5 h-5 mr-2 text-primary-600" />
             Export Resume
           </h3>
-        </div>
-
-        {/* Directly display PDF and Word export buttons for mobile */}
-        <div className="grid-responsive-2 gap-3">
+          
           <button
-            onClick={handleExportPDF} // This directly opens the modal for PDF export
-            disabled={isExportingPDF || isExportingWord}
-            className={`flex items-center justify-center space-x-2 font-medium py-3 px-3 rounded-xl transition-all duration-200 text-fluid-sm focus:outline-none min-h-touch ${
-              isExportingPDF || isExportingWord
-                ? 'bg-secondary-400 text-white cursor-not-allowed'
-                : 'bg-red-600 hover:bg-red-700 active:bg-red-800 text-white shadow-md'
-            }`}
-            style={{
+            onClick={toggleShareOptions}
+            className="btn-primary p-2 rounded-full shadow-md min-w-touch min-h-touch"
+            aria-label="Show export options"
+            // Ensure no accidental double taps/clicks
+            style={{ 
               WebkitTapHighlightColor: 'transparent',
               touchAction: 'manipulation'
             }}
           >
-            {isExportingPDF ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <FileText className="w-4 h-4" />
-            )}
-            <span>PDF</span>
-          </button>
-
-          <button
-            onClick={handleExportWord}
-            disabled={isExportingWord || isExportingPDF}
-            className={`flex items-center justify-center space-x-2 font-medium py-3 px-3 rounded-xl transition-all duration-200 text-fluid-sm focus:outline-none min-h-touch ${
-              isExportingWord || isExportingPDF
-                ? 'bg-secondary-400 text-white cursor-not-allowed'
-                : 'btn-primary shadow-md'
-            }`}
-            style={{
-              WebkitTapHighlightColor: 'transparent',
-              touchAction: 'manipulation'
-            }}
-          >
-            {isExportingWord ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <FileText className="w-4 h-4" />
-            )}
-            <span>Word</span>
+            <ArrowDown className={`w-5 h-5 transition-transform duration-300 ${showShareOptions ? 'rotate-180' : ''}`} />
           </button>
         </div>
-
-        {/* Share Button - Only on supported devices, directly below export buttons */}
-        {navigator.share && (
-          <button
-            onClick={() => handleShare('pdf')} // Default to sharing PDF for simplicity
-            disabled={isExportingPDF || isExportingWord}
-            className={`w-full flex items-center justify-center space-x-2 font-medium py-3 px-4 rounded-xl transition-all duration-200 text-fluid-sm focus:outline-none min-h-touch mt-3 ${ // Added mt-3 for spacing
-              isExportingPDF || isExportingWord
-                ? 'bg-secondary-400 text-white cursor-not-allowed'
-                : 'bg-green-600 hover:bg-green-700 text-white shadow-md'
-            }`}
-            style={{
-              WebkitTapHighlightColor: 'transparent',
-              touchAction: 'manipulation'
-            }}
-          >
-            <Share2 className="w-4 h-4" />
-            <span>Share Resume</span>
-          </button>
+        
+        {/* Primary Export Button for Mobile (always present for quick PDF export) */}
+        <button
+          onClick={handleExportPDF} // This directly opens the modal for PDF export
+          disabled={isExportingPDF || isExportingWord}
+          className={`w-full flex items-center justify-center space-x-2 font-semibold py-4 px-4 rounded-xl transition-all duration-200 text-fluid-base focus:outline-none focus:ring-2 focus:ring-primary-500 min-h-touch mb-4 ${
+            isExportingPDF || isExportingWord
+              ? 'bg-secondary-400 text-white cursor-not-allowed'
+              : 'btn-primary shadow-lg hover:shadow-xl active:scale-[0.98]'
+          }`}
+          style={{ 
+            WebkitTapHighlightColor: 'transparent',
+            touchAction: 'manipulation'
+          }}
+        >
+          {isExportingPDF ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>Exporting PDF...</span>
+            </>
+          ) : (
+            <>
+              <Download className="w-5 h-5" />
+              <span>Export Resume (PDF)</span> {/* Clarified to PDF */}
+            </>
+          )}
+        </button>
+        
+        {/* Expandable Export Options for Mobile */}
+        {showShareOptions && (
+          <div className="space-y-3 animate-fadeIn">
+            <div className="flex items-center justify-between">
+              <div className="text-fluid-sm font-medium text-secondary-700">More Options:</div> {/* Changed text */}
+            </div>
+            
+            <div className="grid-responsive-2 gap-3">
+              {/* PDF button in expanded options (if distinct from main button, otherwise remove) */}
+              {/* Keeping for clarity if user wants both "quick" PDF and "options" PDF */}
+              <button
+                onClick={handleExportPDF} // Still triggers modal
+                disabled={isExportingPDF || isExportingWord}
+                className={`flex items-center justify-center space-x-2 font-medium py-3 px-3 rounded-xl transition-all duration-200 text-fluid-sm focus:outline-none min-h-touch ${
+                  isExportingPDF || isExportingWord
+                    ? 'bg-secondary-400 text-white cursor-not-allowed'
+                    : 'bg-red-600 hover:bg-red-700 active:bg-red-800 text-white shadow-md'
+                }`}
+                style={{ 
+                  WebkitTapHighlightColor: 'transparent',
+                  touchAction: 'manipulation'
+                }}
+              >
+                {isExportingPDF ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <FileText className="w-4 h-4" />
+                )}
+                <span>PDF</span>
+              </button>
+              
+              <button
+                onClick={handleExportWord}
+                disabled={isExportingWord || isExportingPDF} // Corrected typo here
+                className={`flex items-center justify-center space-x-2 font-medium py-3 px-3 rounded-xl transition-all duration-200 text-fluid-sm focus:outline-none min-h-touch ${
+                  isExportingWord || isExportingPDF
+                    ? 'bg-secondary-400 text-white cursor-not-allowed'
+                    : 'btn-primary shadow-md'
+                }`}
+                style={{ 
+                  WebkitTapHighlightColor: 'transparent',
+                  touchAction: 'manipulation'
+                }}
+              >
+                {isExportingWord ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <FileText className="w-4 h-4" />
+                )}
+                <span>Word</span>
+              </button>
+            </div>
+            
+            {/* Share Button - Only on supported devices */}
+            {navigator.share && (
+              <button
+                onClick={() => shareFile('pdf')} // Default to sharing PDF for simplicity
+                disabled={isExportingPDF || isExportingWord}
+                className={`w-full flex items-center justify-center space-x-2 font-medium py-3 px-4 rounded-xl transition-all duration-200 text-fluid-sm focus:outline-none min-h-touch ${
+                  isExportingPDF || isExportingWord
+                    ? 'bg-secondary-400 text-white cursor-not-allowed'
+                    : 'bg-green-600 hover:bg-green-700 text-white shadow-md'
+                }`}
+                style={{ 
+                  WebkitTapHighlightColor: 'transparent',
+                  touchAction: 'manipulation'
+                }}
+              >
+                <Share2 className="w-4 h-4" />
+                <span>Share Resume</span>
+              </button>
+            )}
+          </div>
         )}
       </div>
-
+      
       {/* Desktop Export Buttons */}
       <div className="hidden lg:block">
         <h3 className="text-fluid-xl font-semibold text-secondary-900 mb-4 flex items-center">
           <Download className="w-5 h-5 mr-2 text-primary-600" />
           Export Resume
         </h3>
-
+        
         <div className="grid-responsive-2 gap-4">
           {/* PDF Export Button */}
           <button
@@ -265,7 +318,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ resumeData, userTy
                 ? 'bg-secondary-400 text-white cursor-not-allowed'
                 : 'bg-red-600 hover:bg-red-700 active:bg-red-800 text-white shadow-lg hover:shadow-xl active:scale-[0.98]'
             }`}
-            style={{
+            style={{ 
               WebkitTapHighlightColor: 'transparent',
               touchAction: 'manipulation'
             }}
@@ -286,13 +339,13 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ resumeData, userTy
           {/* Word Export Button */}
           <button
             onClick={handleExportWord}
-            disabled={isExportingWord || isExportingPDF}
+            disabled={isExportingWord || isExportingPDF} // Corrected typo here
             className={`flex items-center justify-center space-x-2 font-semibold py-4 px-6 rounded-xl transition-all duration-200 text-fluid-base focus:outline-none focus:ring-2 focus:ring-primary-500 min-h-touch ${
               isExportingWord || isExportingPDF
                 ? 'bg-secondary-400 text-white cursor-not-allowed'
                 : 'btn-primary shadow-lg hover:shadow-xl active:scale-[0.98]'
             }`}
-            style={{
+            style={{ 
               WebkitTapHighlightColor: 'transparent',
               touchAction: 'manipulation'
             }}
@@ -311,12 +364,12 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ resumeData, userTy
           </button>
         </div>
       </div>
-
+      
       {/* Export Status Message */}
       {exportStatus.status && (
         <div className={`mt-4 p-3 rounded-lg border transition-all ${
-          exportStatus.status === 'success'
-            ? 'bg-green-50 border-green-200 text-green-800'
+          exportStatus.status === 'success' 
+            ? 'bg-green-50 border-green-200 text-green-800' 
             : 'bg-red-50 border-red-200 text-red-800'
         }`}>
           <div className="flex items-center space-x-2">
@@ -329,7 +382,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ resumeData, userTy
           </div>
         </div>
       )}
-
+      
       {/* Mobile-specific instructions */}
       <div className="mt-6 lg:hidden">
         <div className="p-3 bg-primary-50 border border-primary-200 rounded-lg">
@@ -344,7 +397,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ resumeData, userTy
           </div>
         </div>
       </div>
-
+      
       {/* PDF Quality Notice */}
       <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
         <div className="flex items-start space-x-2">
