@@ -20,16 +20,13 @@ import {
   CheckCircle,
   Loader2,
   Download,
-  Eye,
-  AlertTriangle
+  Eye
 } from 'lucide-react';
 import { UserType, ResumeData } from '../types/resume';
 import { optimizeResume } from '../services/geminiService';
 import { useAuth } from '../contexts/AuthContext';
 import { ResumePreview } from './ResumePreview';
 import { ExportButtons } from './ExportButtons';
-import { paymentService } from '../services/paymentService';
-import { Subscription } from '../types/payment';
 
 interface ContactDetails {
   fullName: string;
@@ -77,16 +74,14 @@ interface FormData {
 
 interface GuidedResumeBuilderProps {
   onNavigateBack: () => void;
-  userSubscription: Subscription | null;
+  userSubscription: any; // Assuming a subscription object with guidedBuildsTotal and guidedBuildsUsed
   onShowSubscriptionPlans: () => void;
-  onShowAlert: (title: string, message: string, type: 'info' | 'success' | 'warning' | 'error', actionText?: string, onAction?: () => void) => void;
 }
 
 export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
   onNavigateBack,
   userSubscription,
   onShowSubscriptionPlans,
-  onShowAlert,
 }) => {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
@@ -186,20 +181,15 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
     }
   ];
 
+  // Check subscription on mount and whenever the subscription state changes
   useEffect(() => {
     if (userSubscription) {
       const remainingBuilds = userSubscription.guidedBuildsTotal - userSubscription.guidedBuildsUsed;
       if (remainingBuilds <= 0) {
-        onShowAlert(
-          'Guided Build Credits Exhausted',
-          'You have used all your guided resume builds. Please upgrade your plan to continue building.',
-          'warning',
-          'Upgrade Plan',
-          onShowSubscriptionPlans
-        );
+        onShowSubscriptionPlans();
       }
     }
-  }, [userSubscription, onShowSubscriptionPlans, onShowAlert]);
+  }, [userSubscription, onShowSubscriptionPlans]);
 
   const updateFormData = (section: keyof FormData, data: any) => {
     setFormData(prev => ({
@@ -261,21 +251,21 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
 
   const canProceedToNext = () => {
     switch (currentStep) {
-      case 0:
+      case 0: // Experience Level
         return formData.experienceLevel !== '';
-      case 1:
+      case 1: // Contact Details
         return formData.contactDetails.fullName && formData.contactDetails.email;
-      case 2:
+      case 2: // Education
         return formData.education.some(edu => edu.degree && edu.school);
-      case 3:
+      case 3: // Work Experience
         return true;
-      case 4:
+      case 4: // Projects
         return true;
-      case 5:
+      case 5: // Skills
         return Object.values(formData.skills).some(skillArray => skillArray.some(skill => skill.trim() !== ''));
-      case 6:
+      case 6: // Additional Sections
         return true;
-      case 7:
+      case 7: // Review & Generate - always can proceed to generate once here
         return true;
       default:
         return true;
@@ -284,22 +274,16 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
 
   const generateResume = async () => {
     if (!userSubscription || userSubscription.guidedBuildsTotal - userSubscription.guidedBuildsUsed <= 0) {
-      const planDetails = paymentService.getPlanById(userSubscription?.planId);
-      const planName = planDetails?.name || 'your current plan';
-      const guidedBuildsTotal = planDetails?.guidedBuilds || 0;
-      onShowAlert(
-        'Guided Build Credits Exhausted',
-        `You have used all your ${guidedBuildsTotal} Guided Resume Builds from ${planName}. Please upgrade your plan to continue building your resume.`,
-        'warning',
-        'Upgrade Plan',
-        onShowSubscriptionPlans
-      );
+      onShowSubscriptionPlans();
       return;
     }
-
+    
     setIsGenerating(true);
     try {
+      // Construct a basic resume text from form data
       const resumeText = constructResumeText(formData);
+
+      // Use a generic job description for formatting
       const genericJobDescription = "We are looking for a motivated individual with strong technical skills and good communication abilities. The ideal candidate should have relevant education and experience in their field.";
 
       const result = await optimizeResume(
@@ -311,9 +295,9 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
         formData.contactDetails.phone,
         formData.contactDetails.linkedin,
         formData.contactDetails.github,
-        formData.contactDetails.linkedin,
-        formData.contactDetails.github,
-        ''
+        formData.contactDetails.linkedin, // These last two seem redundant based on your current setup.
+        formData.contactDetails.github,    // You might want to review the optimizeResume signature.
+        '' // No specific target role
       );
 
       setGeneratedResume(result);
@@ -334,6 +318,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
     if (data.contactDetails.linkedin) text += `LinkedIn: ${data.contactDetails.linkedin}\n`;
     if (data.contactDetails.github) text += `GitHub: ${data.contactDetails.github}\n`;
 
+    // Education
     text += '\nEDUCATION:\n';
     data.education.forEach(edu => {
       if (edu.degree.trim() && edu.school.trim()) {
@@ -344,6 +329,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
       }
     });
 
+    // Work Experience
     if (data.workExperience.some(exp => exp.role.trim() && exp.company.trim())) {
       text += '\nWORK EXPERIENCE:\n';
       data.workExperience.forEach(exp => {
@@ -356,6 +342,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
       });
     }
 
+    // Projects
     if (data.projects.some(proj => proj.title.trim())) {
       text += '\nPROJECTS:\n';
       data.projects.forEach(proj => {
@@ -368,6 +355,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
       });
     }
 
+    // Skills
     text += '\nSKILLS:\n';
     Object.entries(data.skills).forEach(([category, skills]) => {
       const filteredSkills = skills.filter(skill => skill.trim() !== '');
@@ -376,6 +364,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
       }
     });
 
+    // Certifications
     if (data.additionalSections.includeCertifications && data.certifications.some(cert => cert.trim())) {
       text += '\nCERTIFICATIONS:\n';
       data.certifications.forEach(cert => {
@@ -383,6 +372,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
       });
     }
 
+    // Achievements
     if (data.additionalSections.includeAchievements && data.achievements.some(ach => ach.trim())) {
       text += '\nACHIEVEMENTS:\n';
       data.achievements.forEach(ach => {
@@ -397,6 +387,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else if (currentStep === steps.length - 1) {
+      // This is the "Review & Generate" step
       generateResume();
     }
   };
@@ -411,6 +402,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
         <div className="container-responsive py-8">
+          {/* Header */}
           <div className="text-center mb-8">
             <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-200">
               <div className="flex items-center justify-center mb-4">
@@ -420,6 +412,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                   <p className="text-gray-600 mt-1">Your professional resume is ready for download</p>
                 </div>
               </div>
+
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <button
                   onClick={() => setShowPreview(false)}
@@ -434,11 +427,15 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                 >
                   <ArrowLeft className="w-5 h-5" />
                   <span className="block sm:inline">Back to Home</span>
+
                 </button>
               </div>
             </div>
           </div>
+
+          {/* Resume Preview and Export */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Resume Preview */}
             <div className="lg:col-span-2">
               <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
                 <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 border-b border-gray-200">
@@ -450,6 +447,8 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                 <ResumePreview resumeData={generatedResume} userType={formData.experienceLevel} />
               </div>
             </div>
+
+            {/* Export Options */}
             <div className="lg:col-span-1">
               <ExportButtons resumeData={generatedResume} userType={formData.experienceLevel} />
             </div>
@@ -461,13 +460,14 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
 
   const renderStepContent = () => {
     switch (currentStep) {
-      case 0:
+      case 0: // Experience Level
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">What's your experience level?</h2>
               <p className="text-gray-600">This helps us customize your resume format</p>
             </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
                 { id: 'fresher', label: 'Fresher/New Graduate', desc: 'Just graduated or starting career', icon: <GraduationCap className="w-8 h-8" /> },
@@ -495,16 +495,20 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
             </div>
           </div>
         );
-      case 1:
+
+      case 1: // Contact Details
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Contact Information</h2>
               <p className="text-gray-600">Tell us how employers can reach you</p>
             </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Full Name *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Full Name *
+                </label>
                 <div className="relative">
                   <User className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                   <input
@@ -516,8 +520,11 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                   />
                 </div>
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Email Address *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email Address *
+                </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                   <input
@@ -529,8 +536,11 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                   />
                 </div>
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Phone Number
+                </label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                   <input
@@ -542,8 +552,11 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                   />
                 </div>
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Location
+                </label>
                 <div className="relative">
                   <MapPin className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                   <input
@@ -555,8 +568,11 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                   />
                 </div>
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">LinkedIn Profile</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  LinkedIn Profile
+                </label>
                 <div className="relative">
                   <Linkedin className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                   <input
@@ -568,8 +584,11 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                   />
                 </div>
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">GitHub Profile</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  GitHub Profile
+                </label>
                 <div className="relative">
                   <Github className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                   <input
@@ -584,13 +603,15 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
             </div>
           </div>
         );
-      case 2:
+
+      case 2: // Education
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Education Background</h2>
               <p className="text-gray-600">Add your educational qualifications</p>
             </div>
+
             {formData.education.map((edu, index) => (
               <div key={index} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
@@ -604,6 +625,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                     </button>
                   )}
                 </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Degree *</label>
@@ -615,6 +637,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                       placeholder="e.g., Bachelor of Science in Computer Science"
                     />
                   </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">School/University *</label>
                     <input
@@ -625,6 +648,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                       placeholder="e.g., Stanford University"
                     />
                   </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Year</label>
                     <input
@@ -635,6 +659,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                       placeholder="e.g., 2020-2024"
                     />
                   </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">CGPA/GPA</label>
                     <input
@@ -645,6 +670,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                       placeholder="e.g., 3.8/4.0"
                     />
                   </div>
+
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
                     <input
@@ -658,6 +684,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                 </div>
               </div>
             ))}
+
             <button
               onClick={() => addArrayItem('education', { degree: '', school: '', year: '', cgpa: '', location: '' })}
               className="w-full border-2 border-dashed border-gray-300 rounded-xl p-4 text-gray-600 hover:text-gray-800 hover:border-gray-400 transition-colors flex items-center justify-center"
@@ -667,13 +694,15 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
             </button>
           </div>
         );
-      case 3:
+
+      case 3: // Work Experience
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Work Experience</h2>
               <p className="text-gray-600">Highlight your professional work history</p>
             </div>
+
             {formData.workExperience.map((experience, expIndex) => (
               <div key={expIndex} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
@@ -687,6 +716,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                     </button>
                   )}
                 </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
@@ -719,6 +749,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                     />
                   </div>
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Responsibilities / Achievements (Bullet Points)</label>
                   {experience.bullets.map((bullet, bulletIndex) => (
@@ -759,6 +790,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                 </div>
               </div>
             ))}
+
             <button
               onClick={() => addArrayItem('workExperience', { role: '', company: '', year: '', bullets: [''] })}
               className="w-full border-2 border-dashed border-gray-300 rounded-xl p-4 text-gray-600 hover:text-gray-800 hover:border-gray-400 transition-colors flex items-center justify-center"
@@ -768,13 +800,15 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
             </button>
           </div>
         );
-      case 4:
+
+      case 4: // Projects
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Projects</h2>
               <p className="text-gray-600">Showcase your personal or academic projects</p>
             </div>
+
             {formData.projects.map((project, projIndex) => (
               <div key={projIndex} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
@@ -788,6 +822,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                     </button>
                   )}
                 </div>
+
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Project Title *</label>
                   <input
@@ -798,6 +833,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                     placeholder="e.g., E-commerce Platform"
                   />
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Project Details (Bullet Points)</label>
                   {project.bullets.map((bullet, bulletIndex) => (
@@ -838,6 +874,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                 </div>
               </div>
             ))}
+
             <button
               onClick={() => addArrayItem('projects', { title: '', bullets: [''] })}
               className="w-full border-2 border-dashed border-gray-300 rounded-xl p-4 text-gray-600 hover:text-gray-800 hover:border-gray-400 transition-colors flex items-center justify-center"
@@ -847,13 +884,15 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
             </button>
           </div>
         );
-      case 5:
+
+      case 5: // Skills
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Your Skills</h2>
               <p className="text-gray-600">List your technical, soft, and other relevant skills</p>
             </div>
+
             {Object.keys(formData.skills).map((category) => (
               <div key={category} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                 <h3 className="font-semibold text-gray-900 mb-4">{category}</h3>
@@ -888,14 +927,17 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
             ))}
           </div>
         );
-      case 6:
+
+      case 6: // Additional Sections
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Additional Sections</h2>
               <p className="text-gray-600">Include optional sections to enhance your resume</p>
             </div>
+
             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
+              {/* Certifications Toggle */}
               <div className="flex items-center justify-between">
                 <label htmlFor="includeCertifications" className="text-lg font-medium text-gray-900 flex items-center">
                   <Award className="w-5 h-5 mr-2 text-yellow-500" />
@@ -914,6 +956,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                   className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
               </div>
+
               {formData.additionalSections.includeCertifications && (
                 <div className="space-y-2 pt-4 border-t border-gray-200">
                   <label className="block text-sm font-medium text-gray-700 mb-2">List your certifications (one per line)</label>
@@ -944,6 +987,8 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                   </button>
                 </div>
               )}
+
+              {/* Achievements Toggle */}
               <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                 <label htmlFor="includeAchievements" className="text-lg font-medium text-gray-900 flex items-center">
                   <CheckCircle className="w-5 h-5 mr-2 text-green-500" />
@@ -962,6 +1007,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                   className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
               </div>
+
               {formData.additionalSections.includeAchievements && (
                 <div className="space-y-2 pt-4 border-t border-gray-200">
                   <label className="block text-sm font-medium text-gray-700 mb-2">List your key achievements (one per line)</label>
@@ -995,14 +1041,17 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
             </div>
           </div>
         );
-      case 7:
+
+      case 7: // Review & Generate
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Review Your Resume Information</h2>
               <p className="text-gray-600">Please review the details below. If everything looks good, click "Generate Resume"!</p>
             </div>
+
             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-6">
+              {/* Contact Details Summary */}
               <div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-3 flex items-center">
                   <Mail className="w-5 h-5 mr-2 text-blue-600" /> Contact Details
@@ -1014,7 +1063,10 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                 <p className="text-gray-700"><strong>LinkedIn:</strong> {formData.contactDetails.linkedin || 'N/A'}</p>
                 <p className="text-gray-700"><strong>GitHub:</strong> {formData.contactDetails.github || 'N/A'}</p>
               </div>
+
               <hr className="border-t border-gray-200" />
+
+              {/* Education Summary */}
               <div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-3 flex items-center">
                   <GraduationCap className="w-5 h-5 mr-2 text-blue-600" /> Education
@@ -1030,7 +1082,10 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                   <p className="text-gray-600 italic">No education details added.</p>
                 )}
               </div>
+
               <hr className="border-t border-gray-200" />
+
+              {/* Work Experience Summary */}
               <div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-3 flex items-center">
                   <Briefcase className="w-5 h-5 mr-2 text-blue-600" /> Work Experience
@@ -1052,7 +1107,10 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                   <p className="text-gray-600 italic">No work experience added.</p>
                 )}
               </div>
+
               <hr className="border-t border-gray-200" />
+
+              {/* Projects Summary */}
               <div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-3 flex items-center">
                   <Code className="w-5 h-5 mr-2 text-blue-600" /> Projects
@@ -1073,7 +1131,10 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                   <p className="text-gray-600 italic">No projects added.</p>
                 )}
               </div>
+
               <hr className="border-t border-gray-200" />
+
+              {/* Skills Summary */}
               <div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-3 flex items-center">
                   <Award className="w-5 h-5 mr-2 text-blue-600" /> Skills
@@ -1091,9 +1152,12 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                   })
                 )}
               </div>
+
               {(formData.additionalSections.includeCertifications || formData.additionalSections.includeAchievements) && (
                 <hr className="border-t border-gray-200" />
               )}
+
+              {/* Certifications Summary */}
               {formData.additionalSections.includeCertifications && (
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-3 flex items-center">
@@ -1110,6 +1174,8 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                   )}
                 </div>
               )}
+
+              {/* Achievements Summary */}
               {formData.additionalSections.includeAchievements && (
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-3 flex items-center">
@@ -1129,6 +1195,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
             </div>
           </div>
         );
+
       default:
         return (
           <div className="text-center py-12">
@@ -1141,6 +1208,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
         <div className="container-responsive">
           <div className="flex items-center justify-between h-16">
@@ -1151,13 +1219,17 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
               <ArrowLeft className="w-5 h-5" />
               <span className="hidden sm:block">Back to Home</span>
             </button>
+
             <h1 className="text-lg font-semibold text-gray-900">Resume Builder</h1>
+
             <div className="text-sm text-gray-500">
               Step {currentStep + 1} of {steps.length}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Progress Bar */}
       <div className="bg-white border-b border-gray-200">
         <div className="container-responsive">
           <div className="flex items-center py-4 overflow-x-auto">
@@ -1185,8 +1257,11 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Main Content */}
       <div className="container-responsive py-8">
         <div className="max-w-4xl mx-auto">
+          {/* Step Description */}
           <div className="text-center mb-8">
             <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-200">
               <div className="flex items-center justify-center mb-4">
@@ -1198,9 +1273,13 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
               <p className="text-gray-600">{steps[currentStep].description}</p>
             </div>
           </div>
+
+          {/* Step Content */}
           <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 sm:p-8 mb-8">
             {renderStepContent()}
           </div>
+
+          {/* Navigation */}
           <div className="flex justify-between items-center">
             <button
               onClick={prevStep}
@@ -1214,6 +1293,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
               <ArrowLeft className="w-5 h-5" />
               <span>Previous</span>
             </button>
+
             <div className="text-center">
               <div className="text-sm text-gray-500 mb-1">Progress</div>
               <div className="w-48 bg-gray-200 rounded-full h-2">
@@ -1223,6 +1303,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                 />
               </div>
             </div>
+
             <button
               onClick={nextStep}
               disabled={!canProceedToNext() || isGenerating}
