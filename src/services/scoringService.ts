@@ -148,11 +148,7 @@ SCORING CRITERIA (Total: 100 points, calculated from weighted sum of categories)
     - **Detailed checks:** How directly relevant are the listed skills to the job description? Is there any indication of proficiency level (e.g., "proficient in", "expert in")? Is there a good balance between technical and soft skills (if applicable to the role)? Are skills placed logically and easy to find only words to give easy understand way?
     - 0-10 points: Score based on the quality, relevance, and presentation of the skills section.
 
-CALCULATION OF TOTAL SCORE:
-1. Calculate initial sum: Sum of scores from all 9 categories (ATS Compatibility, Keyword & Skill Match, Project & Work Relevance, Structure & Flow, Critical Fixes & Red Flags, Impact Score, Brevity Score, Style Score, Skills Score).
-2. Apply missing section penalties: Deduct 10 points from the initial sum for EACH of the following key sections if it is missing or empty in the resume: 'summary', 'education', 'workExperience', 'projects', 'skills'.
-3. Apply section order penalty: Deduct an additional 10 points from the sum if the primary sections (Contact Info, Summary, Skills, Work Experience, Projects, Education) are not in a logical and standard professional order.
-4. The final 'totalScore' should be the result of these calculations, ensuring it does not go below 0.
+
 
 ANALYSIS REQUIREMENTS:
 - Calculate exact scores for each category.
@@ -248,6 +244,12 @@ Respond ONLY with valid JSON in this exact structure:
     }
   },
   "recommendations": ["recommendation1", "recommendation2", "recommendation3"],
+
+  CALCULATION OF TOTAL SCORE:
+1. Calculate initial sum: Sum of scores from all 9 categories (ATS Compatibility, Keyword & Skill Match, Project & Work Relevance, Structure & Flow, Critical Fixes & Red Flags, Impact Score, Brevity Score, Style Score, Skills Score).
+2. Apply missing section penalties: Deduct 10 points from the initial sum for EACH of the following key sections if it is missing or empty in the resume: 'summary', 'education', 'workExperience', 'projects', 'skills'.
+3. Apply section order penalty: Deduct an additional 10 points from the sum if the primary sections (Contact Info, Summary, Skills, Work Experience, Projects, Education) are not in a logical and standard professional order.
+4. The final 'totalScore' should be the result of these calculations, ensuring it does not go below 0.
   "grade": "A+"
 }`;
 
