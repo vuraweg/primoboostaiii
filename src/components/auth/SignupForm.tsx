@@ -1,3 +1,4 @@
+// src/components/auth/SignupForm.tsx
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -23,7 +24,7 @@ const signupSchema = z.object({
     .regex(/(?=.*\d)/, 'Must contain at least one number')
     .regex(/(?=.*[@$!%*?&])/, 'Must contain at least one special character (@$!%*?&)'),
   confirmPassword: z.string().min(1, 'Please confirm your password'),
-  referralCode: z.string().optional(), // Removed duplicate declaration here
+  referralCode: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Passwords do not match',
   path: ['confirmPassword'],
@@ -31,7 +32,7 @@ const signupSchema = z.object({
 
 interface SignupFormProps {
   onSwitchToLogin: () => void;
-  onSignupSuccess: () => void; // This prop is still needed for post-signup prompt
+  onSignupSuccess: (needsVerification: boolean, email: string) => void;
 }
 
 export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin, onSignupSuccess }) => {
@@ -40,8 +41,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin, onSignu
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [needsVerification, setNeedsVerification] = useState(false);
-  const [userEmail, setUserEmail] = useState('');
+  // Removed local needsVerification and userEmail states as AuthModal will manage them
 
   const {
     register,
@@ -82,14 +82,13 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin, onSignu
 
     try {
       const result = await signup(data);
-      setUserEmail(data.email);
-      
-      if (result.needsVerification) {
-        setNeedsVerification(true);
-      } else {
-        // --- REMOVED onSignupSuccess() CALL HERE ---
-        // AuthModal's useEffect will now handle closing/prompting based on isAuthenticated and user state.
-      }
+      // Call onSignupSuccess here, passing the result from the signup service
+      onSignupSuccess(result.needsVerification, data.email); // <--- THIS IS THE CRITICAL CHANGE
+
+      // The local state setNeedsVerification is no longer needed here as AuthModal handles the view
+      // if (result.needsVerification) {
+      //   setNeedsVerification(true);
+      // }
     } catch (err) {
       let errorMessage = 'Account creation failed. Please try again.';
       
@@ -107,29 +106,30 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin, onSignu
     }
   };
 
-  if (needsVerification) {
-    return (
-      <div className="text-center py-8">
-        <div className="bg-blue-100 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6">
-          <Mail className="w-10 h-10 text-blue-600" />
-        </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-3">Check Your Email</h2>
-        <p className="text-gray-600 mb-4 leading-relaxed">
-          We've sent a verification link to <br />
-          <strong className="text-gray-900">{userEmail}</strong>
-        </p>
-        <p className="text-gray-500 text-sm mb-6">
-          Click the link in your email to verify your account and complete the signup process.
-        </p>
-        <button
-          onClick={onSwitchToLogin}
-          className="text-blue-600 hover:text-blue-700 font-semibold transition-colors hover:underline"
-        >
-          ← Back to Sign In
-        </button>
-      </div>
-    );
-  }
+  // The conditional return for needsVerification is now handled by AuthModal
+  // if (needsVerification) {
+  //   return (
+  //     <div className="text-center py-8">
+  //       <div className="bg-blue-100 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6">
+  //         <Mail className="w-10 h-10 text-blue-600" />
+  //       </div>
+  //       <h2 className="text-2xl font-bold text-gray-900 mb-3">Check Your Email</h2>
+  //       <p className="text-gray-600 mb-4 leading-relaxed">
+  //         We've sent a verification link to <br />
+  //         <strong className="text-gray-900">{userEmail}</strong>
+  //       </p>
+  //       <p className="text-gray-500 text-sm mb-6">
+  //         Click the link in your email to verify your account and complete the signup process.
+  //       </p>
+  //       <button
+  //         onClick={onSwitchToLogin}
+  //         className="text-blue-600 hover:text-blue-700 font-semibold transition-colors hover:underline"
+  //       >
+  //         ← Back to Sign In
+  //       </button>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="space-y-6">
