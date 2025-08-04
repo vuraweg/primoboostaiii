@@ -27,6 +27,7 @@ import { DetailedScore } from '../types/resume';
 
 // Import Subscription type if it's not already globally available
 import { Subscription } from '../types/payment'; // Assuming this path is correct
+import { paymentService } from '../services/paymentService'; // Import paymentService
 
 interface ResumeScoreCheckerProps {
   onNavigateBack: () => void;
@@ -34,6 +35,8 @@ interface ResumeScoreCheckerProps {
   onShowAuth: () => void;
   userSubscription: Subscription | null; // Add this prop
   onShowSubscriptionPlans: () => void; // Add this prop
+  onShowAlert: (title: string, message: string, type?: 'info' | 'success' | 'warning' | 'error', actionText?: string, onAction?: () => void) => void;
+  refreshUserSubscription: () => Promise<void>; // ADD THIS PROP
 }
 
 export const ResumeScoreChecker: React.FC<ResumeScoreCheckerProps> = ({
@@ -42,6 +45,8 @@ export const ResumeScoreChecker: React.FC<ResumeScoreCheckerProps> = ({
   onShowAuth,
   userSubscription, // Destructure the new prop
   onShowSubscriptionPlans, // Destructure the new prop
+  onShowAlert,
+  refreshUserSubscription, // DESTUCTURE THE NEW PROP
 }) => {
   const [resumeText, setResumeText] = useState('');
   const [jobDescription, setJobDescription] = useState('');
@@ -60,12 +65,22 @@ export const ResumeScoreChecker: React.FC<ResumeScoreCheckerProps> = ({
 
     // Check subscription and score check credits
     if (!userSubscription || (userSubscription.scoreChecksTotal - userSubscription.scoreChecksUsed) <= 0) {
-      onShowSubscriptionPlans(); // Directly show the subscription plans modal
+      const planDetails = paymentService.getPlanById(userSubscription?.planId);
+      const planName = planDetails?.name || 'your current plan';
+      const scoreChecksTotal = planDetails?.scoreChecks || 0;
+
+      onShowAlert(
+        'Resume Score Check Credits Exhausted',
+        `You have used all your ${scoreChecksTotal} Resume Score Checks from ${planName}. Please upgrade your plan to continue checking scores.`,
+        'warning',
+        'Upgrade Plan',
+        onShowSubscriptionPlans
+      );
       return;
     }
 
     if (!resumeText.trim()) {
-      alert('Please upload your resume first');
+      onShowAlert('Missing Resume', 'Please upload your resume first to get a score.', 'warning');
       return;
     }
 
@@ -98,9 +113,21 @@ export const ResumeScoreChecker: React.FC<ResumeScoreCheckerProps> = ({
       };
 
       setScoreResult(updatedResult);
+
+      // Decrement usage count and refresh subscription
+      if (userSubscription) { // Ensure userSubscription is not null before attempting to use it
+        const usageResult = await paymentService.useScoreCheck(userSubscription.userId); // Assuming useScoreCheck exists
+        if (usageResult.success) {
+          await refreshUserSubscription(); // Refresh the global subscription state
+        } else {
+          console.error('Failed to decrement score check usage:', usageResult.error);
+          onShowAlert('Usage Update Failed', 'Failed to record score check usage. Please contact support.', 'error');
+        }
+      }
+
     } catch (error) {
       console.error('Error analyzing resume:', error);
-      alert('Failed to analyze resume. Please try again.');
+      onShowAlert('Analysis Failed', `Failed to analyze resume: ${error.message || 'Unknown error'}. Please try again.`, 'error');
     } finally {
       setIsAnalyzing(false); // Ensure loading state is reset
     }
