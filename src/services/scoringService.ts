@@ -170,7 +170,7 @@ Respond ONLY with valid JSON in this exact structure:
   "breakdown": {
     "atsCompatibility": {
       "score": 0,
-      "maxScore": 15,
+      "maxScore": 14,
       "details": "Concise explanation (max 10 words) of ATS compatibility scoring based on consistency in font sizes, date formats, single-column layout, avoidance of tables/images, and proper section headings. Example: 'Resume uses two different font sizes (11pt and 12pt) and a two-column layout which might confuse ATS.'",
       "noTablesColumnsFonts": true,
       "properFileStructure": true,
@@ -178,7 +178,7 @@ Respond ONLY with valid JSON in this exact structure:
     },
     "keywordSkillMatch": {
       "score": 0,
-      "maxScore": 20,
+      "maxScore": 18,
       "details": "Concise explanation (max 10 words) of keyword and skill match scoring, highlighting missing keywords from JD and relevance of listed skills. Example: 'Missing keywords like 'React Native' and 'AWS' from the job description. Consider integrating these skills into your projects or work experience.'",
       "technicalSoftSkillsAligned": true,
       "toolsTechCertsPresent": true,
@@ -186,14 +186,14 @@ Respond ONLY with valid JSON in this exact structure:
     },
     "projectWorkRelevance": {
       "score": 0,
-      "maxScore": 15,
+      "maxScore": 14,
       "details": "Concise explanation (max 10 words) of project and work relevance, focusing on accomplishment-oriented bullets and quantified impact. Example: 'Several bullet points describe responsibilities rather than achievements. Rewrite 'Responsible for managing social media' to 'Increased social media engagement by 25% through strategic content planning.'",
       "projectsAlignedWithJD": true,
       "quantifiedImpact": true
     },
     "structureFlow": {
       "score": 0,
-      "maxScore": 10,
+      "maxScore": 9,
       "details": "Concise explanation (max 10 words) of structure and flow, including resume length, presence of unnecessary sections, and section completeness. Example: 'Resume is 3 pages long; condense relevant experience to fit within 2 pages as per industry standard for your experience level. Consider removing the 'References' section.'",
       "logicalSectionOrder": true,
       "noMissingSections": true,
@@ -201,7 +201,7 @@ Respond ONLY with valid JSON in this exact structure:
     },
     "criticalFixesRedFlags": {
       "score": 0,
-      "maxScore": 10,
+      "maxScore": 9,
       "details": "Concise explanation (max 10 words) of critical fixes and red flags, such as pronouns, buzzwords, and grammar. Example: 'Avoid using personal pronouns like 'I' and 'my'. Correct the spelling error in 'managment' to 'management'.' ",
       "hasContactInfo": true,
       "noOverusedWords": true,
@@ -210,7 +210,7 @@ Respond ONLY with valid JSON in this exact structure:
     },
     "impactScore": {
       "score": 0,
-      "maxScore": 10,
+      "maxScore": 9,
       "details": "Concise explanation (max 10 words) of impact score, focusing on strong action verbs, quantified accomplishments, and achievement-oriented content. Example: 'Many bullet points lack quantifiable results. For instance, instead of 'Managed a team', state 'Managed a team of 5 engineers, leading to a 15% increase in project delivery speed.'",
       "strongActionVerbs": true,
       "quantifiedAccomplishments": true,
@@ -219,7 +219,7 @@ Respond ONLY with valid JSON in this exact structure:
     },
     "brevityScore": {
       "score": 0,
-      "maxScore": 10,
+      "maxScore": 9,
       "details": "Concise explanation (max 10 words) of brevity score, focusing on conciseness, word economy, and avoiding redundancy. Example: 'The resume contains redundant phrases such as 'responsible for' and 'duties included'. Streamline sentences for greater impact.'",
       "conciseness": true,
       "wordEconomy": true,
@@ -228,7 +228,7 @@ Respond ONLY with valid JSON in this exact structure:
     },
     "styleScore": {
       "score": 0,
-      "maxScore": 10,
+      "maxScore": 9,
       "details": "Concise explanation (max 10 words) of style score, focusing on professional tone, formatting consistency, and clarity of language. Example: 'Inconsistent use of bolding for job titles and company names. Maintain a consistent formatting style throughout the document.'",
       "professionalTone": true,
       "consistencyInFormatting": true,
@@ -237,7 +237,7 @@ Respond ONLY with valid JSON in this exact structure:
     },
     "skillsScore": {
       "score": 0,
-      "maxScore": 10,
+      "maxScore": 9,
       "details": "Concise explanation (max 10 words) of skills score, focusing on relevance to JD, proficiency indication, and variety. Example: 'Skills section lists many generic tools. Prioritize skills directly mentioned in the job description and consider adding a proficiency level for key technical skills.'",
       "relevanceToJD": true,
       "proficiencyIndicated": true,
