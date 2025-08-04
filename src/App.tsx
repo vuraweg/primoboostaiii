@@ -387,7 +387,7 @@ function App() {
           isOpen={showSubscriptionPlans}
           onNavigateBack={() => setShowSubscriptionPlans(false)}
           onSubscriptionSuccess={handleSubscriptionSuccess}
-          onShowAlert={handleShowAlert} {/* ADDED: Pass handleShowAlert here */}
+          onShowAlert={handleShowAlert} 
         />
       )}
       <AlertModal
