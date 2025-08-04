@@ -27,6 +27,7 @@ import {
 // import { useAuth } from "../contexts/AuthContext";
 // import { Subscription } from '../types/payment';
 import { paymentService } from '../services/paymentService'; // Import paymentService to get plan details
+import { useAuth } from "../contexts/AuthContext"; // Import useAuth
 
 // Mocking the imported functions and types for a self-contained example.
 // In a real application, these would be external.
@@ -40,22 +41,16 @@ const generateLinkedInMessage = async (formData: any) => {
   ];
 };
 
-const useAuth = () => ({
-  user: { name: 'Your Name' },
-});
-
-const Subscription = {
-  linkedinMessagesTotal: 10,
-  linkedinMessagesUsed: 2,
-};
+// Removed mock useAuth and Subscription, using actual imports
 
 interface LinkedInMessageGeneratorProps {
   onNavigateBack: () => void;
   isAuthenticated: boolean;
   onShowAuth: () => void;
-  userSubscription: typeof Subscription | null;
+  userSubscription: Subscription | null;
   onShowSubscriptionPlans: () => void;
-  onShowAlert: (title: string, message: string, type?: 'info' | 'success' | 'warning' | 'error', actionText?: string, onAction?: () => void) => void; // Add this prop
+  onShowAlert: (title: string, message: string, type?: 'info' | 'success' | 'warning' | 'error', actionText?: string, onAction?: () => void) => void;
+  refreshUserSubscription: () => Promise<void>; // ADD THIS PROP
 }
 
 type MessageType = 'connection' | 'cold-outreach' | 'follow-up' | 'job-inquiry';
@@ -80,7 +75,8 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
   onShowAuth,
   userSubscription,
   onShowSubscriptionPlans,
-  onShowAlert // Destructure
+  onShowAlert,
+  refreshUserSubscription, // DESTRUCTURE THE NEW PROP
 }) => {
   const { user } = useAuth();
   const [formData, setFormData] = useState<MessageForm>({
@@ -174,6 +170,18 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
     try {
       const messages = await generateLinkedInMessage(formData);
       setGeneratedMessages(messages);
+
+      // Decrement usage count and refresh subscription
+      if (userSubscription) { // Ensure userSubscription is not null before attempting to use it
+        const usageResult = await paymentService.useLinkedInMessage(userSubscription.userId); // Assuming useLinkedInMessage exists
+        if (usageResult.success) {
+          await refreshUserSubscription(); // Refresh the global subscription state
+        } else {
+          console.error('Failed to decrement LinkedIn message usage:', usageResult.error);
+          onShowAlert('Usage Update Failed', 'Failed to record LinkedIn message usage. Please contact support.', 'error');
+        }
+      }
+
     } catch (error) {
       console.error('Error generating LinkedIn message:', error);
       onShowAlert('Generation Failed', `Failed to generate message: ${error.message || 'Unknown error'}. Please try again.`, 'error');
@@ -607,11 +615,6 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
                 <button
                   onClick={() => setCurrentStep(currentStep + 1)}
                   disabled={!validateCurrentStep()}
-                  className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
-                    !validateCurrentStep()
-                      ? 'bg-gray-400 cursor-not-allowed text-white'
-                      : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
-                  }`}
                   className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
                     !validateCurrentStep()
                       ? 'bg-gray-400 cursor-not-allowed text-white'
