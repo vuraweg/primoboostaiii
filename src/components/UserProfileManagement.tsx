@@ -1,4 +1,3 @@
-// src/components/UserProfileManagement.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -55,17 +54,19 @@ type ProfileFormData = z.infer<typeof profileSchema>;
 interface UserProfileManagementProps {
   isOpen: boolean;
   onClose: () => void;
+  onProfileCompleted?: () => void;
   viewMode?: 'profile' | 'wallet';
-  walletRefreshKey?: number;
+  walletRefreshKey?: number; // NEW: Accept walletRefreshKey as a prop
 }
 
 export const UserProfileManagement: React.FC<UserProfileManagementProps> = ({
   isOpen,
   onClose,
+  onProfileCompleted,
   viewMode = 'profile',
-  walletRefreshKey
+  walletRefreshKey // NEW: Destructure the prop
 }) => {
-  const { user, revalidateUserSession, markProfilePromptSeen } = useAuth();
+  const { user, revalidateUserSession } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -83,31 +84,7 @@ export const UserProfileManagement: React.FC<UserProfileManagementProps> = ({
   const [redeemSuccess, setRedeemSuccess] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
 
-  // --- MOVE fetchWalletBalance HERE ---
-  const fetchWalletBalance = async () => {
-    if (!user) return;
-    console.log('Fetching wallet data for user ID:', user.id);
-
-    try {
-      const { data: transactions, error } = await supabase
-        .from('wallet_transactions')
-        .select('amount, status')
-        .eq('user_id', user.id);
-      if (error) {
-        console.error('Error fetching wallet balance:', error);
-        return;
-      }
-      const completed = (transactions || []).filter((t: any) => t.status === 'completed');
-      const balance = completed.reduce((sum: number, tr: any) => sum + parseFloat(tr.amount), 0);
-      setWalletBalance(Math.max(0, balance));
-    } catch (err) {
-      console.error('Error fetching wallet data:', err);
-    } finally {
-      setLoadingWallet(false); // Assuming setLoadingWallet is defined elsewhere or needs to be added
-    }
-  };
-  // --- END MOVE ---
-
+  // Function to handle copying referral code to clipboard
   const handleCopyReferralCode = async () => {
     if (user?.referralCode) {
       try {
@@ -125,6 +102,48 @@ export const UserProfileManagement: React.FC<UserProfileManagementProps> = ({
         setCopySuccess(true);
         setTimeout(() => setCopySuccess(false), 2000);
       }
+    }
+  };
+
+  // Function to fetch wallet data from Supabase
+  const fetchWalletData = async () => {
+    if (!user) return;
+    // --- ADDED CONSOLE.LOG HERE ---
+    console.log('Fetching wallet data for user ID:', user.id);
+
+    try {
+      const { data: transactions, error } = await supabase
+        .from('wallet_transactions')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error fetching wallet data:', error);
+        return;
+      }
+      // --- ADDED CONSOLE.LOG FOR ALL RAW TRANSACTIONS ---
+      console.log('Raw fetched transactions:', transactions);
+
+      const completedTransactions = transactions?.filter(t => t.status === 'completed') || [];
+      // --- ADDED CONSOLE.LOG FOR FILTERED COMPLETED TRANSACTIONS ---
+      console.log('Filtered completed transactions (for balance):', completedTransactions);
+
+      const balance = completedTransactions.reduce((sum, transaction) => sum + parseFloat(transaction.amount), 0);
+      setWalletBalance(Math.max(0, balance));
+      // --- ADDED CONSOLE.LOG FOR CALCULATED BALANCE ---
+      console.log('Calculated wallet balance:', balance);
+
+      const pendingTransactions = transactions?.filter(t => t.status === 'pending' && parseFloat(t.amount) > 0) || [];
+      // --- ADDED CONSOLE.LOG FOR FILTERED PENDING TRANSACTIONS ---
+      console.log('Filtered pending transactions (for earnings):', pendingTransactions);
+
+      const pending = pendingTransactions.reduce((sum, transaction) => sum + parseFloat(transaction.amount), 0);
+      setPendingEarnings(pending);
+      // --- ADDED CONSOLE.LOG FOR PENDING EARNINGS ---
+      console.log('Calculated pending earnings:', pending);
+
+    } catch (err) {
+      console.error('Error fetching wallet data:', err);
     }
   };
 
@@ -148,7 +167,7 @@ export const UserProfileManagement: React.FC<UserProfileManagementProps> = ({
       setValue('github_profile', user.github || '');
       
       // Initial fetch when modal opens
-      fetchWalletBalance();
+      fetchWalletData();
     } else if (!isOpen) {
         reset();
         setError(null);
@@ -164,7 +183,7 @@ export const UserProfileManagement: React.FC<UserProfileManagementProps> = ({
     // Add walletRefreshKey !== undefined to prevent running on initial component mount if key is not provided yet
     if (user && isOpen && walletRefreshKey !== undefined) {
       console.log(`walletRefreshKey changed to ${walletRefreshKey}. Refetching wallet data.`);
-      fetchWalletBalance();
+      fetchWalletData();
     }
   }, [walletRefreshKey, user, isOpen]); // Add user and isOpen as dependencies
 
@@ -236,18 +255,16 @@ export const UserProfileManagement: React.FC<UserProfileManagementProps> = ({
         github_profile: data.github_profile || undefined,
       });
 
-      await revalidateUserSession(); // Crucial for updating the user object in AuthContext
-      await markProfilePromptSeen(); // ADDED: Ensure this is awaited here
+      await revalidateUserSession();
 
       setSuccess(true);
-      // Removed onProfileCompleted call as its logic is now handled here
-      // if (onProfileCompleted) {
-      //   onProfileCompleted();
-      // }
+      if (onProfileCompleted) {
+        onProfileCompleted();
+      }
 
-      // Close the modal after successful update and state synchronization
-      onClose(); // ADDED: Close modal here after all async operations are complete
-
+      setTimeout(() => {
+        setSuccess(false);
+      }, 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update profile');
     } finally {
@@ -255,6 +272,7 @@ export const UserProfileManagement: React.FC<UserProfileManagementProps> = ({
     }
   };
 
+  // Handle redemption submission
   const handleRedeemSubmit = async () => {
     if (!user) {
       setError('User not authenticated. Please log in again.');
@@ -321,7 +339,8 @@ export const UserProfileManagement: React.FC<UserProfileManagementProps> = ({
         setRedeemSuccess(false);
       }, 5000);
 
-      fetchWalletBalance();
+      // Re-fetch wallet data to ensure it's fully up-to-date after redemption
+      fetchWalletData();
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit redemption request.');
@@ -577,7 +596,7 @@ export const UserProfileManagement: React.FC<UserProfileManagementProps> = ({
                 </button>
               </div>
             </form>
-          )}
+          )} {/* End viewMode === 'profile' conditional block */}
 
 
           {/* Wallet Section */}
@@ -619,6 +638,8 @@ export const UserProfileManagement: React.FC<UserProfileManagementProps> = ({
                           </>
                         )}
                       </button>
+                      
+                      {/* The "Share" button and its logic has been removed below */}
                       
                     </div>
                     
@@ -722,7 +743,7 @@ export const UserProfileManagement: React.FC<UserProfileManagementProps> = ({
                           type="button" // Important: Prevent form submission if inside a form
                           onClick={() => setRedeemMethod('bank_transfer')}
                           className={`p-3 rounded-lg border-2 transition-all ${
-                            redeeemMethod === 'bank_transfer' // Corrected from redeeemMethod
+                            redeemMethod === 'bank_transfer' // Corrected from redeeemMethod
                               ? 'border-green-500 bg-green-50 text-green-700'
                               : 'border-gray-300 hover:border-green-300'
                           }`}
@@ -826,7 +847,7 @@ export const UserProfileManagement: React.FC<UserProfileManagementProps> = ({
                 )}
               </div>
             </div>
-          )}
+          )} {/* End viewMode === 'wallet' conditional block */}
 
 
           {/* Info Note (only visible in profile view) */}
