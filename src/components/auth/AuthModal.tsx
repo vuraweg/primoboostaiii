@@ -35,16 +35,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   }, [initialView, isOpen]); // Depend on initialView and isOpen
 
   // Handle prompt dismissal when modal is closed while showing postSignupPrompt
- useEffect(() => {
+useEffect(() => {
   console.log('AuthModal isOpen prop changed:', isOpen);
-  if (!isOpen && currentView === 'postSignupPrompt') {
-    onPromptDismissed();
-    setCurrentView('login');
+  if (!isOpen) {
+    if (currentView === 'postSignupPrompt') {
+      onPromptDismissed();
+    }
+    // Don't immediately reset currentView — allow it to persist when modal reopens
+    // Instead, reset view only when modal **opens again** via prop
   }
-  if (!isOpen && currentView !== 'postSignupPrompt') {
-    setCurrentView(initialView);
-  }
-}, [isOpen, currentView, onPromptDismissed, initialView]);
+}, [isOpen, currentView, onPromptDismissed]);
+
 
 
   // REFINED useEffect: Manage currentView based on auth state and profile prompt status
