@@ -16,7 +16,7 @@ import { AuthModal } from './components/auth/AuthModal';
 import { UserProfileManagement } from './components/UserProfileManagement';
 import { SubscriptionPlans } from './components/payment/SubscriptionPlans';
 import { paymentService } from './services/paymentService';
-
+import { AlertModal } from './components/AlertModal'; // Import AlertModal
 
 function App() {
   const { isAuthenticated, user, markProfilePromptSeen } = useAuth();
@@ -30,6 +30,15 @@ function App() {
   const [successMessage, setSuccessMessage] = useState('');
   const [profileViewMode, setProfileViewMode] = useState<'profile' | 'wallet'>('profile');
   const [userSubscription, setUserSubscription] = useState<any>(null);
+
+  // New state for AlertModal
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertType, setAlertType] = useState<'info' | 'success' | 'warning' | 'error'>('info');
+  const [alertActionText, setAlertActionText] = useState<string | undefined>(undefined);
+  const [alertActionCallback, setAlertActionCallback] = useState<(() => void) | undefined>(undefined);
+
 
   // Handle mobile menu toggle
   const handleMobileMenuToggle = () => {
@@ -89,6 +98,26 @@ function App() {
     setShowSubscriptionPlans(true);
   };
 
+  // New function to show generic alert modal
+  const handleShowAlert = (
+    title: string,
+    message: string,
+    type: 'info' | 'success' | 'warning' | 'error' = 'info',
+    actionText?: string,
+    onAction?: () => void
+  ) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertType(type);
+    setAlertActionText(actionText);
+    setAlertActionCallback(() => { // Wrap in a function to prevent immediate execution
+      if (onAction) onAction();
+      setShowAlertModal(false); // Close modal after action
+    });
+    setShowAlertModal(true);
+  };
+
+
   // Fetch user subscription on auth state change
   useEffect(() => {
     const fetchSubscription = async () => {
@@ -124,19 +153,15 @@ function App() {
         console.log('App.tsx useEffect: User profile complete, closing AuthModal.');
         setShowAuthModal(false);
       }
-      // If user has NOT seen the profile prompt, and the AuthModal is NOT open, open it.
-      // This ensures the prompt is shown if the user is authenticated but hasn't completed profile.
-      else if (user.hasSeenProfilePrompt === false && !showAuthModal) {
-        console.log('App.tsx useEffect: User needs to complete profile, opening AuthModal.');
-        setShowAuthModal(true);
-      }
+      // REMOVED: The else if block that automatically opened AuthModal if hasSeenProfilePrompt was false.
+      // This prevents the modal from showing on every refresh.
     }
     // If user logs out, ensure AuthModal is closed
     if (!isAuthenticated && showAuthModal) {
       console.log('App.tsx useEffect: User logged out, closing AuthModal.');
       setShowAuthModal(false);
     }
-  }, [isAuthenticated, user, user?.hasSeenProfilePrompt]); // Depend on isAuthenticated and user.hasSeenProfilePrompt
+  }, [isAuthenticated, user, user?.hasSeenProfilePrompt, showAuthModal]); // Depend on isAuthenticated and user.hasSeenProfilePrompt
 
   const renderCurrentPage = (isAuthenticatedProp: boolean) => {
     // Define props for HomePage once to ensure consistency
@@ -145,14 +170,20 @@ function App() {
       isAuthenticated: isAuthenticatedProp,
       onShowAuth: handleShowAuth,
       onShowSubscriptionPlans: handleShowSubscriptionPlans, // This is the corrected line
-      userSubscription: userSubscription
+      userSubscription: userSubscription,
+      onShowAlert: handleShowAlert // Pass handleShowAlert
     };
 
     switch (currentPage) {
       case 'new-home':
         return <HomePage {...homePageProps} />;
       case 'guided-builder':
-        return <GuidedResumeBuilder onNavigateBack={() => setCurrentPage('new-home')} userSubscription={userSubscription} onShowSubscriptionPlans={handleShowSubscriptionPlans} />;
+        return <GuidedResumeBuilder
+          onNavigateBack={() => setCurrentPage('new-home')}
+          userSubscription={userSubscription}
+          onShowSubscriptionPlans={handleShowSubscriptionPlans}
+          onShowAlert={handleShowAlert} // Pass handleShowAlert
+        />;
       case 'score-checker':
         return <ResumeScoreChecker
           onNavigateBack={() => setCurrentPage('new-home')}
@@ -160,11 +191,19 @@ function App() {
           onShowAuth={handleShowAuth}
           userSubscription={userSubscription} // Pass userSubscription
           onShowSubscriptionPlans={handleShowSubscriptionPlans} // Pass onShowSubscriptionPlans
+          onShowAlert={handleShowAlert} // Pass handleShowAlert
         />;
       case 'optimizer':
         return (
           <main className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-            <ResumeOptimizer isAuthenticated={isAuthenticatedProp} onShowAuth={handleShowAuth} onShowProfile={handleShowProfile} onNavigateBack={handleNavigateHome} />
+            <ResumeOptimizer
+              isAuthenticated={isAuthenticatedProp}
+              onShowAuth={handleShowAuth}
+              onShowProfile={handleShowProfile}
+              onNavigateBack={handleNavigateHome}
+              onShowSubscriptionPlans={handleShowSubscriptionPlans} // Pass onShowSubscriptionPlans
+              onShowAlert={handleShowAlert} // Pass handleShowAlert
+            />
           </main>
         );
       case 'about':
@@ -180,6 +219,7 @@ function App() {
           onShowAuth={handleShowAuth}
           userSubscription={userSubscription} // Pass userSubscription
           onShowSubscriptionPlans={handleShowSubscriptionPlans} // Pass onShowSubscriptionPlans
+          onShowAlert={handleShowAlert} // Pass handleShowAlert
         />;
       default:
         // Pass all props here as a fallback
@@ -332,6 +372,17 @@ function App() {
           }}
         />
       )}
+
+      {/* Generic Alert Modal */}
+      <AlertModal
+        isOpen={showAlertModal}
+        onClose={() => setShowAlertModal(false)}
+        title={alertTitle}
+        message={alertMessage}
+        type={alertType}
+        actionText={alertActionText}
+        onAction={alertActionCallback}
+      />
     </div>
   );
 }
