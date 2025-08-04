@@ -65,6 +65,7 @@ function App() {
     setProfileViewMode(mode);
     setShowProfileManagement(true);
     setShowMobileMenu(false);
+     console.log('App.tsx: handleShowProfile called. showProfileManagement set to true.');
   };
 
   // Handle profile completion
