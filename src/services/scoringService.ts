@@ -151,14 +151,8 @@ SCORING CRITERIA (Total: 100 points, calculated from weighted sum of categories)
     - 0-10 points: Score based on the quality, relevance, and presentation of the skills section.
 
 CALCULATION OF TOTAL SCORE:
-Total Score = (ATS Compatibility * 1) + (Keyword & Skill Match * 1) + (Project & Work Relevance * 1) + (Structure & Flow * 1) + (Critical Fixes & Red Flags * 1) + (Impact Score * 1) + (Brevity Score * 1) + (Style Score * 1) + (Skills Score * 1)
-(Adjust points for new categories as if they are weighted equally for calculation to sum to 100, assuming you'll adjust max scores later if needed. For now, consider all max scores sum up to 100.)
-
-ANALYSIS REQUIREMENTS:
-- Calculate exact scores for each category.
-- Provide detailed breakdown and reasoning for each category's score within the 'details' field. This field MUST contain specific, actionable feedback relevant to the checks outlined for each category.
-- Identify specific actionable recommendations for overall improvement in the 'recommendations' array, especially for scores below 70% in any *individual category* (not just totalScore). These recommendations should be concrete and directly related to the issues found.
-- Assign a letter grade (A+ 95-100, A 90-94, B+ 85-89, B 80-84, C+ 75-79, C 70-74, D 60-69, F <60).
+The `totalScore` should be calculated as the sum of all individual category scores (e.g., `atsCompatibility.score + keywordSkillMatch.score + ... + skillsScore.score`), then normalized to a percentage out of 100.
+For example, if the sum of individual scores is X, and the sum of all `maxScore` values is Y (which is 110), then `totalScore = Math.round((X / Y) * 100)`. Ensure `totalScore` is an integer between 0 and 100.
 
 -section order summary education and work experience and  project and skill certifications any not this flow -10 points per section unders and miss section -20 if any section miss 
 
@@ -250,6 +244,27 @@ Respond ONLY with valid JSON in this exact structure:
   "recommendations": ["recommendation1", "recommendation2", "recommendation3"],
   "grade": "A+"
 }`;
+
+  try {
+    setLoading(true);
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: 'POST',
+      headers: {
+        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        "HTTP-Referer": "https://primoboost.ai",
+        "X-Title": "PrimoBoost AI"
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "user",
+            content: prompt
+          }
+        ]
+      }),
+    });
 
   try {
     setLoading(true);
