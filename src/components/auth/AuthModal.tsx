@@ -27,6 +27,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [currentView, setCurrentView] = useState<AuthView>(initialView);
   const [signupEmail, setSignupEmail] = useState<string>(''); // To pass email to success/prompt view
 
+  // Effect to update currentView when initialView prop changes
+  useEffect(() => {
+    if (isOpen) { // Only update if the modal is actually open
+      setCurrentView(initialView);
+    }
+  }, [initialView, isOpen]); // Depend on initialView and isOpen
+
   // Handle prompt dismissal when modal is closed while showing postSignupPrompt
   useEffect(() => {
     console.log('AuthModal isOpen prop changed:', isOpen);
@@ -51,19 +58,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
 
     // If user has seen the profile prompt, and the AuthModal is currently open, close it.
-    // This logic is primarily handled by App.tsx, but this ensures consistency if AuthModal is somehow left open.
-    if (user.hasSeenProfilePrompt === true && isOpen) { // CHANGED: Use isOpen instead of showAuthModal
-      console.log('AuthModal useEffect: User profile complete, closing AuthModal.');
+    // This logic is primarily handled by the parent App.tsx, but this ensures consistency if AuthModal is somehow left open.
+    if (user.hasSeenProfilePrompt === true) { // Removed `&& isOpen` as `isOpen` is already checked above
+      console.log('AuthModal useEffect: User profile complete, ensuring AuthModal is closed.');
       // This part of the logic is typically handled by the parent App.tsx to close the modal.
       // If this useEffect is meant to *force* close the modal from within, it would need to call onClose().
       // For now, just logging as the parent App.tsx is responsible for `setShowAuthModal(false)`.
+      setCurrentView('login'); // Ensure internal view is reset
     }
     // If user logs out, ensure AuthModal is closed
-    if (!isAuthenticated && isOpen) { // CHANGED: Use isOpen instead of showAuthModal
-      console.log('AuthModal useEffect: User logged out, closing AuthModal.');
+    if (!isAuthenticated) { // Removed `&& isOpen` as `isOpen` is already checked above
+      console.log('AuthModal useEffect: User logged out, ensuring AuthModal is closed.');
       // Similar to above, parent App.tsx handles `setShowAuthModal(false)`.
+      setCurrentView('login'); // Ensure internal view is reset
     }
-  }, [isAuthenticated, user, user?.hasSeenProfilePrompt, isOpen]); // CHANGED: Use isOpen in dependencies
+  }, [isAuthenticated, user, user?.hasSeenProfilePrompt, isOpen]); // Depend on isOpen to re-evaluate when modal opens/closes
 
   // --- CONDITIONAL RETURN IS NOW AFTER ALL HOOKS ---
   if (!isOpen) {
@@ -266,3 +275,4 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     </div>
   );
 };
+
