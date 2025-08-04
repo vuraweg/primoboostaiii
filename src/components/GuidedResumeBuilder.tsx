@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -74,9 +74,15 @@ interface FormData {
 
 interface GuidedResumeBuilderProps {
   onNavigateBack: () => void;
+  userSubscription: any; // Assuming a subscription object with guidedBuildsTotal and guidedBuildsUsed
+  onShowSubscriptionPlans: () => void;
 }
 
-export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({ onNavigateBack }) => {
+export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
+  onNavigateBack,
+  userSubscription,
+  onShowSubscriptionPlans,
+}) => {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -175,6 +181,16 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({ onNavi
     }
   ];
 
+  // Check subscription on mount and whenever the subscription state changes
+  useEffect(() => {
+    if (userSubscription) {
+      const remainingBuilds = userSubscription.guidedBuildsTotal - userSubscription.guidedBuildsUsed;
+      if (remainingBuilds <= 0) {
+        onShowSubscriptionPlans();
+      }
+    }
+  }, [userSubscription, onShowSubscriptionPlans]);
+
   const updateFormData = (section: keyof FormData, data: any) => {
     setFormData(prev => ({
       ...prev,
@@ -242,19 +258,12 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({ onNavi
       case 2: // Education
         return formData.education.some(edu => edu.degree && edu.school);
       case 3: // Work Experience
-        // Work experience is optional, so it's always true.
-        // If you wanted to make it required for 'experienced' users, you'd add:
-        // return formData.experienceLevel === 'fresher' || formData.workExperience.some(exp => exp.role && exp.company);
         return true;
       case 4: // Projects
-        // Projects are optional. If you wanted to make at least one title required:
-        // return formData.projects.some(proj => proj.title.trim() !== '');
         return true;
       case 5: // Skills
-        // Requires at least one non-empty skill across all categories
         return Object.values(formData.skills).some(skillArray => skillArray.some(skill => skill.trim() !== ''));
       case 6: // Additional Sections
-        // Additional sections are optional, so it's always true.
         return true;
       case 7: // Review & Generate - always can proceed to generate once here
         return true;
@@ -264,6 +273,11 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({ onNavi
   };
 
   const generateResume = async () => {
+    if (!userSubscription || userSubscription.guidedBuildsTotal - userSubscription.guidedBuildsUsed <= 0) {
+      onShowSubscriptionPlans();
+      return;
+    }
+    
     setIsGenerating(true);
     try {
       // Construct a basic resume text from form data
@@ -282,7 +296,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({ onNavi
         formData.contactDetails.linkedin,
         formData.contactDetails.github,
         formData.contactDetails.linkedin, // These last two seem redundant based on your current setup.
-        formData.contactDetails.github,   // You might want to review the optimizeResume signature.
+        formData.contactDetails.github,    // You might want to review the optimizeResume signature.
         '' // No specific target role
       );
 
@@ -384,7 +398,6 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({ onNavi
     }
   };
 
-  // This entire block handles displaying the generated resume and export options
   if (showPreview && generatedResume) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
