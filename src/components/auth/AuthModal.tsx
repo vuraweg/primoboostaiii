@@ -9,7 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 type AuthView = 'login' | 'signup' | 'forgot-password' | 'success' | 'postSignupPrompt' | 'reset_password';
 
 interface AuthModalProps {
-  isOpen: boolean;
+  isOpen: boolean; // This is the prop that indicates if the modal is open
   onClose: () => void;
   initialView?: AuthView;
   onProfileFillRequest?: (mode?: 'profile' | 'wallet') => void;
@@ -17,7 +17,7 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
-  isOpen,
+  isOpen, // Use this prop
   onClose,
   initialView = 'login',
   onProfileFillRequest = () => {},
@@ -53,19 +53,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     // If user is authenticated, modal is open, and profile prompt status is known:
     // If user has seen the profile prompt, and the AuthModal is currently open, close it.
-    if (user.hasSeenProfilePrompt === true && showAuthModal) {
+    if (user.hasSeenProfilePrompt === true && isOpen) { // CHANGED: Use isOpen instead of showAuthModal
       console.log('App.tsx useEffect: User profile complete, closing AuthModal.');
       // Removed the else if block that automatically opened AuthModal if hasSeenProfilePrompt was false.
       // This prevents the modal from showing on every refresh.
     }
     // If user logs out, ensure AuthModal is closed
-    if (!isAuthenticated && showAuthModal) {
+    if (!isAuthenticated && isOpen) { // CHANGED: Use isOpen instead of showAuthModal
       console.log('App.tsx useEffect: User logged out, closing AuthModal.');
       // Removed the else if block that automatically opened AuthModal if hasSeenProfilePrompt was false.
       // This prevents the modal from showing on every refresh.
     }
-  }, [isAuthenticated, user, user?.hasSeenProfilePrompt, showAuthModal]);
-
+  }, [isAuthenticated, user, user?.hasSeenProfilePrompt, isOpen]); // CHANGED: Use isOpen in dependencies
 
   // If the modal is not open, don't render anything
   if (!isOpen) {
