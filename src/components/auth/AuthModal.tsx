@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react'; // Ensure useEffect is imported for the hook
-import { X, CheckCircle, Sparkles, Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, User as UserIcon, UserPlus } from 'lucide-react'; // Added necessary icons for forms
+// src/components/auth/AuthModal.tsx
+import React, { useState, useEffect } from 'react';
+import { X, CheckCircle, Sparkles, Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, User as UserIcon, UserPlus } from 'lucide-react';
 import { LoginForm } from './LoginForm';
 import { SignupForm } from './SignupForm';
 import { ForgotPasswordForm } from './ForgotPasswordForm';
@@ -16,7 +17,7 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
-  isOpen,
+  isOpen, // Use this prop
   onClose,
   initialView = 'login',
   onProfileFillRequest = () => {},
@@ -26,6 +27,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [currentView, setCurrentView] = useState<AuthView>(initialView);
   const [signupEmail, setSignupEmail] = useState<string>(''); // To pass email to success/prompt view
 
+  // Effect to update currentView when initialView prop changes
+  useEffect(() => {
+    if (isOpen) { // Only update if the modal is actually open
+      setCurrentView(initialView);
+    }
+  }, [initialView, isOpen]); // Depend on initialView and isOpen
+
   // Handle prompt dismissal when modal is closed while showing postSignupPrompt
   useEffect(() => {
     console.log('AuthModal isOpen prop changed:', isOpen);
@@ -34,57 +42,49 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setCurrentView('login'); // Reset to login view for next time
     }
     // Also reset error/success messages when modal closes
-    if (!isOpen) {
-      // You might have local state in forms that also need reset,
-      // but the main AuthModal state controlled here should be clean.
+    if (!isOpen && currentView !== 'postSignupPrompt') {
+      setCurrentView(initialView); // Reset to initial view when closed
     }
-  }, [isOpen, currentView, onPromptDismissed]);
+  }, [isOpen, currentView, onPromptDismissed, initialView]);
 
-  // NEW useEffect: Auto-close modal on successful authentication
+  // REFINED useEffect: Manage currentView based on auth state and profile prompt status
   useEffect(() => {
-    let timer: NodeJS.Timeout | null = null;
-    // Check if authenticated, user object is loaded, modal is open,
-    // AND we are not currently showing the needs-email-verification or post-signup-prompt view
-    if (
-      isAuthenticated &&
-      user &&
-      isOpen &&
-      currentView !== 'postSignupPrompt' &&
-      currentView !== 'success'
-    ) {
-      console.log('AuthModal useEffect: User is authenticated and modal is open. Checking profile prompt status.');
-      console.log('AuthModal useEffect: user.hasSeenProfilePrompt:', user.hasSeenProfilePrompt);
-      if (user.hasSeenProfilePrompt === false) {
-        console.log('AuthModal useEffect: User needs to fill profile. Calling onProfileFillRequest.');
-        timer = setTimeout(() => {
-          onProfileFillRequest('profile');
-          onClose();
-        }, 300);
-      } else {
-        console.log('AuthModal useEffect: User profile is complete or prompt seen. Closing AuthModal.');
-        timer = setTimeout(() => {
-          onClose();
-        }, 300);
-      }
-    } else {
-      console.log('AuthModal useEffect: Conditions not met for profile prompt check. isAuthenticated:', isAuthenticated, 'user:', !!user, 'isOpen:', isOpen, 'currentView:', currentView);
-    }
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [isAuthenticated, user, isOpen, currentView, onClose, onProfileFillRequest]);
+    console.log('AuthModal useEffect: Running. isAuthenticated:', isAuthenticated, 'user:', user, 'isOpen:', isOpen, 'currentView:', currentView);
 
+    // If modal is not open, or user is not authenticated, or user object is not fully loaded, do nothing.
+    if (!isOpen || !isAuthenticated || !user || (user.hasSeenProfilePrompt === null || user.hasSeenProfilePrompt === undefined)) {
+      console.log('AuthModal useEffect: Not ready to determine view or modal is closed.');
+      return;
+    }
+
+    // If user has seen the profile prompt, and the AuthModal is currently open, close it.
+    // This logic is primarily handled by the parent App.tsx, but this ensures consistency if AuthModal is somehow left open.
+    if (user.hasSeenProfilePrompt === true) { // Removed `&& isOpen` as `isOpen` is already checked above
+      console.log('AuthModal useEffect: User profile complete, ensuring AuthModal is closed.');
+      // This part of the logic is typically handled by the parent App.tsx to close the modal.
+      // If this useEffect is meant to *force* close the modal from within, it would need to call onClose().
+      // For now, just logging as the parent App.tsx is responsible for `setShowAuthModal(false)`.
+      setCurrentView('login'); // Ensure internal view is reset
+    }
+    // If user logs out, ensure AuthModal is closed
+    if (!isAuthenticated) { // Removed `&& isOpen` as `isOpen` is already checked above
+      console.log('AuthModal useEffect: User logged out, ensuring AuthModal is closed.');
+      // Similar to above, parent App.tsx handles `setShowAuthModal(false)`.
+      setCurrentView('login'); // Ensure internal view is reset
+    }
+  }, [isAuthenticated, user, user?.hasSeenProfilePrompt, isOpen]); // Depend on isOpen to re-evaluate when modal opens/closes
 
   // --- CONDITIONAL RETURN IS NOW AFTER ALL HOOKS ---
   if (!isOpen) {
     console.log('AuthModal is NOT open, returning null');
     return null;
   }
-  
+
   console.log('AuthModal IS open, rendering content');
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
+      console.log('AuthModal: Backdrop clicked. Calling onClose().');
       onClose();
     }
   };
@@ -92,10 +92,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const handleCloseClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    console.log('AuthModal: X button clicked. Calling onClose().');
     onClose();
   };
 
-  const handleSignupSuccess = (email: string) => {
+  const handleSignupSuccess = (needsVerification: boolean, email: string) => {
     setSignupEmail(email); // Store email for the prompt
     // We determine if verification is needed within the signup function in AuthContext
     // If not needing verification, isAuthenticated will become true, and the useEffect will handle the close.
@@ -103,22 +104,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     // The previous AuthModal's internal logic was to change view to 'postSignupPrompt' here
     // However, the new useEffect takes precedence for immediate signed-in users.
     // If signup is successful AND it requires email verification (i.e. not auto-signed in),
-    // then we still want to show the 'needs verification' message.
-    // The AuthContext.signup function's return (needsVerification) should be handled here.
-    // For now, removing this direct call as useEffect will monitor isAuthenticated.
-    // If the signup flow implies *auto-login*, then the useEffect above will handle closing.
-    // If it implies *email verification needed*, then you'd switch to a specific "check your email" view.
-    // Assuming `signup` in AuthContext sets `needsVerification` and does *not* auto-sign in if verification is pending.
-    // If `AuthContext.signup` automatically signs in, then `isAuthenticated` changes and the useEffect above fires.
-    // If `AuthContext.signup` doesn't auto-sign in but indicates `needsVerification`,
     // then this component needs to respond by setting `currentView` to a verification message.
     // Let's adjust AuthModal's submit handlers to reflect this.
+    if (needsVerification) {
+      setCurrentView('success'); // Show success message for email verification
+    } else {
+      // User is immediately signed in, show the profile prompt
+      setCurrentView('postSignupPrompt'); // This is correct and should trigger the prompt
+    }
   };
 
   const handleForgotPasswordSuccess = () => {
     setCurrentView('success');
     // The useEffect will not prevent this success message as currentView is 'success'
     setTimeout(() => {
+      console.log('AuthModal: Forgot password success. Calling onClose().');
       onClose();
       setCurrentView('login'); // Reset to login view for next time
     }, 2500);
@@ -181,14 +181,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               onSwitchToLogin={() => setCurrentView('login')}
               // The onSignupSuccess handler needs to manage the AuthModal's internal view state.
               // We'll pass a function that updates AuthModal's state based on signup result.
-              onSignupSuccess={(needsVerification: boolean, email: string) => {
-                setSignupEmail(email);
-                if (needsVerification) {
-                  // If verification needed, switch to a view indicating email check
-                  setCurrentView('success'); // Re-using success view for email verification message
-                }
-                // If not needsVerification, isAuthenticated will become true, and the useEffect above will handle closing.
-              }}
+              onSignupSuccess={handleSignupSuccess}
             />
           )}
 
@@ -246,14 +239,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
               <h2 className="text-lg sm:text-2xl font-bold text-gray-900 mb-3">Welcome!</h2>
               <p className="text-sm sm:text-base text-gray-600 leading-relaxed px-4 mb-6">
-                Your account for **{signupEmail}** has been created successfully!
+                Your account for {signupEmail} has been created successfully!
                 Would you like to complete your profile now?
               </p>
               <div className="flex flex-col sm:flex-row gap-3 px-4">
                 <button
                   onClick={() => {
-                    onProfileFillRequest(); // Call the prop function
-                    onClose(); // Close the modal
+                    onProfileFillRequest(); // Call this first
+                    // Introduce a small delay before closing the AuthModal
+                    setTimeout(() => {
+                      onClose();
+                    }, 50); // 50ms delay should be sufficient
                   }}
                   className="w-full btn-primary py-3 px-4 rounded-xl font-semibold text-sm transition-colors"
                 >
@@ -262,7 +258,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <button
                   onClick={() => {
                     onPromptDismissed(); // Mark prompt as dismissed
-                    onClose(); // Just close the modal
+                    // Introduce a small delay before closing the AuthModal
+                    setTimeout(() => {
+                      onClose();
+                    }, 50); // 50ms delay
                   }}
                   className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-3 px-4 rounded-xl text-sm transition-colors"
                 >
@@ -276,3 +275,4 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     </div>
   );
 };
+
