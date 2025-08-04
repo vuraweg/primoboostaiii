@@ -596,7 +596,12 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
               {currentStep < steps.length - 1 ? (
                 <button
                   onClick={() => setCurrentStep(currentStep + 1)}
-                  disabled={!validateCurrentStep()} // Disable if current step is not valid
+                  disabled={!validateCurrentStep()}
+                  className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                    !validateCurrentStep()
+                      ? 'bg-gray-400 cursor-not-allowed text-white'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
+                  }`}
                   className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
                     !validateCurrentStep()
                       ? 'bg-gray-400 cursor-not-allowed text-white'
