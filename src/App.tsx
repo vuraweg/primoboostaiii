@@ -158,6 +158,12 @@ function App() {
     }
 
     if (isAuthenticated && user) {
+      // CRITICAL: Only proceed if hasSeenProfilePrompt is explicitly true or false, not undefined
+      if (user.hasSeenProfilePrompt === undefined) {
+        console.log('App.tsx useEffect: user.hasSeenProfilePrompt is undefined, waiting for full profile load.');
+        return; // Wait for the next render cycle when it's defined
+      }
+
       // User is authenticated
       // Check if hasSeenProfilePrompt is explicitly false
       if (user.hasSeenProfilePrompt === false) {
