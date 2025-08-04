@@ -82,15 +82,23 @@ function App() {
 
   // Handle profile completion
   const handleProfileCompleted = () => {
-    setShowProfileManagement(false);
-    setCurrentPage('new-home'); // Redirect to home or a dashboard after profile update
-    setSuccessMessage('Profile updated successfully!');
-    setShowSuccessNotification(true);
-    setTimeout(() => {
-      setShowSuccessNotification(false);
-      setSuccessMessage('');
-    }, 3000);
-  };
+  setShowProfileManagement(false);
+  setCurrentPage('new-home'); // ✅ redirect
+
+  // ✅ CRITICAL: Mark profile prompt as seen here
+  if (user) {
+    markProfilePromptSeen(); // 🔥 THIS MUST BE ADDED
+  }
+
+  // ✅ Show success notification
+  setSuccessMessage('Profile updated successfully!');
+  setShowSuccessNotification(true);
+  setTimeout(() => {
+    setShowSuccessNotification(false);
+    setSuccessMessage('');
+  }, 3000);
+};
+
 
   // New function to navigate back to the home page
   const handleNavigateHome = () => {
