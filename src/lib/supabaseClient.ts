@@ -1,4 +1,5 @@
 // src/lib/supabaseClient.ts
+console.log('DEBUG: Entering supabaseClient.ts');
 import { createClient } from '@supabase/supabase-js';
 
 
