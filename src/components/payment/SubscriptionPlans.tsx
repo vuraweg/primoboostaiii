@@ -144,12 +144,13 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
     // If you intend to use it, you would set setCurrentSlide(index);
   };
 
-  const handleApplyCoupon = () => {
+  const handleApplyCoupon = async () => { // Made async
     if (!couponCode.trim()) {
       setCouponError('Please enter a coupon code');
       return;
     }
-    const result = paymentService.applyCoupon(selectedPlan, couponCode.trim());
+    // Pass user.id to applyCoupon
+    const result = await paymentService.applyCoupon(selectedPlan, couponCode.trim(), user?.id || null);
     if (result.couponApplied) {
       setAppliedCoupon({
         code: result.couponApplied,
@@ -158,7 +159,8 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
       });
       setCouponError('');
     } else {
-      setCouponError('Invalid coupon code or not applicable to selected plan');
+      // Handle error message from applyCoupon
+      setCouponError(result.error || 'Invalid coupon code or not applicable to selected plan');
       setAppliedCoupon(null);
     }
   };
@@ -670,3 +672,4 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
     </div>
   );
 };
+
