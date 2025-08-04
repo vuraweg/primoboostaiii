@@ -142,7 +142,26 @@ serve(async (req) => {
 
     if (couponCode) {
       const normalizedCoupon = couponCode.toLowerCase().trim()
-      
+
+      // Backend check: Ensure coupon hasn't been used by this user before
+      const { data: existingTransaction, error: transactionError } = await supabase
+        .from('payment_transactions')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('coupon_code', normalizedCoupon)
+        .eq('status', 'success') // Only count successful uses
+        .limit(1)
+
+      if (transactionError) {
+        console.error('Error checking existing coupon usage on backend:', transactionError)
+        throw new Error('Failed to verify coupon usage.')
+      }
+
+      if (existingTransaction && existingTransaction.length > 0) {
+        throw new Error('This coupon has already been used by your account.')
+      }
+      // End backend check
+
       // NEW: full_support coupon - free career_pro_max plan
       if (normalizedCoupon === 'fullsupport' && planId === 'career_pro_max') {
         finalAmount = 0
