@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createHmac } from 'https://deno.land/std@0.168.0/node/crypto.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -103,6 +104,8 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  let transactionId: string | null = null; // Initialize transactionId here
+
   try {
     // Retrieve addOnsTotal from the request body
     const body: OrderRequest = await req.json()
@@ -145,18 +148,21 @@ serve(async (req) => {
 
       // Backend check: Ensure coupon hasn't been used by this user before
       // Now checks for both 'success' and 'pending' statuses
+      console.log(`[${new Date().toISOString()}] - Checking coupon usage for user: ${user.id}, coupon: ${normalizedCoupon}`);
       const { data: existingTransaction, error: transactionError } = await supabase
         .from('payment_transactions')
-        .select('id')
+        .select('id, status, coupon_code') // Select more fields for logging
         .eq('user_id', user.id)
         .eq('coupon_code', normalizedCoupon)
         .in('status', ['success', 'pending']) // Check for both success and pending
-        .limit(1)
+        .limit(1);
 
       if (transactionError) {
         console.error('Error checking existing coupon usage on backend:', transactionError)
         throw new Error('Failed to verify coupon usage.')
       }
+
+      console.log(`[${new Date().toISOString()}] - Coupon check result for user ${user.id}, coupon ${normalizedCoupon}: ${JSON.stringify(existingTransaction)}`);
 
       if (existingTransaction && existingTransaction.length > 0) {
         throw new Error('This coupon has already been used by your account or is currently in use for a pending transaction.')
@@ -214,7 +220,7 @@ serve(async (req) => {
       console.error('Error creating pending transaction:', pendingTransactionError);
       throw new Error('Failed to initiate payment transaction.');
     }
-    const transactionId = pendingTransaction.id;
+    transactionId = pendingTransaction.id;
     // --- END NEW ---
 
     // Create Razorpay order
