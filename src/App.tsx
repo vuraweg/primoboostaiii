@@ -1,4 +1,3 @@
-// src/App.tsx
 import React, { useState, useEffect } from 'react';
 import { Menu, X, Home, Info, BookOpen, Phone, FileText, LogIn, LogOut, User, Wallet } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
@@ -21,7 +20,7 @@ import { paymentService } from './services/paymentService'; // Import paymentSer
 
 function App() {
   // This line must be at the top of the function
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, markProfilePromptSeen } = useAuth();
 
   const [currentPage, setCurrentPage] = useState('new-home');
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -283,6 +282,7 @@ function App() {
           console.log('AuthModal closed, showAuthModal set to false');
         }}
         onProfileFillRequest={handleShowProfile}
+        onPromptDismissed={markProfilePromptSeen}
       />
 
       {/* Profile Management Modal */}
@@ -362,6 +362,13 @@ const AuthButtons: React.FC<{
           >
             <User className="w-5 h-5" />
             <span>Profile Settings</span>
+          </button>
+          <button
+            onClick={() => onShowProfile('wallet')}
+            className="w-full flex items-center space-x-3 min-h-touch px-4 py-3 rounded-xl font-medium transition-all duration-200 text-secondary-700 hover:text-primary-600 hover:bg-primary-50"
+          >
+            <Wallet className="w-5 h-5" />
+            <span>My Wallet</span>
           </button>
           <button
             onClick={handleLogout}
