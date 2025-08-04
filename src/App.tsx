@@ -81,7 +81,7 @@ function App() {
   };
 
   // UPDATED: handleProfileCompleted now uses the new state variable
-  const handleProfileCompleted = () => {
+  const handleProfileCompleted = async () => { // MARKED ASYNC
     setShowProfileManagement(false);
     setCurrentPage('new-home');
     setSuccessMessage('Profile updated successfully!');
@@ -100,7 +100,7 @@ function App() {
     
     // CRITICAL: Mark profile prompt as seen here
     if (user) {
-      markProfilePromptSeen();
+      await markProfilePromptSeen(); // AWAIT THE CALL
     }
   };
 
