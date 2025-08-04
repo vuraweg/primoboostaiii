@@ -27,55 +27,51 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [currentView, setCurrentView] = useState<AuthView>(initialView);
   const [signupEmail, setSignupEmail] = useState<string>('');
 
+  // Handle prompt dismissal when modal is closed while showing postSignupPrompt
   useEffect(() => {
     console.log('AuthModal isOpen prop changed:', isOpen);
     if (!isOpen && currentView === 'postSignupPrompt') {
+      // If the modal is closed while the prompt is showing, assume user dismissed it
       onPromptDismissed();
-      setCurrentView('login');
+      setCurrentView('login'); // Reset to login view for next time
     }
-    if (!isOpen) {
-      // No local state to reset on close.
+    // If modal is closed from other views, just reset view
+    if (!isOpen && currentView !== 'postSignupPrompt') {
+      setCurrentView(initialView); // Reset to initial view when closed
     }
-  }, [isOpen, currentView, onPromptDismissed]);
+  }, [isOpen, currentView, onPromptDismissed, initialView]);
 
+  // REFINED useEffect: Manage currentView based on auth state and profile prompt status
   useEffect(() => {
-    let timer: NodeJS.Timeout | null = null;
     console.log('AuthModal useEffect: Running. isAuthenticated:', isAuthenticated, 'user:', user, 'isOpen:', isOpen, 'currentView:', currentView);
 
+    // 1. Wait for full user profile to load if authenticated and profile status is unknown
     if (isAuthenticated && user && (user.hasSeenProfilePrompt === null || user.hasSeenProfilePrompt === undefined)) {
       console.log('AuthModal useEffect: User authenticated, but profile prompt status not yet loaded. Waiting...');
-      return;
+      return; // Do not proceed until hasSeenProfilePrompt is definitively true/false
     }
 
-    if (
-      isAuthenticated &&
-      user &&
-      isOpen &&
-      currentView !== 'postSignupPrompt' &&
-      currentView !== 'success'
-    ) {
-      console.log('AuthModal useEffect: User is authenticated and modal is open. Checking profile prompt status.');
-      console.log('AuthModal useEffect: user.hasSeenProfilePrompt:', user.hasSeenProfilePrompt);
-      if (user.hasSeenProfilePrompt === false) {
-        console.log('AuthModal useEffect: User needs to fill profile. Calling onProfileFillRequest.');
-        timer = setTimeout(() => {
-          onProfileFillRequest('profile');
-          onClose();
-        }, 300);
-      } else {
-        console.log('AuthModal useEffect: User profile is complete or prompt seen. Closing AuthModal.');
-        timer = setTimeout(() => {
-          onClose();
-        }, 300);
+    // 2. If modal is open and user is authenticated
+    if (isAuthenticated && user && isOpen) {
+      // If user has NOT seen profile prompt AND current view is NOT already the prompt
+      if (user.hasSeenProfilePrompt === false && currentView !== 'postSignupPrompt') {
+        console.log('AuthModal useEffect: User needs to fill profile. Setting view to postSignupPrompt.');
+        setCurrentView('postSignupPrompt');
       }
-    } else {
-      console.log('AuthModal useEffect: Conditions not met for profile prompt check. isAuthenticated:', isAuthenticated, 'user:', !!user, 'isOpen:', isOpen, 'currentView:', currentView);
+      // If user HAS seen profile prompt AND current view is NOT 'success' (which is for email verification/forgot password)
+      // This means the user is authenticated, profile prompt seen, and they are not in a 'success' state.
+      // So, the modal should close.
+      else if (user.hasSeenProfilePrompt === true && currentView !== 'success') {
+        console.log('AuthModal useEffect: User profile is complete or prompt seen. Closing AuthModal.');
+        onClose(); // Directly close the modal.
+      }
+      // If currentView is 'success' (from email verification), let it stay until user closes it.
+      // If currentView is 'postSignupPrompt', let it stay until user interacts with buttons.
     }
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [isAuthenticated, user, isOpen, currentView, onClose, onProfileFillRequest]);
+    // If not authenticated or modal is not open, no action needed from this useEffect.
+  }, [isAuthenticated, user, isOpen, currentView, onClose]);
 
+  // If the modal is not open, don't render anything
   if (!isOpen) {
     console.log('AuthModal is NOT open, returning null');
     return null;
@@ -95,8 +91,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     onClose();
   };
 
-  const handleSignupSuccess = (email: string) => {
+  const handleSignupSuccess = (needsVerification: boolean, email: string) => {
     setSignupEmail(email);
+    if (needsVerification) {
+      setCurrentView('success'); // Show success message for email verification
+    } else {
+      // User is immediately signed in, show the profile prompt
+      setCurrentView('postSignupPrompt'); // This is correct and should trigger the prompt
+    }
   };
 
   const handleForgotPasswordSuccess = () => {
@@ -159,14 +161,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {currentView === 'signup' && (
             <SignupForm
               onSwitchToLogin={() => setCurrentView('login')}
-              onSignupSuccess={(needsVerification: boolean, email: string) => {
-                setSignupEmail(email);
-                if (needsVerification) {
-                  setCurrentView('success');
-                } else {
-                  setCurrentView('postSignupPrompt');
-                }
-              }}
+              onSignupSuccess={handleSignupSuccess}
             />
           )}
 
