@@ -12,6 +12,7 @@ interface PaymentVerificationRequest {
   razorpay_order_id: string
   razorpay_payment_id: string
   razorpay_signature: string
+  transactionId: string // ADDED: transactionId to request
 }
 
 interface PlanConfig {
@@ -100,8 +101,11 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  let transactionStatus = 'failed'; // Default status if anything goes wrong
+  let subscriptionId: string | null = null;
+
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature }: PaymentVerificationRequest = await req.json()
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, transactionId }: PaymentVerificationRequest = await req.json()
 
     // Get user from auth header
     const authHeader = req.headers.get('authorization')
@@ -161,6 +165,29 @@ serve(async (req) => {
       throw new Error('Invalid plan')
     }
 
+    // --- NEW: Update the existing pending payment_transactions record ---
+    const { data: updatedTransaction, error: updateTransactionError } = await supabase
+      .from('payment_transactions')
+      .update({
+        payment_id: razorpay_payment_id,
+        status: 'success', // Mark as success
+        order_id: razorpay_order_id, // Ensure order_id is set
+        amount: orderData.amount, // Update with final amount from Razorpay
+        currency: orderData.currency, // Update currency
+        coupon_code: couponCode, // Ensure coupon code is set
+        discount_amount: discountAmount, // Ensure discount is set
+        final_amount: orderData.amount // Ensure final amount is set
+      })
+      .eq('id', transactionId) // Identify the record by the passed transactionId
+      .select()
+      .single();
+
+    if (updateTransactionError) {
+      console.error('Error updating payment transaction to success:', updateTransactionError);
+      throw new Error('Failed to update payment transaction status.');
+    }
+    transactionStatus = 'success'; // Set status for final response
+
     // Create subscription
     const { data: subscription, error: subscriptionError } = await supabase
       .from('subscriptions')
@@ -188,26 +215,17 @@ serve(async (req) => {
       console.error('Subscription creation error:', subscriptionError)
       throw new Error('Failed to create subscription')
     }
+    subscriptionId = subscription.id; // Capture subscription ID
 
-    // Create payment transaction record
-    const { error: transactionError } = await supabase
+    // Update the payment transaction with the subscription_id
+    const { error: updateSubscriptionIdError } = await supabase
       .from('payment_transactions')
-      .insert({
-        user_id: user.id,
-        subscription_id: subscription.id,
-        payment_id: razorpay_payment_id,
-        order_id: razorpay_order_id,
-        amount: orderData.amount,
-        currency: orderData.currency,
-        status: 'success',
-        coupon_code: couponCode,
-        discount_amount: discountAmount,
-        final_amount: orderData.amount
-      })
+      .update({ subscription_id: subscription.id })
+      .eq('id', transactionId);
 
-    if (transactionError) {
-      console.error('Transaction creation error:', transactionError)
-      // Don't throw error here as subscription is already created
+    if (updateSubscriptionIdError) {
+      console.error('Error updating payment transaction with subscription_id:', updateSubscriptionIdError);
+      // Non-critical error, payment is already successful
     }
 
     // Record wallet usage if applicable
@@ -311,6 +329,18 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Payment verification error:', error)
+    // If an error occurs during verification, update the pending transaction to 'failed'
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const { transactionId } = await req.json(); // Re-parse to get transactionId
+
+    if (transactionId) {
+      await supabase.from('payment_transactions')
+        .update({ status: 'failed' })
+        .eq('id', transactionId);
+    }
+
     return new Response(
       JSON.stringify({
         success: false,
@@ -323,3 +353,4 @@ serve(async (req) => {
     )
   }
 })
+
