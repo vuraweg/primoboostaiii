@@ -85,7 +85,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   }, [isAuthenticated, user, isOpen, currentView, onClose, onProfileFillRequest]);
 
   // ... (rest of the component code)
-};
 
 
   // --- CONDITIONAL RETURN IS NOW AFTER ALL HOOKS ---
