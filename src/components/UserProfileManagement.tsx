@@ -1,871 +1,494 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import {
-  X,
-  User,
-  Mail,
-  Phone,
-  Linkedin,
-  Github,
-  Save,
-  Loader2,
-  CheckCircle,
-  AlertCircle,
-  Wallet,
-  CreditCard,
-  ArrowUpRight,
-  Banknote,
-  Copy,
-  Gift,
-} from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { authService } from '../services/authService';
-import { supabase } from '../lib/supabaseClient';
+import React, { useState, useEffect } from 'react';
+import { Menu, X, Home, Info, BookOpen, Phone, FileText, LogIn, LogOut, User, Wallet } from 'lucide-react';
+import { useAuth } from './contexts/AuthContext';
+import { Header } from './components/Header';
+import { Navigation } from './components/navigation/Navigation';
+import ResumeOptimizer from './components/ResumeOptimizer';
+import { HomePage } from './components/pages/HomePage';
+import { GuidedResumeBuilder } from './components/GuidedResumeBuilder';
+import { ResumeScoreChecker } from './components/ResumeScoreChecker';
+import { LinkedInMessageGenerator } from './components/LinkedInMessageGenerator';
+import { AboutUs } from './components/pages/AboutUs';
+import { Contact } from './components/pages/Contact';
+import { Tutorials } from './components/pages/Tutorials';
+import { AuthModal } from './components/auth/AuthModal';
+import { UserProfileManagement } from './components/UserProfileManagement';
+import { SubscriptionPlans } from './components/payment/SubscriptionPlans';
+import { paymentService } from './services/paymentService';
+import { AlertModal } from './components/AlertModal'; // Import AlertModal
 
-// --- Zod Schema for Validation ---
-const profileSchema = z.object({
-  full_name: z.string()
-    .min(2, 'Name must be at least 2 characters')
-    .max(50, 'Name must be less than 50 characters')
-    .regex(/^[a-zA-Z\s]+$/, 'Name can only contain letters and spaces'),
-  email_address: z.string()
-    .email('Please enter a valid email address'),
-  phone: z.string()
-    .optional()
-    .refine((val) => !val || /^[\+]?[1-9][\d]{0,15}$/.test(val), {
-      message: 'Please enter a valid phone number',
-    }),
-  linkedin_profile: z.string()
-    .optional()
-    .refine((val) => !val || val.includes('linkedin.com'), {
-      message: 'Please enter a valid LinkedIn URL',
-    }),
-  github_profile: z.string()
-    .optional()
-    .refine((val) => !val || /^https:\/\/github\.com\/[a-zA-Z0-9_-]+$/.test(val), {
-      message: 'Please enter a valid GitHub URL (e.g., https://github.com/yourusername)',
-    }),
-});
+function App() {
+  const { isAuthenticated, user, markProfilePromptSeen, isLoading } = useAuth();
 
-type ProfileFormData = z.infer<typeof profileSchema>;
+  const [currentPage, setCurrentPage] = useState('new-home');
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showProfileManagement, setShowProfileManagement] = useState(false);
+  const [showSubscriptionPlans, setShowSubscriptionPlans] = useState(false);
+  const [showSuccessNotification, setShowSuccessNotification] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [profileViewMode, setProfileViewMode] = useState<'profile' | 'wallet'>('profile');
+  const [userSubscription, setUserSubscription] = useState<any>(null);
 
-interface UserProfileManagementProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onProfileCompleted?: () => void;
-  viewMode?: 'profile' | 'wallet';
-  walletRefreshKey?: number; // NEW: Accept walletRefreshKey as a prop
-}
+  // New state for AlertModal
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertType, setAlertType] = useState<'info' | 'success' | 'warning' | 'error'>('info');
+  const [alertActionText, setAlertActionText] = useState<string | undefined>(undefined);
+  const [alertActionCallback, setAlertActionCallback] = useState<(() => void) | undefined>(undefined);
 
-export const UserProfileManagement: React.FC<UserProfileManagementProps> = ({
-  isOpen,
-  onClose,
-  onProfileCompleted,
-  viewMode = 'profile',
-  walletRefreshKey // NEW: Destructure the prop
-}) => {
-  const { user, revalidateUserSession } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const [walletBalance, setWalletBalance] = useState<number>(0);
-  const [pendingEarnings, setPendingEarnings] = useState<number>(0);
-  const [showRedeemForm, setShowRedeemForm] = useState(false);
-  const [redeemMethod, setRedeemMethod] = useState<'upi' | 'bank_transfer'>('upi');
-  const [redeemDetails, setRedeemDetails] = useState({
-    upi_id: '',
-    bank_account: '',
-    ifsc_code: '',
-    account_holder_name: ''
-  });
-  const [isRedeeming, setIsRedeeming] = useState(false);
-  const [redeemSuccess, setRedeemSuccess] = useState(false);
-  const [copySuccess, setCopySuccess] = useState(false);
+  // NEW state for AuthModal's initial view
+  const [authModalInitialView, setAuthModalInitialView] = useState<'login' | 'signup' | 'forgot-password' | 'success' | 'postSignupPrompt'>('login');
 
-  // Function to handle copying referral code to clipboard
-  const handleCopyReferralCode = async () => {
-    if (user?.referralCode) {
-      try {
-        await navigator.clipboard.writeText(user.referralCode);
-        setCopySuccess(true);
-        setTimeout(() => setCopySuccess(false), 2000);
-      } catch (err) {
-        console.error('Failed to copy referral code:', err);
-        const textArea = document.createElement('textarea');
-        textArea.value = user.referralCode;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        setCopySuccess(true);
-        setTimeout(() => setCopySuccess(false), 2000);
-      }
+
+  // Handle mobile menu toggle
+  const handleMobileMenuToggle = () => {
+    setShowMobileMenu(!showMobileMenu);
+  };
+
+  const logoImage = "https://res.cloudinary.com/dlkovvlud/image/upload/w_1000,c_fill,ar_1:1,g_auto,r_max,bo_5px_solid_red,b_rgb:262c35/v1751536902/a-modern-logo-design-featuring-primoboos_XhhkS8E_Q5iOwxbAXB4CqQ_HnpCsJn4S1yrhb826jmMDw_nmycqj.jpg";
+
+  // Handle page change from mobile nav
+  const handlePageChange = (page: string) => {
+    if (page === 'menu') {
+      handleMobileMenuToggle();
+    } else if (page === 'profile') {
+      handleShowProfile(); // Defaults to 'profile' mode
+      setShowMobileMenu(false);
+    } else {
+      setCurrentPage(page);
+      setShowMobileMenu(false);
     }
   };
 
-  // Function to fetch wallet data from Supabase
-  const fetchWalletData = async () => {
-    if (!user) return;
-    // --- ADDED CONSOLE.LOG HERE ---
-    console.log('Fetching wallet data for user ID:', user.id);
+  // Handle showing auth modal
+  const handleShowAuth = () => {
+    console.log('handleShowAuth called in App.tsx');
+    setShowAuthModal(true);
+    setAuthModalInitialView('login'); // Ensure it opens to login by default
+    console.log('showAuthModal set to true');
+    setShowMobileMenu(false);
+  };
 
-    try {
-      const { data: transactions, error } = await supabase
-        .from('wallet_transactions')
-        .select('*')
-        .eq('user_id', user.id);
+  // UPDATED: Handle showing profile modal with an optional mode
+  const handleShowProfile = (mode: 'profile' | 'wallet' = 'profile') => {
+    setProfileViewMode(mode);
+    setShowProfileManagement(true);
+    setShowMobileMenu(false);
+    console.log('App.tsx: handleShowProfile called. showProfileManagement set to true.');
+  };
 
-      if (error) {
-        console.error('Error fetching wallet data:', error);
-        return;
-      }
-      // --- ADDED CONSOLE.LOG FOR ALL RAW TRANSACTIONS ---
-      console.log('Raw fetched transactions:', transactions);
+  // Handle profile completion
+  const handleProfileCompleted = () => {
+    setShowProfileManagement(false);
+    setCurrentPage('new-home'); // Redirect to home or a dashboard after profile update
+    setSuccessMessage('Profile updated successfully!');
+    setShowSuccessNotification(true);
+    setTimeout(() => {
+      setShowSuccessNotification(false);
+      setSuccessMessage('');
+    }, 3000);
+  };
 
-      const completedTransactions = transactions?.filter(t => t.status === 'completed') || [];
-      // --- ADDED CONSOLE.LOG FOR FILTERED COMPLETED TRANSACTIONS ---
-      console.log('Filtered completed transactions (for balance):', completedTransactions);
+  // New function to navigate back to the home page
+  const handleNavigateHome = () => {
+    setCurrentPage('new-home');
+  };
 
-      const balance = completedTransactions.reduce((sum, transaction) => sum + parseFloat(transaction.amount), 0);
-      setWalletBalance(Math.max(0, balance));
-      // --- ADDED CONSOLE.LOG FOR CALCULATED BALANCE ---
-      console.log('Calculated wallet balance:', balance);
+  // New prop handler for showing subscription plans
+  const handleShowSubscriptionPlans = () => {
+    setShowSubscriptionPlans(true);
+  };
 
-      const pendingTransactions = transactions?.filter(t => t.status === 'pending' && parseFloat(t.amount) > 0) || [];
-      // --- ADDED CONSOLE.LOG FOR FILTERED PENDING TRANSACTIONS ---
-      console.log('Filtered pending transactions (for earnings):', pendingTransactions);
+  // Handle subscription success
+  const handleSubscriptionSuccess = async () => {
+    setShowSubscriptionPlans(false);
+    setSuccessMessage('Subscription activated successfully!');
+    setShowSuccessNotification(true);
+    setTimeout(() => {
+      setShowSuccessNotification(false);
+      setSuccessMessage('');
+    }, 3000);
+    await fetchSubscription();
+  };
 
-      const pending = pendingTransactions.reduce((sum, transaction) => sum + parseFloat(transaction.amount), 0);
-      setPendingEarnings(pending);
-      // --- ADDED CONSOLE.LOG FOR PENDING EARNINGS ---
-      console.log('Calculated pending earnings:', pending);
-
-    } catch (err) {
-      console.error('Error fetching wallet data:', err);
+  // Fetch user subscription on auth state change
+  const fetchSubscription = async () => {
+    if (isAuthenticated && user) {
+      const sub = await paymentService.getUserSubscription(user.id);
+      setUserSubscription(sub);
+    } else {
+      setUserSubscription(null);
     }
   };
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-    setValue
-  } = useForm<ProfileFormData>({
-    resolver: zodResolver(profileSchema),
-  });
-
-  // Pre-fill form with current user data when modal opens or user changes
   useEffect(() => {
-    if (user && isOpen) {
-      setValue('full_name', user.name);
-      setValue('email_address', user.email);
-      setValue('phone', user.phone || '');
-      setValue('linkedin_profile', user.linkedin || '');
-      setValue('github_profile', user.github || '');
-      
-      // Initial fetch when modal opens
-      fetchWalletData();
-    } else if (!isOpen) {
-        reset();
-        setError(null);
-        setSuccess(false);
-        setShowRedeemForm(false);
-        setRedeemSuccess(false);
-    }
-  }, [user, isOpen, setValue, reset]);
+    fetchSubscription(); // Initial fetch when auth state changes
+  }, [isAuthenticated, user]);
 
-  // NEW useEffect: Listen for walletRefreshKey changes to refetch wallet data
+  // New function to show generic alert modal
+  const handleShowAlert = (
+    title: string,
+    message: string,
+    type: 'info' | 'success' | 'warning' | 'error' = 'info',
+    actionText?: string,
+    onAction?: () => void
+  ) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertType(type);
+    setAlertActionText(actionText);
+    setAlertActionCallback(() => {
+      if (onAction) onAction();
+      setShowAlertModal(false);
+    });
+    setShowAlertModal(true);
+  };
+
+
+  // Close mobile menu on window resize
   useEffect(() => {
-    // Only fetch if the modal is open and the key actually changes (and user exists)
-    // Add walletRefreshKey !== undefined to prevent running on initial component mount if key is not provided yet
-    if (user && isOpen && walletRefreshKey !== undefined) {
-      console.log(`walletRefreshKey changed to ${walletRefreshKey}. Refetching wallet data.`);
-      fetchWalletData();
-    }
-  }, [walletRefreshKey, user, isOpen]); // Add user and isOpen as dependencies
-
-  // Effect for referral code generation
-  useEffect(() => {
-    const ensureReferralCode = async () => {
-      if (user && isOpen && !user.referralCode) {
-        console.log('User has no referral code, attempting to generate via Edge Function (fetch API)...');
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (!session) {
-            console.error('No active session found for referral code generation.');
-            setError('Authentication required to generate referral code.');
-            return;
-          }
-
-          const edgeFunctionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-referral-code`;
-          if (!import.meta.env.VITE_SUPABASE_URL) {
-            throw new Error('VITE_SUPABASE_URL is not defined in your environment variables.');
-          }
-
-          const response = await fetch(edgeFunctionUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify({ userId: user.id }),
-          });
-
-          const result = await response.json();
-
-          if (!response.ok) {
-            console.error('Error generating referral code via Edge Function:', result.error || response.statusText);
-            setError('Failed to generate referral code: ' + (result.error || response.statusText));
-          } else {
-            console.log('Referral code generated successfully via Edge Function:', result.referral_code);
-            await revalidateUserSession();
-          }
-        } catch (err) {
-          console.error('Fetch call to generate-referral-code Edge Function failed:', err);
-          setError('An unexpected error occurred during referral code generation.');
-        }
+    const handleResize = () => {
+      if (window.innerWidth >= 768) { // 768px is typically md breakpoint
+        setShowMobileMenu(false);
       }
     };
 
-    if (isOpen) {
-      ensureReferralCode();
-    }
-  }, [user, isOpen, revalidateUserSession]);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
+  // NEW useEffect to manage AuthModal visibility based on user profile status
+  useEffect(() => {
+    console.log('App.tsx useEffect: isAuthenticated:', isAuthenticated, 'user:', user?.id, 'hasSeenProfilePrompt:', user?.hasSeenProfilePrompt);
 
-  const onSubmit = async (data: ProfileFormData) => {
-    if (!user) {
-      setError('User not authenticated. Please log in again.');
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    setSuccess(false);
-
-    try {
-      await authService.updateUserProfile(user.id, {
-        full_name: data.full_name,
-        email_address: data.email_address,
-        phone: data.phone || undefined,
-        linkedin_profile: data.linkedin_profile || undefined,
-        github_profile: data.github_profile || undefined,
-      });
-
-      await revalidateUserSession();
-
-      setSuccess(true);
-      if (onProfileCompleted) {
-        onProfileCompleted();
+    if (isAuthenticated && user) {
+      // User is authenticated and user object is loaded
+      // Check if hasSeenProfilePrompt is explicitly false
+      if (user.hasSeenProfilePrompt === false) {
+        console.log('App.tsx useEffect: User profile incomplete, opening AuthModal to prompt for profile.');
+        setAuthModalInitialView('postSignupPrompt');
+        setShowAuthModal(true);
+      } else {
+        // If hasSeenProfilePrompt is true, or still undefined/null (meaning loading),
+        // ensure the AuthModal is closed. It should only be open for postSignupPrompt.
+        console.log('App.tsx useEffect: User authenticated, ensuring AuthModal is closed unless explicitly needing prompt.');
+        setShowAuthModal(false);
+        setAuthModalInitialView('login'); // Reset to default view
       }
+    } else {
+      // User is not authenticated, ensure modal is closed
+      console.log('App.tsx useEffect: User not authenticated, ensuring AuthModal is closed.');
+      setShowAuthModal(false);
+      setAuthModalInitialView('login'); // Reset to default view
+    }
+  }, [isAuthenticated, user, user?.hasSeenProfilePrompt]); // Dependencies remain the same
 
-      setTimeout(() => {
-        setSuccess(false);
-      }, 2000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update profile');
-    } finally {
-      setIsLoading(false);
+  const renderCurrentPage = (isAuthenticatedProp: boolean) => {
+    // Define props for HomePage once to ensure consistency
+    const homePageProps = {
+      onPageChange: setCurrentPage,
+      isAuthenticated: isAuthenticatedProp,
+      onShowAuth: handleShowAuth,
+      onShowSubscriptionPlans: handleShowSubscriptionPlans, // This is the corrected line
+      userSubscription: userSubscription,
+      onShowAlert: handleShowAlert // Pass handleShowAlert
+    };
+
+    switch (currentPage) {
+      case 'new-home':
+        return <HomePage {...homePageProps} />;
+      case 'guided-builder':
+        return <GuidedResumeBuilder
+          onNavigateBack={() => setCurrentPage('new-home')}
+          userSubscription={userSubscription}
+          onShowSubscriptionPlans={handleShowSubscriptionPlans}
+          onShowAlert={handleShowAlert} // Pass handleShowAlert
+        />;
+      case 'score-checker':
+        return <ResumeScoreChecker
+          onNavigateBack={() => setCurrentPage('new-home')}
+          isAuthenticated={isAuthenticatedProp}
+          onShowAuth={handleShowAuth}
+          userSubscription={userSubscription} // Pass userSubscription
+          onShowSubscriptionPlans={handleShowSubscriptionPlans} // Pass onShowSubscriptionPlans
+          onShowAlert={handleShowAlert} // Pass handleShowAlert
+        />;
+      case 'optimizer':
+        return (
+          <main className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+            <ResumeOptimizer
+              isAuthenticated={isAuthenticatedProp}
+              onShowAuth={handleShowAuth}
+              onShowProfile={handleShowProfile}
+              onNavigateBack={handleNavigateHome}
+              onShowSubscriptionPlans={handleShowSubscriptionPlans} // Pass onShowSubscriptionPlans
+              onShowAlert={handleShowAlert} // Pass handleShowAlert
+            />
+          </main>
+        );
+      case 'about':
+        return <AboutUs />;
+      case 'contact':
+        return <Contact />;
+      case 'tutorials':
+        return <Tutorials />;
+      case 'linkedin-generator':
+        return <LinkedInMessageGenerator
+          onNavigateBack={() => setCurrentPage('new-home')}
+          isAuthenticated={isAuthenticatedProp}
+          onShowAuth={handleShowAuth}
+          userSubscription={userSubscription} // Pass userSubscription
+          onShowSubscriptionPlans={handleShowSubscriptionPlans} // Pass onShowSubscriptionPlans
+          onShowAlert={handleShowAlert} // Pass handleShowAlert
+        />;
+      default:
+        // Pass all props here as a fallback
+        return <HomePage {...homePageProps} />;
     }
   };
 
-  // Handle redemption submission
-  const handleRedeemSubmit = async () => {
-    if (!user) {
-      setError('User not authenticated. Please log in again.');
-      return;
-    }
-
-    if (walletBalance < 100) {
-      setError('Minimum redemption amount is ₹100.');
-      return;
-    }
-
-    let redemptionData: any;
-    if (redeemMethod === 'upi') {
-      if (!redeemDetails.upi_id) {
-        setError('UPI ID is required.');
-        return;
-      }
-      redeemData = { method: 'upi', details: { upi_id: redeemDetails.upi_id } };
-    } else { // bank_transfer
-      if (!redeemDetails.account_holder_name || !redeemDetails.bank_account || !redeemDetails.ifsc_code) {
-        setError('All bank transfer details are required.');
-        return;
-      }
-      redeemData = { method: 'bank_transfer', details: redeemDetails };
-    }
-
-    setIsRedeeming(true);
-    setError(null);
-    setRedeemSuccess(false);
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No active session found for redemption.');
-      }
-
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/redeem-balance`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          user_id: user.id,
-          amount: walletBalance,
-          method: redemptionData.method,
-          details: redemptionData.details,
-        }),
-      });
-      
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || response.statusText);
-      }
-
-      setWalletBalance(0);
-      setPendingEarnings(prev => prev + walletBalance);
-
-      setRedeemSuccess(true);
-      setShowRedeemForm(false);
-
-      setTimeout(() => {
-        setRedeemSuccess(false);
-      }, 5000);
-
-      // Re-fetch wallet data to ensure it's fully up-to-date after redemption
-      fetchWalletData();
-
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit redemption request.');
-      console.error('Redemption error:', err);
-    } finally {
-      setIsRedeeming(false);
-    }
-  };
-
-
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
-  if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={handleBackdropClick}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
-        {/* Header */}
-        <div className="relative bg-gradient-to-br from-blue-50 to-indigo-50 p-6 border-b border-gray-200">
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-white/50 min-w-[44px] min-h-[44px]"
-          >
-            <X className="w-6 h-6" />
-          </button>
-
-          <div className="text-center">
-            <div className="bg-gradient-to-br from-blue-600 to-indigo-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-              {viewMode === 'profile' ? <User className="w-8 h-8 text-white" /> : <Wallet className="w-8 h-8 text-white" />}
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              {viewMode === 'profile' ? 'Profile Settings' : 'Referral & Wallet'}
-            </h1>
-            <p className="text-gray-600">
-              {viewMode === 'profile' ? 'Update your personal information and social profiles' : 'Manage your earnings and referral program'}
-            </p>
-          </div>
+    <div className="min-h-screen pb-safe-bottom safe-area">
+      {/* Global Success Notification */}
+      {showSuccessNotification && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 p-3 bg-green-500 text-white rounded-lg shadow-lg animate-fade-in-down">
+          {successMessage}
         </div>
+      )}
 
-        {/* Content */}
-        <div className="p-6">
-          {/* Inline Success Message */}
-          {success && (
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl">
-              <div className="flex items-start">
-                <CheckCircle className="w-5 h-5 text-green-600 mr-3 flex-shrink-0 mt-0.5" />
-                <p className="text-green-700 text-sm font-medium">Profile updated successfully!</p>
-              </div>
-            </div>
-          )}
+      {/* Always render the Header component */}
+      <Header onMobileMenuToggle={handleMobileMenuToggle} showMobileMenu={showMobileMenu} onShowProfile={handleShowProfile}>
+        <Navigation currentPage={currentPage} onPageChange={setCurrentPage} />
+      </Header>
 
-          {/* Redemption Success Message */}
-          {redeemSuccess && (
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-              <div className="flex items-start">
-                <CheckCircle className="w-5 h-5 text-blue-600 mr-3 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-blue-700 text-sm font-medium">Redemption request submitted successfully!</p>
-                  <p className="text-blue-600 text-xs mt-1">The money will be credited to your account within 2 hours. We understand.</p>
+      {/* Render the current page content below the header */}
+      {renderCurrentPage(isAuthenticated)}
+
+      {/* Mobile Menu Overlay */}
+      {showMobileMenu && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowMobileMenu(false)}
+          />
+          <div className="fixed top-0 right-0 h-full w-80 max-w-[90vw] bg-white shadow-2xl overflow-y-auto safe-area">
+            <div className="flex flex-col space-y-4 p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2 sm:space-x-3">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl overflow-hidden shadow-lg">
+                    <img
+                      src={logoImage}
+                      alt="PrimoBoost AI Logo"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <h1 className="text-lg sm:text-xl font-bold text-secondary-900">PrimoBoost AI</h1>
                 </div>
-              </div>
-            </div>
-          )}
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
-              <div className="flex items-start">
-                <AlertCircle className="w-5 h-5 text-red-600 mr-3 mt-0.5" />
-                <p className="text-red-700 text-sm font-medium">{error}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Conditional rendering based on viewMode */}
-          {viewMode === 'profile' && (
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-              {/* Personal Information Section */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                  <User className="w-5 h-5 mr-2 text-blue-600" />
-                  Personal Information
-                </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Full Name */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Full Name <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <User className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <input
-                        {...register('full_name')}
-                        type="text"
-                        placeholder="Enter your full name"
-                        className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${
-                          errors.full_name ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-gray-50 focus:bg-white'
-                        }`}
-                      />
-                    </div>
-                    {errors.full_name && (
-                      <p className="mt-2 text-sm text-red-600 flex items-center">
-                        <AlertCircle className="w-4 h-4 mr-1" />
-                        {errors.full_name.message}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Email */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email Address <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Mail className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <input
-                        {...register('email_address')}
-                        type="email"
-                        placeholder="your.email@example.com"
-                        className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${
-                          errors.email_address ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-gray-50 focus:bg-white'
-                        }`}
-                      />
-                    </div>
-                    {errors.email_address && (
-                      <p className="mt-2 text-sm text-red-600 flex items-center">
-                        <AlertCircle className="w-4 h-4 mr-1" />
-                        {errors.email_address.message}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Phone */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Phone Number
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Phone className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <input
-                        {...register('phone')}
-                        type="tel"
-                        placeholder="+1 (555) 123-4567"
-                        className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${
-                          errors.phone ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-gray-50 focus:bg-white'
-                        }`}
-                      />
-                    </div>
-                    {errors.phone && (
-                      <p className="mt-2 text-sm text-red-600 flex items-center">
-                        <AlertCircle className="w-4 h-4 mr-1" />
-                        {errors.phone.message}
-                      </p>
-                    )}
-                  </div>
-
-                </div>
-              </div>
-
-              {/* Social Profiles Section */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                  <Linkedin className="w-5 h-5 mr-2 text-blue-600" />
-                  Social Profiles
-                </h3>
-
-                <div className="space-y-4">
-                  {/* LinkedIn */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      LinkedIn Profile URL
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Linkedin className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <input
-                        {...register('linkedin_profile')}
-                        type="url"
-                        placeholder="https://linkedin.com/in/yourprofile"
-                        className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${
-                          errors.linkedin_profile ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-gray-50 focus:bg-white'
-                        }`}
-                      />
-                    </div>
-                    {errors.linkedin_profile && (
-                      <p className="mt-2 text-sm text-red-600 flex items-center">
-                        <AlertCircle className="w-4 h-4 mr-1" />
-                        {errors.linkedin_profile.message}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* GitHub */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      GitHub Profile URL
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Github className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <input
-                        {...register('github_profile')}
-                        type="url"
-                        placeholder="https://github.com/yourusername"
-                        className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${
-                          errors.github_profile ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-gray-50 focus:bg-white'
-                        }`}
-                      />
-                    </div>
-                    {errors.github_profile && (
-                      <p className="mt-2 text-sm text-red-600 flex items-center">
-                        <AlertCircle className="w-4 h-4 mr-1" />
-                        {errors.github_profile.message}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Submit Button */}
-              <div className="pt-6 border-t border-gray-200">
                 <button
-                  type="submit"
-                  disabled={isLoading}
-                  className={`w-full py-4 px-6 rounded-xl font-semibold text-white transition-all duration-300 flex items-center justify-center space-x-2 ${
-                    isLoading
-                      ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl'
-                  }`}
+                  onClick={() => setShowMobileMenu(false)}
+                  className="min-w-touch min-h-touch p-2 text-secondary-600 hover:text-secondary-900 hover:bg-secondary-100 rounded-lg transition-colors"
                 >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>Updating Profile...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-5 h-5" />
-                      <span>Save Changes</span>
-                    </>
-                  )}
+                  <X className="w-6 h-6" />
                 </button>
               </div>
-            </form>
-          )} {/* End viewMode === 'profile' conditional block */}
 
-
-          {/* Wallet Section */}
-          {viewMode === 'wallet' && (
-            <div className="space-y-6">
-              {/* Referral Code Section */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                  <Gift className="w-5 h-5 mr-2 text-purple-600" />
-                  Your Referral Code
-                </h3>
-
-                <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-6 mb-6">
-                  <div className="text-center">
-                    <div className="bg-white border border-purple-300 rounded-lg p-4 mb-4 inline-block">
-                      <div className="text-2xl font-bold text-purple-700 tracking-wider">
-                        {user?.referralCode || 'Loading...'}
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                      <button
-                        onClick={handleCopyReferralCode}
-                        className={`flex items-center justify-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all min-h-[44px] ${
-                          copySuccess
-                            ? 'bg-green-600 text-white'
-                            : 'bg-purple-600 hover:bg-purple-700 text-white'
-                        }`}
-                      >
-                        {copySuccess ? (
-                          <>
-                            <CheckCircle className="w-4 h-4" />
-                            <span>Copied!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-4 h-4" />
-                            <span>Copy Code</span>
-                          </>
-                        )}
-                      </button>
-                      
-                      {/* The "Share" button and its logic has been removed below */}
-                      
-                    </div>
-                    
-                    <div className="mt-4 text-center">
-                      <p className="text-sm text-gray-600 mb-2">
-                        🎉 <strong>Earn 10%</strong> every time your friend purchases a plan with your code!
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Your friends also get ₹10 bonus when they use your referral code
-                      </p>
-                    </div>
-                  </div>
-                </div>
+              <div className="border-t border-secondary-200 pt-4">
+                <nav className="flex flex-col space-y-4">
+                  {[
+                    { id: 'new-home', label: 'Home', icon: <Home className="w-5 h-5" /> },
+                    { id: 'about', label: 'About Us', icon: <Info className="w-5 h-5" /> },
+                    { id: 'tutorials', label: 'Tutorials', icon: <BookOpen className="w-5 h-5" /> },
+                    { id: 'contact', label: 'Contact', icon: <Phone className="w-5 h-5" /> },
+                    // Conditionally render the 'referral' item
+                    ...(isAuthenticated ? [{ id: 'referral', label: 'Referral', icon: <Wallet className="w-5 h-5" /> }] : []),
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        if (item.id === 'referral') {
+                          handleShowProfile('wallet'); // Pass 'wallet' mode here
+                          setShowMobileMenu(false);
+                        } else {
+                          setCurrentPage(item.id);
+                          setShowMobileMenu(false);
+                        }
+                      }}
+                      className={`flex items-center space-x-3 min-h-touch px-4 py-3 rounded-xl font-medium transition-all duration-200 ${
+                        currentPage === item.id
+                          ? 'bg-primary-100 text-primary-700 shadow-md'
+                          : 'text-secondary-700 hover:text-primary-600 hover:bg-primary-50'
+                      }`}
+                    >
+                      {item.icon}
+                      <span>{item.label}</span>
+                    </button>
+                  ))}
+                </nav>
               </div>
 
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                  <Wallet className="w-5 h-5 mr-2 text-green-600" />
-                  Wallet & Earnings
-                </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  {/* Current Balance */}
-                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-green-700">Current Balance</p>
-                        <p className="text-2xl font-bold text-green-900">₹{walletBalance.toFixed(2)}</p>
-                      </div>
-                      <div className="bg-green-100 p-3 rounded-full">
-                        <Banknote className="w-6 h-6 text-green-600" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Pending Earnings */}
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-blue-700">Pending Earnings</p>
-                        <p className="text-2xl font-bold text-blue-900">₹{pendingEarnings.toFixed(2)}</p>
-                      </div>
-                      <div className="bg-blue-100 p-3 rounded-full">
-                        <CreditCard className="w-6 h-6 text-blue-600" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Redemption Section */}
-                {walletBalance >= 100 && !showRedeemForm && (
-                  <button
-                    onClick={() => setShowRedeemForm(true)}
-                    className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl"
-                  >
-                    <ArrowUpRight className="w-5 h-5" />
-                    <span>Redeem ₹{walletBalance.toFixed(2)}</span>
-                  </button>
-                )}
-
-                {walletBalance < 100 && (
-                  <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
-                    <div className="flex items-start">
-                      <AlertCircle className="w-5 h-5 text-orange-600 mr-3 mt-0.5" />
-                      <div>
-                        <p className="text-orange-800 font-medium">Minimum Redemption Amount</p>
-                        <p className="text-orange-700 text-sm mt-1">
-                          You need at least ₹100 to redeem your earnings. Current balance: ₹{walletBalance.toFixed(2)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Redemption Form */}
-                {showRedeemForm && (
-                  <div className="mt-4 bg-gray-50 border border-gray-200 rounded-xl p-4">
-                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Redeem Earnings</h4>
-                    
-                    {/* Redemption Method Selection */}
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Redemption Method
-                      </label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <button
-                          type="button" // Important: Prevent form submission if inside a form
-                          onClick={() => setRedeemMethod('upi')}
-                          className={`p-3 rounded-lg border-2 transition-all ${
-                            redeemMethod === 'upi'
-                              ? 'border-green-500 bg-green-50 text-green-700'
-                              : 'border-gray-300 hover:border-green-300'
-                          }`}
-                        >
-                          <div className="text-center">
-                            <CreditCard className="w-6 h-6 mx-auto mb-2" />
-                            <span className="font-medium">UPI</span>
-                          </div>
-                        </button>
-                        <button
-                          type="button" // Important: Prevent form submission if inside a form
-                          onClick={() => setRedeemMethod('bank_transfer')}
-                          className={`p-3 rounded-lg border-2 transition-all ${
-                            redeemMethod === 'bank_transfer' // Corrected from redeeemMethod
-                              ? 'border-green-500 bg-green-50 text-green-700'
-                              : 'border-gray-300 hover:border-green-300'
-                          }`}
-                        >
-                          <div className="text-center">
-                            <Banknote className="w-6 h-6 mx-auto mb-2" />
-                            <span className="font-medium">Bank Transfer</span>
-                          </div>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* UPI Details */}
-                    {redeemMethod === 'upi' && (
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          UPI ID
-                        </label>
-                        <input
-                          type="text"
-                          value={redeemDetails.upi_id}
-                          onChange={(e) => setRedeemDetails(prev => ({ ...prev, upi_id: e.target.value }))}
-                          placeholder="yourname@upi"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                        />
-                      </div>
-                    )}
-
-                    {/* Bank Transfer Details */}
-                    {redeemMethod === 'bank_transfer' && (
-                      <div className="space-y-4 mb-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Account Holder Name
-                          </label>
-                          <input
-                            type="text"
-                            value={redeemDetails.account_holder_name}
-                            onChange={(e) => setRedeemDetails(prev => ({ ...prev, account_holder_name: e.target.value }))}
-                            placeholder="Full name as per bank account"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Bank Account Number
-                          </label>
-                          <input
-                            type="text"
-                            value={redeemDetails.bank_account}
-                            onChange={(e) => setRedeemDetails(prev => ({ ...prev, bank_account: e.target.value }))}
-                            placeholder="Account number"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            IFSC Code
-                          </label>
-                          <input
-                            type="text"
-                            value={redeemDetails.ifsc_code}
-                            onChange={(e) => setRedeemDetails(prev => ({ ...prev, ifsc_code: e.target.value }))}
-                            placeholder="IFSC Code"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="flex space-x-3">
-                      <button
-                        type="button" // Important: Prevent default form submission
-                        onClick={handleRedeemSubmit}
-                        disabled={isRedeeming || (redeemMethod === 'upi' && !redeemDetails.upi_id) ||
-                                 (redeemMethod === 'bank_transfer' && (!redeemDetails.account_holder_name || !redeemDetails.bank_account || !redeemDetails.ifsc_code))}
-                        className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold py-3 px-4 rounded-xl transition-colors flex items-center justify-center space-x-2"
-                      >
-                        {isRedeeming ? (
-                          <>
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                            <span>Processing...</span>
-                          </>
-                        ) : (
-                          <>
-                            <ArrowUpRight className="w-5 h-5" />
-                            <span>Submit Redemption</span>
-                          </>
-                        )}
-                      </button>
-                      <button
-                        type="button" // Important: Prevent default form submission
-                        onClick={() => setShowRedeemForm(false)}
-                        className="px-6 py-3 bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold rounded-xl transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
+              <div className="border-t border-secondary-200 pt-4">
+                <AuthButtons
+                  onPageChange={setCurrentPage}
+                  onClose={() => setShowMobileMenu(false)}
+                  onShowAuth={handleShowAuth}
+                  onShowProfile={handleShowProfile} // onShowProfile passed directly
+                />
               </div>
-            </div>
-          )} {/* End viewMode === 'wallet' conditional block */}
 
-
-          {/* Info Note (only visible in profile view) */}
-          {viewMode === 'profile' && (
-            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-              <div className="flex items-start">
-                <div className="w-2 h-2 bg-blue-500 rounded-full mr-3 mt-2 flex-shrink-0"></div>
-                <div className="text-sm text-blue-800">
-                  <p className="font-medium mb-1">📝 Auto-Resume Population</p>
-                  <p className="text-blue-700">
-                    These details will be automatically included in your generated resumes, saving you time during the optimization process.
+              <div className="mt-auto pt-4 border-t border-secondary-200">
+                <div className="bg-gradient-to-r from-primary-50 to-accent-50 rounded-xl p-4">
+                  <p className="text-sm text-secondary-700 mb-2">
+                    Need help with your resume?
                   </p>
+                  <button
+                    onClick={() => {
+                      setCurrentPage('new-home');
+                      setShowMobileMenu(false);
+                    }}
+                    className="w-full btn-primary text-sm flex items-center justify-center space-x-2"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>Optimize Now</span>
+                  </button>
                 </div>
               </div>
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => {
+          setShowAuthModal(false);
+          setAuthModalInitialView('login'); // Reset initial view on close
+          console.log('AuthModal closed, showAuthModal set to false');
+        }}
+        onProfileFillRequest={handleShowProfile} // Passed handleShowProfile here
+        initialView={authModalInitialView} // Pass the initial view
+        onPromptDismissed={() => {
+          // When user dismisses the prompt, mark it as seen so it doesn't reappear immediately
+          if (user) {
+            markProfilePromptSeen();
+          }
+          setShowAuthModal(false); // Close the modal
+          setAuthModalInitialView('login'); // Reset initial view
+        }}
+      />
+
+      {/* Profile Management Modal */}
+      <UserProfileManagement
+        isOpen={showProfileManagement}
+        onClose={() => setShowProfileManagement(false)}
+        onProfileCompleted={handleProfileCompleted}
+        viewMode={profileViewMode}
+      />
+
+      {/* Subscription Plans Modal */}
+      {showSubscriptionPlans && (
+        <SubscriptionPlans
+          isOpen={showSubscriptionPlans}
+          onNavigateBack={() => setShowSubscriptionPlans(false)}
+          onSubscriptionSuccess={handleSubscriptionSuccess}
+        />
+      )}
+
+      {/* Generic Alert Modal */}
+      <AlertModal
+        isOpen={showAlertModal}
+        onClose={() => setShowAlertModal(false)}
+        title={alertTitle}
+        message={alertMessage}
+        type={alertType}
+        actionText={alertActionText}
+        onAction={alertActionCallback}
+      />
+    </div>
+  );
+}
+
+// Authentication Buttons Component (moved inside App.tsx for AuthProvider context access)
+const AuthButtons: React.FC<{
+  onPageChange: (page: string) => void;
+  onClose: () => void;
+  onShowAuth: () => void;
+  onShowProfile: (mode?: 'profile' | 'wallet') => void;
+}> = ({ onPageChange, onClose, onShowAuth, onShowProfile }) => {
+  const { user, isAuthenticated, logout } = useAuth();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      onClose(); // Close mobile menu after logout
+    } catch (error) {
+      console.error('Logout failed:', error);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
+  const handleLogin = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('Sign in button clicked - calling onShowAuth');
+    onShowAuth(); // This should show the auth modal and close the mobile menu
+  };
+
+  return (
+    <div>
+      <h3 className="text-sm font-semibold text-secondary-500 mb-3">Account</h3>
+      {isAuthenticated && user ? (
+        <div className="space-y-3">
+          <div className="flex items-center space-x-3 px-4 py-3 bg-primary-50 rounded-xl">
+            <div className="bg-primary-600 w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold">
+              {user.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2)}
+            </div>
+            <div className="overflow-hidden">
+              <p className="font-medium text-secondary-900 truncate">{user.name}</p>
+              <p className="text-xs text-secondary-500 truncate">{user.email}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => onShowProfile('profile')} // Pass 'profile' mode explicitly
+            className="w-full flex items-center space-x-3 min-h-touch px-4 py-3 rounded-xl font-medium transition-all duration-200 text-secondary-700 hover:text-primary-600 hover:bg-primary-50"
+          >
+            <User className="w-5 h-5" />
+            <span>Profile Settings</span>
+          </button>
+          <button
+            onClick={() => onShowProfile('wallet')}
+            className="w-full flex items-center space-x-3 min-h-touch px-4 py-3 rounded-xl font-medium transition-all duration-200 text-secondary-700 hover:text-primary-600 hover:bg-primary-50"
+          >
+            <Wallet className="w-5 h-5" />
+            <span>My Wallet</span>
+          </button>
+          <button
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            className="w-full flex items-center space-x-3 min-h-touch px-4 py-3 rounded-xl font-medium transition-all duration-200 text-red-600 hover:bg-red-50"
+          >
+            <LogOut className="w-5 h-5" />
+            <span>{isLoggingOut ? 'Signing Out...' : 'Sign Out'}</span>
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={handleLogin}
+          className="w-full flex items-center space-x-3 min-h-touch px-4 py-3 rounded-xl font-medium transition-all duration-200 btn-primary"
+          type="button"
+        >
+          <LogIn className="w-5 h-5" />
+          <span>Sign In</span>
+        </button>
+      )}
     </div>
   );
 };
+
+export default A
