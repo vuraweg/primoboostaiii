@@ -3,7 +3,7 @@ import { X, CheckCircle, Sparkles, Mail, Lock, Eye, EyeOff, Loader2, AlertCircle
 import { supabase } from '../../lib/supabaseClient';
 import { LoginForm } from './LoginForm';
 import { SignupForm } from './SignupForm';
-import { ForgotPasswordForm } from './ForgotPasswordForm';\
+import { ForgotPasswordForm } from './ForgotPasswordForm';
 import { paymentService } from './paymentService'; // Add this line
 import { useAuth } from '../../contexts/AuthContext';
 
