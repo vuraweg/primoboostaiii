@@ -18,18 +18,8 @@ interface AuthContextType extends AuthState {
 // Change createContext to explicitly use null as default
 const AuthContext = createContext<AuthContextType | null>(null);
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  // Check for null instead of undefined
-  if (context === null) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
-
-interface AuthProviderProps {
-  children: ReactNode;
-}
+// src/contexts/AuthContext.tsx
+// ... (rest of the imports)
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [authState, setAuthState] = useState<AuthState>({
@@ -40,34 +30,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const [sessionRefreshTimer, setSessionRefreshTimer] = useState<NodeJS.Timeout | null>(null);
 
-  const scheduleSessionRefresh = () => {
-    if (sessionRefreshTimer) clearTimeout(sessionRefreshTimer);
-    const timer = setTimeout(async () => {
-      try {
-        console.log('AuthContext: Attempting scheduled session refresh...');
-        await refreshSession();
-        scheduleSessionRefresh(); // Schedule next refresh
-      } catch (error) {
-        console.error('AuthContext: Scheduled session refresh failed:', error);
-      }
-    }, 45 * 60 * 1000); // 45 minutes
-    setSessionRefreshTimer(timer);
-  };
-
-  const refreshSession = async () => {
-    try {
-      const { data, error } = await supabase.auth.refreshSession();
-      if (error) {
-        console.error('AuthContext: Session refresh error:', error);
-        throw error;
-      }
-      console.log('AuthContext: ✅ Session refreshed successfully');
-      return data;
-    } catch (error) {
-      console.error('AuthContext: Failed to refresh session:', error);
-      throw error;
-    }
-  };
+  // ... (scheduleSessionRefresh and refreshSession functions)
 
   const revalidateUserSession = async () => {
     try {
@@ -122,30 +85,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               isLoading: false,
             }));
 
-            // Defer fetching the full profile to avoid blocking the main thread
-            setTimeout(async () => {
-              if (!mounted) return; // Check mounted status again inside setTimeout
-              const fullProfile = await authService.fetchUserProfile(session.user.id);
-              console.log('AuthContext: Full user profile fetched:', fullProfile ? fullProfile.full_name : 'none');
+            // REMOVE setTimeout and directly await fetchUserProfile
+            const fullProfile = await authService.fetchUserProfile(session.user.id);
+            console.log('AuthContext: Full user profile fetched:', fullProfile ? fullProfile.full_name : 'none');
 
-              setAuthState(prev => ({
-                ...prev,
-                user: prev.user ? {
-                  ...prev.user, // Use existing basic user data
-                  name: fullProfile?.full_name || prev.user?.name || 'User',
-                  email: fullProfile?.email_address || prev.user?.email!,
-                  phone: fullProfile?.phone || undefined,
-                  linkedin: fullProfile?.linkedin_profile || undefined,
-                  github: fullProfile?.wellfound_profile || undefined,
-                  username: fullProfile?.username || undefined,
-                  referralCode: fullProfile?.referral_code || undefined,
-                  // Ensure hasSeenProfilePrompt defaults to false if null/undefined
-                  hasSeenProfilePrompt: fullProfile?.has_seen_profile_prompt ?? false,
-                } : null,
-                isAuthenticated: true,
-                isLoading: false,
-              }));
-            }, 0); // Defer with setTimeout(0)
+            setAuthState(prev => ({
+              ...prev,
+              user: prev.user ? {
+                ...prev.user, // Use existing basic user data
+                name: fullProfile?.full_name || prev.user?.name || 'User',
+                email: fullProfile?.email_address || prev.user?.email!,
+                phone: fullProfile?.phone || undefined,
+                linkedin: fullProfile?.linkedin_profile || undefined,
+                github: fullProfile?.wellfound_profile || undefined,
+                username: fullProfile?.username || undefined,
+                referralCode: fullProfile?.referral_code || undefined,
+                // Ensure hasSeenProfilePrompt defaults to false if null/undefined
+                hasSeenProfilePrompt: fullProfile?.has_seen_profile_prompt ?? false,
+              } : null,
+              isAuthenticated: true,
+              isLoading: false,
+            }));
 
             scheduleSessionRefresh();
           } catch (error) {
@@ -185,6 +145,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('AuthContext: AuthProvider unmounted. Cleaned up timers and subscriptions.');
     };
   }, []); // Empty dependency array ensures this effect runs only once on mount
+
+  // ... (rest of the AuthContext component)
+};
 
   const login = async (credentials: LoginCredentials) => {
     try {
