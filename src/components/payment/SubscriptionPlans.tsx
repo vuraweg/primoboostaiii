@@ -33,6 +33,8 @@ interface SubscriptionPlansProps {
   isOpen: boolean;
   onNavigateBack: () => void;
   onSubscriptionSuccess: () => void;
+  // ADDED: onShowAlert prop
+  onShowAlert: (title: string, message: string, type?: 'info' | 'success' | 'warning' | 'error', actionText?: string, onAction?: () => void) => void;
 }
 
 type AddOn = {
@@ -51,6 +53,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
   isOpen,
   onNavigateBack,
   onSubscriptionSuccess,
+  onShowAlert, // ADDED: Destructure onShowAlert
 }) => {
   const { user } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState<string>('pro_pack');
@@ -144,12 +147,11 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
     // If you intend to use it, you would set setCurrentSlide(index);
   };
 
-  const handleApplyCoupon = async () => { // Made async
+  const handleApplyCoupon = async () => {
     if (!couponCode.trim()) {
       setCouponError('Please enter a coupon code');
       return;
     }
-    // Pass user.id to applyCoupon
     const result = await paymentService.applyCoupon(selectedPlan, couponCode.trim(), user?.id || null);
     if (result.couponApplied) {
       setAppliedCoupon({
@@ -158,10 +160,13 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
         finalAmount: result.finalAmount,
       });
       setCouponError('');
+      // ADDED: Show success alert for coupon application
+      onShowAlert('Coupon Applied!', `Coupon "${result.couponApplied}" applied successfully. You saved ₹${result.discount}!`, 'success');
     } else {
-      // Handle error message from applyCoupon
       setCouponError(result.error || 'Invalid coupon code or not applicable to selected plan');
       setAppliedCoupon(null);
+      // ADDED: Show error alert for coupon application failure
+      onShowAlert('Coupon Error', result.error || 'Invalid coupon code or not applicable to selected plan', 'warning');
     }
   };
 
@@ -199,7 +204,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
       if (sessionError || !session || !session.access_token) {
         console.error('SubscriptionPlans: No active session found for payment:', sessionError);
         // Optionally, show an error message to the user or redirect to login
-        alert('Please log in to complete your purchase.');
+        onShowAlert('Authentication Required', 'Please log in to complete your purchase.', 'error', 'Sign In', () => {}); // Use onShowAlert
         setIsProcessing(false);
         return;
       }
@@ -217,8 +222,10 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
         );
         if (result.success) {
           onSubscriptionSuccess();
+          onShowAlert('Subscription Activated!', 'Your free plan has been activated successfully.', 'success'); // Use onShowAlert
         } else {
           console.error(result.error || 'Failed to activate free plan.');
+          onShowAlert('Activation Failed', result.error || 'Failed to activate free plan.', 'error'); // Use onShowAlert
         }
       } else {
         const paymentData = {
@@ -237,12 +244,15 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
         );
         if (result.success) {
           onSubscriptionSuccess();
+          onShowAlert('Payment Successful!', 'Your subscription has been activated.', 'success'); // Use onShowAlert
         } else {
           console.error(result.error || 'Payment failed.');
+          onShowAlert('Payment Failed', result.error || 'Payment processing failed. Please try again.', 'error'); // Use onShowAlert
         }
       }
     } catch (error) {
       console.error('Payment process error:', error);
+      onShowAlert('Payment Error', error instanceof Error ? error.message : 'An unexpected error occurred during payment.', 'error'); // Use onShowAlert
     } finally {
       setIsProcessing(false);
     }
