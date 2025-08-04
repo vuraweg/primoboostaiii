@@ -61,22 +61,18 @@ class DeviceTrackingService {
     const userAgent = navigator.userAgent;
     const screen = window.screen;
     
-    // Detect device type
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
-    const isTablet = /iPad|Android(?=.*\bMobile\b)(?=.*\bSafari\b)/i.test(userAgent) || 
+    const isTablet = /iPad|Android(?=.*\bMobile\b)(?=.*\bSafari\b)/i.test(userAgent) ||
                      (screen.width >= 768 && screen.width <= 1024);
     
-    const deviceType: 'desktop' | 'mobile' | 'tablet' = 
+    const deviceType: 'desktop' | 'mobile' | 'tablet' =
       isTablet ? 'tablet' : isMobile ? 'mobile' : 'desktop';
 
-    // Parse browser info
     const browserInfo = this.parseBrowserInfo(userAgent);
     const osInfo = this.parseOSInfo(userAgent);
 
-    // Generate device fingerprint directly here
     const fingerprintString = `${browserInfo.name}|${browserInfo.version}|${osInfo.name}|${screen.width}x${screen.height}|${Intl.DateTimeFormat().resolvedOptions().timeZone}|${navigator.language}`;
     
-    // Create SHA-256 hash
     const encoder = new TextEncoder();
     const data = encoder.encode(fingerprintString);
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -151,74 +147,22 @@ class DeviceTrackingService {
     return `${typeMap[type as keyof typeof typeMap] || '💻'} ${browser} on ${os}`;
   }
 
-  // Get user's IP address (approximate)
+  /**
+   * @description A placeholder function to get the user's IP address without making external API calls.
+   * @returns A default IP address.
+   */
   async getUserIP(): Promise<string> {
-    try {
-      // Add timeout to prevent hanging requests
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
-      const response = await fetch('https://api.ipify.org?format=json', {
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      
-      const data = await response.json();
-      return data.ip;
-    } catch (error) {
-      if (error.name === 'AbortError') {
-        console.warn('IP address request timed out');
-      } else {
-        console.warn('Could not get IP address:', error);
-      }
-      return '0.0.0.0';
-    }
+    console.warn('getUserIP: Skipping external IP lookup due to environment constraints or CORS.');
+    return '0.0.0.0';
   }
 
-  // Get approximate location from IP
+  /**
+   * @description A placeholder function to get the user's location without making external API calls.
+   * @returns Always returns null.
+   */
   async getLocationFromIP(ip: string): Promise<any> {
-    try {
-      // Add timeout to prevent hanging requests
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
-      const response = await fetch(`https://ipapi.co/${ip}/json/`, {
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      // Validate response data
-      if (data.error) {
-        throw new Error(data.reason || 'Location API error');
-      }
-      
-      return {
-        country: data.country_name,
-        region: data.region,
-        city: data.city,
-        lat: data.latitude,
-        lng: data.longitude
-      };
-    } catch (error) {
-      if (error.name === 'AbortError') {
-        console.warn('Location request timed out');
-      } else {
-        console.warn('Could not get location:', error);
-      }
-      return null;
-    }
+    console.warn('getLocationFromIP: Skipping external location lookup due to environment constraints or CORS.');
+    return null;
   }
 
   // Register device for current user
@@ -226,7 +170,6 @@ class DeviceTrackingService {
     try {
       const deviceInfo = await this.getDeviceInfo();
       
-      // Get IP and location with timeout protection
       let ip = '0.0.0.0';
       let location = null;
       
@@ -237,10 +180,8 @@ class DeviceTrackingService {
         }
       } catch (networkError) {
         console.warn('Network requests failed during device registration:', networkError);
-        // Continue with default values
       }
 
-      // Try to use RPC function first, fallback to direct table insert if RPC doesn't exist
       let data, error;
       
       try {
@@ -265,7 +206,6 @@ class DeviceTrackingService {
       } catch (rpcError) {
         console.warn('RPC function register_device not available, using direct table insert:', rpcError);
         
-        // Fallback to direct table operations
         const { data: existingDevice, error: selectError } = await supabase
           .from('user_devices')
           .select('id')
@@ -279,7 +219,6 @@ class DeviceTrackingService {
         }
         
         if (existingDevice) {
-          // Update existing device
           const { data: updateData, error: updateError } = await supabase
             .from('user_devices')
             .update({
@@ -294,7 +233,6 @@ class DeviceTrackingService {
           data = updateData?.id;
           error = updateError;
         } else {
-          // Create new device
           const { data: insertData, error: insertError } = await supabase
             .from('user_devices')
             .insert({
@@ -337,7 +275,6 @@ class DeviceTrackingService {
   // Create session for device
   async createSession(userId: string, deviceId: string, sessionToken: string): Promise<string | null> {
     try {
-      // Get IP and location with timeout protection
       let ip = '0.0.0.0';
       let location = null;
       
@@ -348,10 +285,8 @@ class DeviceTrackingService {
         }
       } catch (networkError) {
         console.warn('Network requests failed during session creation:', networkError);
-        // Continue with default values
       }
 
-      // Try to use RPC function first, fallback to direct table insert if RPC doesn't exist
       let data, error;
       
       try {
@@ -369,8 +304,7 @@ class DeviceTrackingService {
       } catch (rpcError) {
         console.warn('RPC function create_session not available, using direct table insert:', rpcError);
         
-        // Fallback to direct table insert
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
         
         const { data: insertData, error: insertError } = await supabase
           .from('user_sessions')
@@ -407,7 +341,6 @@ class DeviceTrackingService {
   // End session
   async endSession(sessionToken: string, reason: string = 'logout'): Promise<boolean> {
     try {
-      // Try to use RPC function first, fallback to direct table update if RPC doesn't exist
       let data, error;
       
       try {
@@ -421,7 +354,6 @@ class DeviceTrackingService {
       } catch (rpcError) {
         console.warn('RPC function end_session not available, using direct table update:', rpcError);
         
-        // Fallback to direct table update
         const { data: updateData, error: updateError } = await supabase
           .from('user_sessions')
           .update({
@@ -457,7 +389,6 @@ class DeviceTrackingService {
     sessionId?: string
   ): Promise<void> {
     try {
-      // Get IP and location with timeout protection
       let ip = '0.0.0.0';
       let location = null;
       
@@ -468,13 +399,10 @@ class DeviceTrackingService {
         }
       } catch (networkError) {
         console.warn('Network requests failed during activity logging:', networkError);
-        // Continue with default values
       }
       
-      // Calculate risk score
       const riskScore = await this.calculateRiskScore(userId, ip, location);
 
-      // Try to use RPC function first, fallback to direct table insert if RPC doesn't exist
       try {
         await supabase.rpc('log_device_activity', {
           user_uuid: userId,
@@ -490,7 +418,6 @@ class DeviceTrackingService {
       } catch (rpcError) {
         console.warn('RPC function log_device_activity not available, using direct table insert:', rpcError);
         
-        // Fallback to direct table insert
         await supabase
           .from('device_activity_logs')
           .insert({
@@ -513,7 +440,6 @@ class DeviceTrackingService {
   // Calculate risk score for activity
   private async calculateRiskScore(userId: string, ip: string, location: any): Promise<number> {
     try {
-      // Try to call the RPC function, but handle gracefully if it doesn't exist
       try {
         const { data, error } = await supabase.rpc('detect_suspicious_activity', {
           user_uuid: userId,
@@ -523,7 +449,6 @@ class DeviceTrackingService {
         });
 
         if (error) {
-          // If the function doesn't exist, return default risk score
           if (error.message?.includes('function') || error.message?.includes('does not exist')) {
             console.warn('Risk scoring function not available, using default score');
             return 0;
@@ -534,7 +459,6 @@ class DeviceTrackingService {
 
         return data || 0;
       } catch (rpcError) {
-        // Handle network errors or RPC function not existing
         console.warn('Risk scoring RPC call failed, using default score:', rpcError);
         return 0;
       }
@@ -547,7 +471,6 @@ class DeviceTrackingService {
   // Get user's devices
   async getUserDevices(userId: string): Promise<UserDevice[]> {
     try {
-      // Try to use RPC function first, fallback to direct table query if RPC doesn't exist
       let data, error;
       
       try {
@@ -560,7 +483,6 @@ class DeviceTrackingService {
       } catch (rpcError) {
         console.warn('RPC function get_user_devices not available, using direct table query:', rpcError);
         
-        // Fallback to direct table query
         const { data: queryData, error: queryError } = await supabase
           .from('user_devices')
           .select(`
@@ -577,7 +499,6 @@ class DeviceTrackingService {
           .eq('is_active', true)
           .order('last_seen_at', { ascending: false });
         
-        // Transform data to match expected format
         data = queryData?.map(device => ({
           device_id: device.id,
           device_name: device.device_name,
@@ -587,7 +508,7 @@ class DeviceTrackingService {
           is_trusted: device.is_trusted,
           last_seen_at: device.last_seen_at,
           last_location: device.last_location,
-          active_sessions: 0 // We'll calculate this separately if needed
+          active_sessions: 0
         }));
         error = queryError;
       }
@@ -709,13 +630,11 @@ class DeviceTrackingService {
   // Remove device
   async removeDevice(deviceId: string): Promise<boolean> {
     try {
-      // End all active sessions for this device
       await supabase.rpc('end_session', {
         session_token_param: null,
         end_reason_param: 'device_removed'
       });
 
-      // Deactivate device
       const { error } = await supabase
         .from('user_devices')
         .update({ is_active: false })
@@ -738,8 +657,8 @@ class DeviceTrackingService {
     try {
       const { error } = await supabase
         .from('user_sessions')
-        .update({ 
-          is_active: false, 
+        .update({
+          is_active: false,
           ended_at: new Date().toISOString(),
           end_reason: 'manual_logout'
         })
@@ -762,8 +681,8 @@ class DeviceTrackingService {
     try {
       const { error } = await supabase
         .from('user_sessions')
-        .update({ 
-          is_active: false, 
+        .update({
+          is_active: false,
           ended_at: new Date().toISOString(),
           end_reason: 'logout_all_others'
         })
