@@ -1,6 +1,6 @@
+// src/components/auth/AuthModal.tsx
 import React, { useState, useEffect } from 'react';
 import { X, CheckCircle, Sparkles, Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, User as UserIcon, UserPlus } from 'lucide-react';
-import { supabase } from '../../lib/supabaseClient';
 import { LoginForm } from './LoginForm';
 import { SignupForm } from './SignupForm';
 import { ForgotPasswordForm } from './ForgotPasswordForm';
@@ -62,7 +62,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       // This means the user is authenticated, profile prompt seen, and they are not in a 'success' state.
       // So, the modal should close.
       else if (user.hasSeenProfilePrompt === true && currentView !== 'success') {
-        console.log('AuthModal useEffect: User profile is complete or prompt seen. Closing AuthModal.');
+        console.log('AuthModal useEffect: User profile is complete or prompt seen. Calling onClose() from useEffect.');
         onClose(); // Directly close the modal.
       }
       // If currentView is 'success' (from email verification), let it stay until user closes it.
@@ -71,16 +71,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     // If not authenticated or modal is not open, no action needed from this useEffect.
   }, [isAuthenticated, user, isOpen, currentView, onClose]);
 
+
   // If the modal is not open, don't render anything
   if (!isOpen) {
     console.log('AuthModal is NOT open, returning null');
     return null;
   }
-  
+
   console.log('AuthModal IS open, rendering content');
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
+      console.log('AuthModal: Backdrop clicked. Calling onClose().'); // ADD THIS LINE
       onClose();
     }
   };
@@ -88,6 +90,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const handleCloseClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    console.log('AuthModal: X button clicked. Calling onClose().'); // ADD THIS LINE
     onClose();
   };
 
@@ -104,6 +107,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const handleForgotPasswordSuccess = () => {
     setCurrentView('success');
     setTimeout(() => {
+      console.log('AuthModal: Forgot password success. Calling onClose().'); // ADD THIS LINE
       onClose();
       setCurrentView('login');
     }, 2500);
