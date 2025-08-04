@@ -497,11 +497,14 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
   /**
    * Handles a situation where projects are updated (e.g., from the ProjectEnhancement modal).
    */
-  const handleProjectsUpdated = (updatedResumeData: ResumeData) => {
+  const handleProjectsUpdated = async (updatedResumeData: ResumeData) => {
     console.log('Projects updated, triggering final AI re-optimization...');
     setOptimizedResume(updatedResumeData);
     setParsedResumeData(updatedResumeData);
-    const { data: { session } } = supabase.auth.getSession();
+
+    const { data } = await supabase.auth.getSession();
+    const session = data?.session;
+    
     if (initialResumeScore) {
       proceedWithFinalOptimization(updatedResumeData, initialResumeScore, session?.access_token || '');
     } else {
