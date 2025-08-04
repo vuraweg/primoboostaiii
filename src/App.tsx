@@ -1,9 +1,9 @@
+// src/App.tsx
 import React, { useState, useEffect } from 'react';
 import { Menu, X, Home, Info, BookOpen, Phone, FileText, LogIn, LogOut, User, Wallet } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import { Header } from './components/Header';
 import { Navigation } from './components/navigation/Navigation';
-// import { MobileNavBar } from './components/navigation/MobileNavBar'; // <--- REMOVED IMPORT
 import ResumeOptimizer from './components/ResumeOptimizer';
 import { HomePage } from './components/pages/HomePage';
 import { GuidedResumeBuilder } from './components/GuidedResumeBuilder';
@@ -15,11 +15,10 @@ import { Tutorials } from './components/pages/Tutorials';
 import { AuthModal } from './components/auth/AuthModal';
 import { UserProfileManagement } from './components/UserProfileManagement';
 import { SubscriptionPlans } from './components/payment/SubscriptionPlans';
-import { paymentService } from './services/paymentService'; // Import paymentService
+import { paymentService } from './services/paymentService';
 
 
 function App() {
-  // This line must be at the top of the function
   const { isAuthenticated, user, markProfilePromptSeen } = useAuth();
 
   const [currentPage, setCurrentPage] = useState('new-home');
@@ -30,7 +29,7 @@ function App() {
   const [showSuccessNotification, setShowSuccessNotification] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [profileViewMode, setProfileViewMode] = useState<'profile' | 'wallet'>('profile');
-  const [userSubscription, setUserSubscription] = useState<any>(null); // New state for user subscription
+  const [userSubscription, setUserSubscription] = useState<any>(null);
 
   // Handle mobile menu toggle
   const handleMobileMenuToggle = () => {
@@ -65,7 +64,7 @@ function App() {
     setProfileViewMode(mode);
     setShowProfileManagement(true);
     setShowMobileMenu(false);
-     console.log('App.tsx: handleShowProfile called. showProfileManagement set to true.');
+    console.log('App.tsx: handleShowProfile called. showProfileManagement set to true.');
   };
 
   // Handle profile completion
@@ -84,7 +83,7 @@ function App() {
   const handleNavigateHome = () => {
     setCurrentPage('new-home');
   };
-  
+
   // New prop handler for showing subscription plans
   const handleShowSubscriptionPlans = () => {
     setShowSubscriptionPlans(true);
@@ -102,7 +101,7 @@ function App() {
     };
     fetchSubscription();
   }, [isAuthenticated, user]);
-  
+
   // Close mobile menu on window resize
   useEffect(() => {
     const handleResize = () => {
@@ -114,6 +113,30 @@ function App() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // NEW useEffect to manage AuthModal visibility based on user profile status
+  useEffect(() => {
+    console.log('App.tsx useEffect: isAuthenticated:', isAuthenticated, 'user:', user?.id, 'hasSeenProfilePrompt:', user?.hasSeenProfilePrompt);
+    // Only proceed if user object is fully loaded and isAuthenticated is true
+    if (isAuthenticated && user && (user.hasSeenProfilePrompt !== null && user.hasSeenProfilePrompt !== undefined)) {
+      // If user has seen the profile prompt, and the AuthModal is currently open, close it.
+      if (user.hasSeenProfilePrompt === true && showAuthModal) {
+        console.log('App.tsx useEffect: User profile complete, closing AuthModal.');
+        setShowAuthModal(false);
+      }
+      // If user has NOT seen the profile prompt, and the AuthModal is NOT open, open it.
+      // This ensures the prompt is shown if the user is authenticated but hasn't completed profile.
+      else if (user.hasSeenProfilePrompt === false && !showAuthModal) {
+        console.log('App.tsx useEffect: User needs to complete profile, opening AuthModal.');
+        setShowAuthModal(true);
+      }
+    }
+    // If user logs out, ensure AuthModal is closed
+    if (!isAuthenticated && showAuthModal) {
+      console.log('App.tsx useEffect: User logged out, closing AuthModal.');
+      setShowAuthModal(false);
+    }
+  }, [isAuthenticated, user, user?.hasSeenProfilePrompt]); // Depend on isAuthenticated and user.hasSeenProfilePrompt
 
   const renderCurrentPage = (isAuthenticatedProp: boolean) => {
     // Define props for HomePage once to ensure consistency
@@ -178,7 +201,7 @@ function App() {
       <Header onMobileMenuToggle={handleMobileMenuToggle} showMobileMenu={showMobileMenu} onShowProfile={handleShowProfile}>
         <Navigation currentPage={currentPage} onPageChange={setCurrentPage} />
       </Header>
-      
+
       {/* Render the current page content below the header */}
       {renderCurrentPage(isAuthenticated)}
 
@@ -276,9 +299,12 @@ function App() {
       )}
 
       {/* Auth Modal */}
-       <AuthModal
+      <AuthModal
         isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
+        onClose={() => {
+          setShowAuthModal(false);
+          console.log('AuthModal closed, showAuthModal set to false');
+        }}
         onProfileFillRequest={handleShowProfile} // Passed handleShowProfile here
       />
 
