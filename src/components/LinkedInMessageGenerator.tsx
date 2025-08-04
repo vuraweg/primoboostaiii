@@ -1,3 +1,4 @@
+// src/components/LinkedInMessageGenerator.tsx
 import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft,
@@ -28,7 +29,7 @@ import {
 
 // Mocking the imported functions and types for a self-contained example.
 // In a real application, these would be external.
-const generateLinkedInMessage = async (formData) => {
+const generateLinkedInMessage = async (formData: any) => {
   console.log('Generating message with data:', formData);
   await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call delay
   return [
@@ -328,12 +329,13 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Tone
               </label>
-              <div className="flex rounded-xl p-1 bg-gray-100 border border-gray-200 shadow-inner">
+              {/* MODIFIED: Removed p-1, added gap-1 */}
+              <div className="flex rounded-xl gap-1 bg-gray-100 border border-gray-200 shadow-inner">
                 {(['professional', 'casual', 'friendly'] as MessageTone[]).map((tone) => (
                   <button
                     key={tone}
                     onClick={() => handleInputChange('tone', tone)}
-                    className={`flex-1 text-center py-2 px-2 rounded-lg font-medium transition-all duration-300 capitalize ${
+                    className={`flex-1 text-center py-2 px-2 rounded-lg font-medium transition-all duration-300 capitalize ${ // px-2 is already there
                       formData.tone === tone
                         ? 'bg-white shadow-md text-blue-700 font-bold'
                         : 'text-gray-600 hover:text-blue-500'
@@ -611,3 +613,4 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
     </div>
   );
 };
+
