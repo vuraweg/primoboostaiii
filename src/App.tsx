@@ -151,26 +151,30 @@ function App() {
   useEffect(() => {
     console.log('App.tsx useEffect: isAuthenticated:', isAuthenticated, 'user:', user?.id, 'hasSeenProfilePrompt:', user?.hasSeenProfilePrompt);
 
-    if (isAuthenticated && user) {
-      // User is authenticated
+    // Only proceed if user object is fully loaded and isAuthenticated is true
+    // AND user.hasSeenProfilePrompt is explicitly true or false (not undefined/null)
+    if (isAuthenticated && user && (user.hasSeenProfilePrompt === true || user.hasSeenProfilePrompt === false)) {
+      // User is authenticated and hasSeenProfilePrompt status is known
       if (user.hasSeenProfilePrompt === false) {
         // Profile not seen, open modal to prompt
         console.log('App.tsx useEffect: User profile incomplete, opening AuthModal to prompt for profile.');
         setAuthModalInitialView('postSignupPrompt');
         setShowAuthModal(true);
-      } else {
+      } else { // user.hasSeenProfilePrompt === true
         // Profile seen, ensure modal is closed
         console.log('App.tsx useEffect: User profile complete, ensuring AuthModal is closed.');
         setShowAuthModal(false);
         setAuthModalInitialView('login'); // Reset to default view
       }
-    } else {
-      // User is not authenticated, ensure modal is closed
+    } else if (!isAuthenticated) { // User is not authenticated
+      // Ensure modal is closed if user is not authenticated
       console.log('App.tsx useEffect: User not authenticated, ensuring AuthModal is closed.');
       setShowAuthModal(false);
       setAuthModalInitialView('login'); // Reset to default view
     }
-  }, [isAuthenticated, user, user?.hasSeenProfilePrompt]); // Removed showAuthModal from dependencies
+    // If isAuthenticated is true but user.hasSeenProfilePrompt is still undefined/null,
+    // this useEffect will do nothing, waiting for AuthContext to fully load the profile.
+  }, [isAuthenticated, user, user?.hasSeenProfilePrompt]); // Dependencies remain the same
 
   const renderCurrentPage = (isAuthenticatedProp: boolean) => {
     // Define props for HomePage once to ensure consistency
