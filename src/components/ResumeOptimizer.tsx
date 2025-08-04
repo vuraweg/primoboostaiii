@@ -546,9 +546,22 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
         id: 'resume',
         title: 'Optimized Resume',
         icon: <FileText className="w-5 h-5" />,
-        component: optimizedResume ? (
-          <ResumePreview resumeData={optimizedResume} userType={userType} />
-        ) : null,
+        component: (
+          <>
+            {optimizedResume ? (
+              <ResumePreview resumeData={optimizedResume} userType={userType} />
+            ) : null}
+            {optimizedResume && (
+              <ExportButtons
+                resumeData={optimizedResume}
+                userType={userType}
+                targetRole={targetRole}
+                onShowProfile={onShowProfile}
+                walletRefreshKey={walletRefreshKey}
+              />
+            )}
+          </>
+        ),
         resumeData: optimizedResume
       },
       {
