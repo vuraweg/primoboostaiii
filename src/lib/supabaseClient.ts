@@ -6,6 +6,11 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+// Add these new console.log statements
+console.log('SupabaseClient: Attempting to initialize client.');
+console.log('SupabaseClient: VITE_SUPABASE_URL value:', supabaseUrl ? 'Loaded' : 'NOT LOADED', supabaseUrl);
+console.log('SupabaseClient: VITE_SUPABASE_ANON_KEY value:', supabaseAnonKey ? 'Loaded' : 'NOT LOADED', supabaseAnonKey);
+
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('SupabaseClient: Missing Supabase environment variables. VITE_SUPABASE_URL:', supabaseUrl, 'VITE_SUPABASE_ANON_KEY:', supabaseAnonKey);
   throw new Error('Missing Supabase environment variables. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.');
