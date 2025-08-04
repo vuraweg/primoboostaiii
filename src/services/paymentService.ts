@@ -303,7 +303,8 @@ class PaymentService {
   }
 
   // Create Razorpay order via backend
-  private async createOrder(planId: string, grandTotal: number, addOnsTotal: number, couponCode?: string, walletDeduction?: number): Promise<{ orderId: string; amount: number; keyId: string }> {
+  // Updated return type to include transactionId
+  private async createOrder(planId: string, grandTotal: number, addOnsTotal: number, couponCode?: string, walletDeduction?: number): Promise<{ orderId: string; amount: number; keyId: string; transactionId: string }> {
     console.log('createOrder: Function called to create a new order.');
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -355,12 +356,14 @@ class PaymentService {
 
   /**
    * Verifies a Razorpay payment by calling a Supabase Edge Function.
+   * Now accepts transactionId to update the pending record.
    */
   private async verifyPayment(
     razorpay_order_id: string,
     razorpay_payment_id: string,
     razorpay_signature: string,
-    accessToken: string
+    accessToken: string,
+    transactionId: string // ADDED: transactionId parameter
   ): Promise<{ success: boolean; subscriptionId?: string; error?: string }> {
     console.log('verifyPayment: STARTING FUNCTION EXECUTION (with explicit access token).');
     try {
@@ -390,7 +393,8 @@ class PaymentService {
         body: JSON.stringify({
           razorpay_order_id,
           razorpay_payment_id,
-          razorpay_signature
+          razorpay_signature,
+          transactionId // ADDED: Pass transactionId to the backend
         }),
       });
 
@@ -436,8 +440,9 @@ class PaymentService {
       console.log('processPayment: Calling createOrder to initiate a new Razorpay order...');
       let orderData;
       try {
+        // Capture transactionId from createOrder response
         orderData = await this.createOrder(paymentData.planId, paymentData.amount, addOnsTotal || 0, couponCode, walletDeduction);
-        console.log('processPayment: Order created successfully:', orderData.orderId, 'Amount:', orderData.amount);
+        console.log('processPayment: Order created successfully:', orderData.orderId, 'Amount:', orderData.amount, 'Transaction ID:', orderData.transactionId);
         // NEW LOG: Inspect orderData
         console.log('processPayment: Received orderData from backend:', orderData);
       } catch (createOrderError) {
@@ -461,7 +466,8 @@ class PaymentService {
                 response.razorpay_order_id,
                 response.razorpay_payment_id,
                 response.razorpay_signature,
-                accessToken
+                accessToken,
+                orderData.transactionId // ADDED: Pass transactionId to verifyPayment
               );
               console.log('Verification result from verifyPayment:', verificationResult);
               resolve(verificationResult);
@@ -481,6 +487,13 @@ class PaymentService {
           modal: {
             ondismiss: () => {
               console.log('Razorpay modal dismissed by user.');
+              // If user dismisses, mark the pending transaction as failed
+              supabase.from('payment_transactions')
+                .update({ status: 'failed' })
+                .eq('id', orderData.transactionId)
+                .then(({ error }) => {
+                  if (error) console.error('Error updating pending transaction to failed on dismiss:', error);
+                });
               resolve({ success: false, error: 'Payment cancelled by user' });
             },
           },
