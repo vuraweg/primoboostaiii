@@ -122,27 +122,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               isLoading: false,
             }));
 
-            // Now fetch the full user profile from your user_profiles table
-            const fullProfile = await authService.fetchUserProfile(session.user.id);
-            console.log('AuthContext: Full user profile fetched:', fullProfile ? fullProfile.full_name : 'none');
+            // Defer fetching the full profile to avoid blocking the main thread
+            setTimeout(async () => {
+              if (!mounted) return; // Check mounted status again inside setTimeout
+              const fullProfile = await authService.fetchUserProfile(session.user.id);
+              console.log('AuthContext: Full user profile fetched:', fullProfile ? fullProfile.full_name : 'none');
 
-            setAuthState(prev => ({
-              ...prev,
-              user: {
-                ...prev.user!, // Use existing basic user data
-                name: fullProfile?.full_name || prev.user?.name || 'User',
-                email: fullProfile?.email_address || prev.user?.email!,
-                phone: fullProfile?.phone || undefined,
-                linkedin: fullProfile?.linkedin_profile || undefined,
-                github: fullProfile?.wellfound_profile || undefined,
-                username: fullProfile?.username || undefined,
-                referralCode: fullProfile?.referral_code || undefined,
-                // Ensure hasSeenProfilePrompt defaults to false if null/undefined
-                hasSeenProfilePrompt: fullProfile?.has_seen_profile_prompt ?? false,
-              },
-              isAuthenticated: true,
-              isLoading: false,
-            }));
+              setAuthState(prev => ({
+                ...prev,
+                user: prev.user ? {
+                  ...prev.user, // Use existing basic user data
+                  name: fullProfile?.full_name || prev.user?.name || 'User',
+                  email: fullProfile?.email_address || prev.user?.email!,
+                  phone: fullProfile?.phone || undefined,
+                  linkedin: fullProfile?.linkedin_profile || undefined,
+                  github: fullProfile?.wellfound_profile || undefined,
+                  username: fullProfile?.username || undefined,
+                  referralCode: fullProfile?.referral_code || undefined,
+                  // Ensure hasSeenProfilePrompt defaults to false if null/undefined
+                  hasSeenProfilePrompt: fullProfile?.has_seen_profile_prompt ?? false,
+                } : null,
+                isAuthenticated: true,
+                isLoading: false,
+              }));
+            }, 0); // Defer with setTimeout(0)
 
             scheduleSessionRefresh();
           } catch (error) {
@@ -222,7 +225,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         isAuthenticated: false,
         isLoading: true, // Set loading to true during logout process
       });
-      authService.logout(); // Removed await here
+      await authService.logout(); // Added await here
       console.log('AuthContext: authService.logout completed.');
     } catch (error) {
       console.error('AuthContext: Logout error:', error);
@@ -278,3 +281,4 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+
