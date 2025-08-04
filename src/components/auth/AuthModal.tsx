@@ -28,23 +28,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [signupEmail, setSignupEmail] = useState<string>(''); // To pass email to success/prompt view
 
   // Effect to update currentView when initialView prop changes
-  useEffect(() => {
-    if (isOpen) { // Only update if the modal is actually open
-      setCurrentView(initialView);
-    }
-  }, [initialView, isOpen]); // Depend on initialView and isOpen
-
-  // Handle prompt dismissal when modal is closed while showing postSignupPrompt
-useEffect(() => {
-  console.log('AuthModal isOpen prop changed:', isOpen);
+ useEffect(() => {
   if (!isOpen) {
-    if (currentView === 'postSignupPrompt') {
-      onPromptDismissed();
+    if (currentView !== 'login') {
+      console.log('AuthModal closed. Resetting currentView to login.');
+      setCurrentView('login'); // ✅ Reset currentView on close
     }
-    // Don't immediately reset currentView — allow it to persist when modal reopens
-    // Instead, reset view only when modal **opens again** via prop
+    return;
   }
-}, [isOpen, currentView, onPromptDismissed]);
+
+  if (!isAuthenticated || !user) {
+    console.log('AuthModal: Not ready to determine view or modal is closed.');
+    return;
+  }
+
+  if (user.hasSeenProfilePrompt === true && currentView === 'postSignupPrompt') {
+    console.log('AuthModal: User has seen profile prompt. Resetting view.');
+    setCurrentView('login');
+  }
+}, [isOpen, currentView, isAuthenticated, user]);
+
 
 
 
