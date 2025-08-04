@@ -39,6 +39,9 @@ function App() {
   const [alertActionText, setAlertActionText] = useState<string | undefined>(undefined);
   const [alertActionCallback, setAlertActionCallback] = useState<(() => void) | undefined>(undefined);
 
+  // NEW state for AuthModal's initial view
+  const [authModalInitialView, setAuthModalInitialView] = useState<'login' | 'signup' | 'forgot-password' | 'success' | 'postSignupPrompt'>('login');
+
 
   // Handle mobile menu toggle
   const handleMobileMenuToggle = () => {
@@ -64,6 +67,7 @@ function App() {
   const handleShowAuth = () => {
     console.log('handleShowAuth called in App.tsx');
     setShowAuthModal(true);
+    setAuthModalInitialView('login'); // Ensure it opens to login by default
     console.log('showAuthModal set to true');
     setShowMobileMenu(false);
   };
@@ -146,22 +150,27 @@ function App() {
   // NEW useEffect to manage AuthModal visibility based on user profile status
   useEffect(() => {
     console.log('App.tsx useEffect: isAuthenticated:', isAuthenticated, 'user:', user?.id, 'hasSeenProfilePrompt:', user?.hasSeenProfilePrompt);
-    // Only proceed if user object is fully loaded and isAuthenticated is true
-    if (isAuthenticated && user && (user.hasSeenProfilePrompt !== null && user.hasSeenProfilePrompt !== undefined)) {
-      // If user has seen the profile prompt, and the AuthModal is currently open, close it.
-      if (user.hasSeenProfilePrompt === true && showAuthModal) {
-        console.log('App.tsx useEffect: User profile complete, closing AuthModal.');
+
+    if (isAuthenticated && user) {
+      // User is authenticated
+      if (user.hasSeenProfilePrompt === false) {
+        // Profile not seen, open modal to prompt
+        console.log('App.tsx useEffect: User profile incomplete, opening AuthModal to prompt for profile.');
+        setAuthModalInitialView('postSignupPrompt');
+        setShowAuthModal(true);
+      } else {
+        // Profile seen, ensure modal is closed
+        console.log('App.tsx useEffect: User profile complete, ensuring AuthModal is closed.');
         setShowAuthModal(false);
+        setAuthModalInitialView('login'); // Reset to default view
       }
-      // REMOVED: The else if block that automatically opened AuthModal if hasSeenProfilePrompt was false.
-      // This prevents the modal from showing on every refresh.
-    }
-    // If user logs out, ensure AuthModal is closed
-    if (!isAuthenticated && showAuthModal) {
-      console.log('App.tsx useEffect: User logged out, closing AuthModal.');
+    } else {
+      // User is not authenticated, ensure modal is closed
+      console.log('App.tsx useEffect: User not authenticated, ensuring AuthModal is closed.');
       setShowAuthModal(false);
+      setAuthModalInitialView('login'); // Reset to default view
     }
-  }, [isAuthenticated, user, user?.hasSeenProfilePrompt, showAuthModal]); // Depend on isAuthenticated and user.hasSeenProfilePrompt
+  }, [isAuthenticated, user, user?.hasSeenProfilePrompt]); // Removed showAuthModal from dependencies
 
   const renderCurrentPage = (isAuthenticatedProp: boolean) => {
     // Define props for HomePage once to ensure consistency
@@ -343,9 +352,19 @@ function App() {
         isOpen={showAuthModal}
         onClose={() => {
           setShowAuthModal(false);
+          setAuthModalInitialView('login'); // Reset initial view on close
           console.log('AuthModal closed, showAuthModal set to false');
         }}
         onProfileFillRequest={handleShowProfile} // Passed handleShowProfile here
+        initialView={authModalInitialView} // Pass the initial view
+        onPromptDismissed={() => {
+          // When user dismisses the prompt, mark it as seen so it doesn't reappear immediately
+          if (user) {
+            markProfilePromptSeen();
+          }
+          setShowAuthModal(false); // Close the modal
+          setAuthModalInitialView('login'); // Reset initial view
+        }}
       />
 
       {/* Profile Management Modal */}
@@ -468,3 +487,4 @@ const AuthButtons: React.FC<{
 };
 
 export default App;
+
