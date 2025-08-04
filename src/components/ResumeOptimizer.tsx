@@ -197,25 +197,21 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
     try {
       console.log('handleOptimize: Manually refreshing session...');
       const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-      if (refreshError || !refreshData.session) {
-        console.error('handleOptimize: Session refresh failed:', refreshError?.message);
+      if (refreshError) {
+        console.error('handleOptimize: Session refresh failed:', refreshError.message);
         alert('Your session has expired. Please sign in again.');
         onShowAuth();
         return;
       }
-      console.log('handleOptimize: Session refreshed successfully. Session is now:', refreshData.session);
-
-      const { data: { session }, error: getSessionError } = await supabase.auth.getSession();
-      if (getSessionError) {
-        throw new Error(`Supabase getSession failed: ${getSessionError.message}`);
-      }
-
-      const sessionValid = await authService.ensureValidSession();
-      if (!sessionValid || !session?.access_token) {
+      
+      const session = refreshData.session;
+      if (!session || !session.access_token) {
+        console.error('handleOptimize: Session refresh returned no valid session.');
         alert('Your session has expired. Please sign in again.');
         onShowAuth();
         return;
       }
+      console.log('handleOptimize: Session refreshed successfully. Session is now:', session);
 
       console.log('handleOptimize: Current subscription:', subscription);
       console.log('handleOptimize: Optimizations remaining:', subscription ? (subscription.optimizationsTotal - subscription.optimizationsUsed) : 'N/A');
