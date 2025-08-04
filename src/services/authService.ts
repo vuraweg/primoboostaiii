@@ -3,7 +3,12 @@ import { User, LoginCredentials, SignupCredentials, ForgotPasswordData } from '.
 import { supabase } from '../lib/supabaseClient';
 import { deviceTrackingService } from './deviceTrackingService';
 import { paymentService } from './paymentService'; // This line is essential
+
 class AuthService {
+  // Add a static variable to track the last time device activity was logged
+  private static lastDeviceActivityLog: number = 0;
+  private static readonly DEVICE_ACTIVITY_LOG_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
   private isValidGmail(email: string): boolean {
     const gmailRegex = /^[^\s@]+@gmail\.com$/;
     return gmailRegex.test(email);
@@ -43,10 +48,12 @@ class AuthService {
       const deviceId = await deviceTrackingService.registerDevice(data.user.id);
       if (deviceId && data.session) {
         await deviceTrackingService.createSession(data.user.id, deviceId, data.session.access_token);
+        // Log activity immediately after login
         await deviceTrackingService.logActivity(data.user.id, 'login', {
           loginMethod: 'email_password',
           success: true
         }, deviceId);
+        AuthService.lastDeviceActivityLog = Date.now(); // Update last log time
         console.log('AuthService: Device and session tracking successful.');
       } else {
         console.warn('AuthService: Device ID or session not available for tracking.');
@@ -113,6 +120,7 @@ class AuthService {
           signupMethod: 'email_password',
           success: true
         }, deviceId);
+        AuthService.lastDeviceActivityLog = Date.now(); // Update last log time
         console.log('AuthService: Device tracking for signup successful.');
       } else {
         console.warn('AuthService: Device ID not obtained for signup tracking.');
@@ -203,21 +211,27 @@ class AuthService {
         session.user = refreshData.session.user; // Update user object from refreshed session
       }
 
-      // Update device activity for current session
-      try {
-        console.log('AuthService: Attempting device activity update...');
-        const deviceId = await deviceTrackingService.registerDevice(session.user.id);
-        if (deviceId) {
-          await deviceTrackingService.logActivity(session.user.id, 'session_activity', {
-            action: 'session_check',
-            timestamp: new Date().toISOString()
-          }, deviceId);
-          console.log('AuthService: Device activity updated.');
-        } else {
-          console.warn('AuthService: Device ID not obtained for activity update.');
+      // Update device activity for current session, but only if interval has passed
+      const currentTime = Date.now();
+      if (currentTime - AuthService.lastDeviceActivityLog > AuthService.DEVICE_ACTIVITY_LOG_INTERVAL_MS) {
+        try {
+          console.log('AuthService: Attempting device activity update...');
+          const deviceId = await deviceTrackingService.registerDevice(session.user.id);
+          if (deviceId) {
+            await deviceTrackingService.logActivity(session.user.id, 'session_activity', {
+              action: 'session_check',
+              timestamp: new Date().toISOString()
+            }, deviceId);
+            AuthService.lastDeviceActivityLog = currentTime; // Update last log time
+            console.log('AuthService: Device activity updated.');
+          } else {
+            console.warn('AuthService: Device ID not obtained for activity update.');
+          }
+        } catch (deviceError) {
+          console.warn('AuthService: Device activity update failed during session check:', deviceError);
         }
-      } catch (deviceError) {
-        console.warn('AuthService: Device activity update failed during session check:', deviceError);
+      } else {
+        console.log('AuthService: Skipping device activity update (interval not passed).');
       }
 
       // Fetch the full profile using the new public method
