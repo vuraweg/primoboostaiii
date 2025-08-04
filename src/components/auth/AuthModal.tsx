@@ -61,10 +61,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       // If user HAS seen profile prompt AND current view is NOT 'success' (which is for email verification/forgot password)
       // This means the user is authenticated, profile prompt seen, and they are not in a 'success' state.
       // So, the modal should close.
-      else if (user.hasSeenProfilePrompt === true && currentView !== 'success') {
-        console.log('AuthModal useEffect: User profile is complete or prompt seen. Calling onClose() from useEffect.');
-        onClose(); // Directly close the modal.
-      }
+    else if (user.hasSeenProfilePrompt === true && currentView !== 'success' && currentView !== 'postSignupPrompt') {
+  console.log('AuthModal useEffect: User profile is complete. Closing AuthModal.');
+  onClose();
+}
+
       // If currentView is 'success' (from email verification), let it stay until user closes it.
       // If currentView is 'postSignupPrompt', let it stay until user interacts with buttons.
     }
