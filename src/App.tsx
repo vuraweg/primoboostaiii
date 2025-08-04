@@ -350,23 +350,27 @@ function App() {
 
       {/* Auth Modal */}
       <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => {
-          setShowAuthModal(false);
-          setAuthModalInitialView('login'); // Reset initial view on close
-          console.log('AuthModal closed, showAuthModal set to false');
-        }}
-        onProfileFillRequest={handleShowProfile} // Passed handleShowProfile here
-        initialView={authModalInitialView} // Pass the initial view
-        onPromptDismissed={() => {
-          // When user dismisses the prompt, mark it as seen so it doesn't reappear immediately
-          if (user) {
-            markProfilePromptSeen();
-          }
-          setShowAuthModal(false); // Close the modal
-          setAuthModalInitialView('login'); // Reset initial view
-        }}
-      />
+  isOpen={showAuthModal}
+  onClose={() => {
+    setShowAuthModal(false);
+    console.log('AuthModal closed, showAuthModal set to false');
+    setTimeout(() => {
+      setAuthModalInitialView('login'); // ✅ Reset after modal is hidden
+    }, 100);
+  }}
+  onProfileFillRequest={handleShowProfile}
+  initialView={authModalInitialView}
+  onPromptDismissed={() => {
+    if (user) {
+      markProfilePromptSeen();
+    }
+    setShowAuthModal(false);
+    setTimeout(() => {
+      setAuthModalInitialView('login'); // ✅ Reset after modal is hidden
+    }, 100);
+  }}
+/>
+
 
       {/* Profile Management Modal */}
       <UserProfileManagement
