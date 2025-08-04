@@ -1,3 +1,4 @@
+// src/components/payment/SubscriptionPlans.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Check,
@@ -5,7 +6,7 @@ import {
   Zap,
   Crown,
   Clock,
-  X,
+  X, // Ensure X is imported
   Tag,
   Sparkles,
   ArrowRight,
@@ -138,7 +139,9 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
   };
 
   const goToSlide = (index: number) => {
-    goToSlide(index);
+    // This function is currently empty, it should be implemented if you want to jump to a specific slide
+    // For now, it's not used by the current carousel navigation.
+    // If you intend to use it, you would set setCurrentSlide(index);
   };
 
   const handleApplyCoupon = () => {
@@ -187,10 +190,10 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
     try {
       // Retrieve the session and access token
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
+
       console.log('SubscriptionPlans: session object after getSession:', session);
       console.log('SubscriptionPlans: session.access_token after getSession:', session?.access_token);
-      
+
       if (sessionError || !session || !session.access_token) {
         console.error('SubscriptionPlans: No active session found for payment:', sessionError);
         // Optionally, show an error message to the user or redirect to login
@@ -200,9 +203,9 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
       }
 
       const accessToken = session.access_token;
-      
+
       console.log('SubscriptionPlans: Value of accessToken before calling processPayment:', accessToken);
-      
+
       if (grandTotal === 0) {
         const result = await paymentService.processFreeSubscription(
           selectedPlan,
@@ -254,12 +257,22 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-2 sm:p-4 backdrop-blur-sm">
       <div className="bg-white rounded-xl sm:rounded-2xl lg:rounded-3xl w-full max-w-7xl h-[90vh] flex flex-col">
         <div className="relative bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 px-3 sm:px-6 py-4 sm:py-8 border-b border-gray-100 flex-shrink-0">
+          {/* Back button */}
           <button
             onClick={onNavigateBack}
             className="absolute top-2 sm:top-4 left-2 sm:left-4 w-10 h-10 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-white/50 z-10 min-w-[44px] min-h-[44px]"
           >
             <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
+
+          {/* New X (close) button */}
+          <button
+            onClick={onNavigateBack}
+            className="absolute top-2 sm:top-4 right-2 sm:right-4 w-10 h-10 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-white/50 z-10 min-w-[44px] min-h-[44px]"
+          >
+            <X className="w-5 h-5 sm:w-6 sm:h-6" />
+          </button>
+
           <div className="text-center max-w-4xl mx-auto px-8">
             <div className="bg-gradient-to-r from-indigo-600 to-purple-600 w-12 h-12 sm:w-20 sm:h-20 rounded-xl sm:rounded-3xl flex items-center justify-center mx-auto mb-3 sm:mb-6 shadow-lg">
               <Sparkles className="w-6 h-6 sm:w-10 sm:h-10 text-white" />
