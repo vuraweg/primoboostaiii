@@ -149,8 +149,10 @@ SCORING CRITERIA (Total: 100 points, calculated from weighted sum of categories)
     - 0-10 points: Score based on the quality, relevance, and presentation of the skills section.
 
 CALCULATION OF TOTAL SCORE:
-Total Score = (ATS Compatibility * 1) + (Keyword & Skill Match * 1) + (Project & Work Relevance * 1) + (Structure & Flow * 1) + (Critical Fixes & Red Flags * 1) + (Impact Score * 1) + (Brevity Score * 1) + (Style Score * 1) + (Skills Score * 1)
-(Adjust points for new categories as if they are weighted equally for calculation to sum to 100, assuming you'll adjust max scores later if needed. For now, consider all max scores sum up to 100.)
+1. Calculate initial sum: Sum of scores from all 9 categories (ATS Compatibility, Keyword & Skill Match, Project & Work Relevance, Structure & Flow, Critical Fixes & Red Flags, Impact Score, Brevity Score, Style Score, Skills Score).
+2. Apply missing section penalties: Deduct 10 points from the initial sum for EACH of the following key sections if it is missing or empty in the resume: 'summary', 'education', 'workExperience', 'projects', 'skills'.
+3. Apply section order penalty: Deduct an additional 10 points from the sum if the primary sections (Contact Info, Summary, Skills, Work Experience, Projects, Education) are not in a logical and standard professional order.
+4. The final 'totalScore' should be the result of these calculations, ensuring it does not go below 0.
 
 ANALYSIS REQUIREMENTS:
 - Calculate exact scores for each category.
