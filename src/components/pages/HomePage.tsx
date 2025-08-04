@@ -1,3 +1,4 @@
+// src/components/pages/HomePage.tsx
 import React from 'react';
 import {
   FileText,
@@ -25,6 +26,21 @@ import {
 // In a real application, these would be external.
 const paymentService = {
   // A mock service for payment-related functions
+  getPlanById: (planId: string) => {
+    // Mock plan data for demonstration
+    if (planId === 'lite_check') {
+      return {
+        id: 'lite_check',
+        name: 'Lite Check',
+        optimizations: 2,
+        scoreChecks: 2,
+        linkedinMessages: 10,
+        guidedBuilds: 0, // Not included
+      };
+    }
+    // Add other mock plans as needed for testing
+    return null;
+  },
 };
 
 // Define the type for a feature object for clarity and type-safety
@@ -34,6 +50,7 @@ interface Feature {
   description: string;
   icon: JSX.Element;
   requiresAuth: boolean;
+  requiredPlanFeature?: 'optimizations' | 'scoreChecks' | 'linkedinMessages' | 'guidedBuilds'; // New prop
 }
 
 interface HomePageProps {
@@ -42,6 +59,7 @@ interface HomePageProps {
   onShowAuth: () => void;
   onShowSubscriptionPlans: () => void;
   userSubscription: any; // New prop for user's subscription status
+  onShowAlert: (title: string, message: string, type?: 'info' | 'success' | 'warning' | 'error', actionText?: string, onAction?: () => void) => void; // Add this prop
 }
 
 export const HomePage: React.FC<HomePageProps> = ({
@@ -49,7 +67,8 @@ export const HomePage: React.FC<HomePageProps> = ({
   isAuthenticated,
   onShowAuth,
   onShowSubscriptionPlans,
-  userSubscription // Destructure new prop
+  userSubscription, // Destructure new prop
+  onShowAlert // Destructure
 }) => {
   const [showOptimizationDropdown, setShowOptimizationDropdown] = React.useState(false);
   const [showPlanDetails, setShowPlanDetails] = React.useState(false); // New state for the dropdown
@@ -94,14 +113,23 @@ export const HomePage: React.FC<HomePageProps> = ({
       return;
     }
 
-    if (isAuthenticated) {
-      console.log('User is authenticated. Navigating to page.');
-      onPageChange(feature.id);
+    // If authenticated, check if the feature is included in the user's plan
+    if (isAuthenticated && feature.requiredPlanFeature) {
+      const planDetails = paymentService.getPlanById(userSubscription?.planId);
+      if (!planDetails || planDetails[feature.requiredPlanFeature] === 0) {
+        onShowAlert(
+          'Service Not Included',
+          `Your current plan (${planDetails?.name || 'No active plan'}) does not include "${feature.title}". Please upgrade your plan to access this feature.`,
+          'info',
+          'Upgrade Plan',
+          onShowSubscriptionPlans
+        );
+        return;
+      }
     }
-    
-    if (feature.id === 'optimizer') {
-      onPageChange(feature.id);
-    }
+
+    // If all checks pass, navigate to the page
+    onPageChange(feature.id);
   };
 
 
@@ -111,21 +139,24 @@ export const HomePage: React.FC<HomePageProps> = ({
       title: 'JD-Based Optimizer',
       description: 'Upload your resume and a job description to get a perfectly tailored resume.',
       icon: <Target className="w-6 h-6" />,
-      requiresAuth: false
+      requiresAuth: false,
+      requiredPlanFeature: 'optimizations'
     },
     {
       id: 'score-checker',
       title: 'Resume Score Check',
       description: 'Get an instant ATS score with detailed analysis and improvement suggestions.',
       icon: <TrendingUp className="w-6 h-6" />,
-      requiresAuth: true
+      requiresAuth: true,
+      requiredPlanFeature: 'scoreChecks'
     },
     {
       id: 'guided-builder',
       title: 'Guided Resume Builder',
       description: 'Create a professional resume from scratch with our step-by-step AI-powered builder.',
       icon: <PlusCircle className="w-6 h-6" />,
-      requiresAuth: true
+      requiresAuth: true,
+      requiredPlanFeature: 'guidedBuilds'
     },
     
     {
@@ -133,7 +164,8 @@ export const HomePage: React.FC<HomePageProps> = ({
       title: 'LinkedIn Message Generator',
       description: 'Generate personalized messages for connection requests and cold outreach.',
       icon: <MessageCircle className="w-6 h-6" />,
-      requiresAuth: true
+      requiresAuth: true,
+      requiredPlanFeature: 'linkedinMessages'
     }
   ];
 
@@ -161,9 +193,9 @@ export const HomePage: React.FC<HomePageProps> = ({
                 />
               </div>
               <div className="text-left">
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">
                   PrimoBoost AI
-                </h1>
+                </h2>
                 <p className="text-sm sm:text-base text-gray-600">Resume Intelligence</p>
               </div>
             </div>
