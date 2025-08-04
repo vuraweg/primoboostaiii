@@ -26,45 +26,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [currentView, setCurrentView] = useState<AuthView>(initialView);
   const [signupEmail, setSignupEmail] = useState<string>('');
 
-   useEffect(() => {
-    let timer: NodeJS.Timeout | null = null;
-    console.log('AuthModal useEffect: Running. isAuthenticated:', isAuthenticated, 'user:', user, 'isOpen:', isOpen, 'currentView:', currentView);
-
-    // Wait until authentication state and user profile are fully loaded
-    if (isAuthenticated && user && (user.hasSeenProfilePrompt === null || user.hasSeenProfilePrompt === undefined)) {
-      console.log('AuthModal useEffect: User authenticated, but profile prompt status not yet loaded. Waiting...');
-      return;
+  useEffect(() => {
+    console.log('AuthModal isOpen prop changed:', isOpen);
+    if (!isOpen && currentView === 'postSignupPrompt') {
+      onPromptDismissed();
+      setCurrentView('login');
     }
-
-    if (
-      isAuthenticated &&
-      user &&
-      isOpen &&
-      currentView !== 'postSignupPrompt' &&
-      currentView !== 'success'
-    ) {
-      console.log('AuthModal useEffect: User is authenticated and modal is open. Checking profile prompt status.');
-      console.log('AuthModal useEffect: user.hasSeenProfilePrompt:', user.hasSeenProfilePrompt);
-      if (user.hasSeenProfilePrompt === false) {
-        console.log('AuthModal useEffect: User needs to fill profile. Calling onProfileFillRequest.');
-        timer = setTimeout(() => {
-          onProfileFillRequest('profile');
-          onClose();
-        }, 300);
-      } else {
-        console.log('AuthModal useEffect: User profile is complete or prompt seen. Closing AuthModal.');
-        timer = setTimeout(() => {
-          onClose();
-        }, 300);
-      }
-    } else {
-      console.log('AuthModal useEffect: Conditions not met for profile prompt check. isAuthenticated:', isAuthenticated, 'user:', !!user, 'isOpen:', isOpen, 'currentView:', currentView);
+    if (!isOpen) {
+      // No local state to reset on close.
     }
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [isAuthenticated, user, isOpen, currentView, onClose, onProfileFillRequest]);
-
+  }, [isOpen, currentView, onPromptDismissed]);
 
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
