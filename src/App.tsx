@@ -151,29 +151,26 @@ function App() {
   useEffect(() => {
     console.log('App.tsx useEffect: isAuthenticated:', isAuthenticated, 'user:', user?.id, 'hasSeenProfilePrompt:', user?.hasSeenProfilePrompt);
 
-    // Only proceed if user object is fully loaded and isAuthenticated is true
-    // AND user.hasSeenProfilePrompt is explicitly true or false (not undefined/null)
-    if (isAuthenticated && user && (user.hasSeenProfilePrompt === true || user.hasSeenProfilePrompt === false)) {
-      // User is authenticated and hasSeenProfilePrompt status is known
+    if (isAuthenticated && user) {
+      // User is authenticated and user object is loaded
+      // Check if hasSeenProfilePrompt is explicitly false
       if (user.hasSeenProfilePrompt === false) {
-        // Profile not seen, open modal to prompt
         console.log('App.tsx useEffect: User profile incomplete, opening AuthModal to prompt for profile.');
         setAuthModalInitialView('postSignupPrompt');
         setShowAuthModal(true);
-      } else { // user.hasSeenProfilePrompt === true
-        // Profile seen, ensure modal is closed
-        console.log('App.tsx useEffect: User profile complete, ensuring AuthModal is closed.');
+      } else {
+        // If hasSeenProfilePrompt is true, or still undefined/null (meaning loading),
+        // ensure the AuthModal is closed. It should only be open for postSignupPrompt.
+        console.log('App.tsx useEffect: User authenticated, ensuring AuthModal is closed unless explicitly needing prompt.');
         setShowAuthModal(false);
         setAuthModalInitialView('login'); // Reset to default view
       }
-    } else if (!isAuthenticated) { // User is not authenticated
-      // Ensure modal is closed if user is not authenticated
+    } else {
+      // User is not authenticated, ensure modal is closed
       console.log('App.tsx useEffect: User not authenticated, ensuring AuthModal is closed.');
       setShowAuthModal(false);
       setAuthModalInitialView('login'); // Reset to default view
     }
-    // If isAuthenticated is true but user.hasSeenProfilePrompt is still undefined/null,
-    // this useEffect will do nothing, waiting for AuthContext to fully load the profile.
   }, [isAuthenticated, user, user?.hasSeenProfilePrompt]); // Dependencies remain the same
 
   const renderCurrentPage = (isAuthenticatedProp: boolean) => {
@@ -491,4 +488,3 @@ const AuthButtons: React.FC<{
 };
 
 export default App;
-
