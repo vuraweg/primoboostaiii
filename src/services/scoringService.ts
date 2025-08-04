@@ -265,27 +265,7 @@ Respond ONLY with valid JSON in this exact structure:
         ]
       }),
     });
-
-  try {
-    setLoading(true);
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: 'POST',
-      headers: {
-        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        "HTTP-Referer": "https://primoboost.ai",
-        "X-Title": "PrimoBoost AI"
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "user",
-            content: prompt
-          }
-        ]
-      }),
-    });
+ 
 
     if (!response.ok) {
       const errorText = await response.text();
