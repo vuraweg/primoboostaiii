@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 
 // Supabase client and auth context
@@ -48,17 +47,13 @@ interface ResumeOptimizerProps {
   onShowAuth: () => void;
   onShowProfile: (mode?: 'profile' | 'wallet') => void;
   onNavigateBack: () => void;
-  onShowSubscriptionPlans: () => void; // Add this prop
-  onShowAlert: (title: string, message: string, type?: 'info' | 'success' | 'warning' | 'error', actionText?: string, onAction?: () => void) => void; // Add this prop
 }
 
 const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
   isAuthenticated,
   onShowAuth,
   onShowProfile,
-  onNavigateBack,
-  onShowSubscriptionPlans, // Destructure
-  onShowAlert // Destructure
+  onNavigateBack
 }) => {
   const { user } = useAuth();
 
@@ -190,11 +185,12 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
     console.log('handleOptimize: Function called.');
 
     if (!resumeText.trim() || !jobDescription.trim()) {
-      onShowAlert('Missing Information', 'Please provide both resume content and job description.', 'warning');
+      alert('Please provide both resume content and job description');
       return;
     }
     if (!user) {
-      onShowAlert('Authentication Required', 'User information not available. Please sign in again.', 'error', 'Sign In', onShowAuth);
+      alert('User information not available. Please sign in again.');
+      onShowAuth();
       return;
     }
 
@@ -203,14 +199,16 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
       const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
       if (refreshError) {
         console.error('handleOptimize: Session refresh failed:', refreshError.message);
-        onShowAlert('Session Expired', 'Your session has expired. Please sign in again.', 'error', 'Sign In', onShowAuth);
+        alert('Your session has expired. Please sign in again.');
+        onShowAuth();
         return;
       }
       
       const session = refreshData.session;
       if (!session || !session.access_token) {
         console.error('handleOptimize: Session refresh returned no valid session.');
-        onShowAlert('Session Expired', 'Your session has expired. Please sign in again.', 'error', 'Sign In', onShowAuth);
+        alert('Your session has expired. Please sign in again.');
+        onShowAuth();
         return;
       }
       console.log('handleOptimize: Session refreshed successfully. Session is now:', session);
@@ -218,19 +216,8 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
       console.log('handleOptimize: Current subscription:', subscription);
       console.log('handleOptimize: Optimizations remaining:', subscription ? (subscription.optimizationsTotal - subscription.optimizationsUsed) : 'N/A');
 
-      // Check if user has any subscription or if credits are exhausted
       if (!subscription || (subscription.optimizationsTotal - subscription.optimizationsUsed) <= 0) {
-        const planDetails = paymentService.getPlanById(subscription?.planId);
-        const planName = planDetails?.name || 'your current plan';
-        const optimizationsTotal = planDetails?.optimizations || 0;
-
-        onShowAlert(
-          'Optimization Credits Exhausted',
-          `You have used all your ${optimizationsTotal} JD-based optimizations from ${planName}. Please upgrade your plan to continue optimizing your resume.`,
-          'warning',
-          'Upgrade Plan',
-          onShowSubscriptionPlans
-        );
+        setShowSubscriptionPlans(true);
         return;
       }
 
@@ -265,13 +252,13 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
 
       } catch (error: any) {
         console.error('Error optimizing resume:', error);
-        onShowAlert('Optimization Failed', `Failed to optimize resume: ${error.message || 'Unknown error'}. Please try again.`, 'error');
+        alert('Failed to optimize resume. Please try again.');
       } finally {
         setIsOptimizing(false);
       }
     } catch (error: any) {
       console.error('handleOptimize: Error during session validation or subscription check:', error);
-      onShowAlert('An Error Occurred', `An error occurred: ${error.message || 'Failed to validate session or check subscription.'}`, 'error');
+      alert(`An error occurred: ${error.message || 'Failed to validate session or check subscription.'}`);
       setIsOptimizing(false);
     }
   };
@@ -284,7 +271,7 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
       await handleInitialResumeProcessing(resumeData, accessToken);
     } catch (error) {
       console.error('Error in optimization process:', error);
-      onShowAlert('Optimization Failed', 'Failed to continue optimization. Please try again.', 'error');
+      alert('Failed to continue optimization. Please try again.');
       setIsOptimizing(false);
     }
   };
@@ -307,7 +294,7 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
       }
     } catch (error) {
       console.error('Error in initial resume processing:', error);
-      onShowAlert('Processing Failed', 'Failed to process resume. Please try again.', 'error');
+      alert('Failed to process resume. Please try again.');
     } finally {
       setIsCalculatingScore(false);
     }
@@ -353,7 +340,7 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
       await handleInitialResumeProcessing(updatedResume, session?.access_token || '');
     } catch (error) {
       console.error('Error processing missing sections:', error);
-      onShowAlert('Processing Failed', 'Failed to process the provided information. Please try again.', 'error');
+      alert('Failed to process the provided information. Please try again.');
     } finally {
       setIsProcessingMissingSections(false);
     }
@@ -404,7 +391,7 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
       setOptimizedResume(finalOptimizedResume);
     } catch (error) {
       console.error('Error in final optimization pass:', error);
-      onShowAlert('Optimization Failed', 'Failed to complete resume optimization. Please try again.', 'error');
+      alert('Failed to complete resume optimization. Please try again.');
     } finally {
       setIsOptimizing(false);
       setIsCalculatingScore(false);
@@ -476,7 +463,7 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
    */
   const handleManualProjectSubmit = async () => {
     if (!manualProject.title || manualProject.techStack.length === 0 || !parsedResumeData) {
-      onShowAlert('Missing Information', 'Please provide project title and tech stack.', 'warning');
+      alert('Please provide project title and tech stack.');
       return;
     }
 
@@ -501,7 +488,7 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
       }
     } catch (error) {
       console.error('Error creating manual project:', error);
-      onShowAlert('Project Creation Failed', 'Failed to create project. Please try again.', 'error');
+      alert('Failed to create project. Please try again.');
     } finally {
       setIsOptimizing(false);
     }
@@ -536,7 +523,7 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
       await proceedWithFinalOptimization(updatedResume, freshInitialScore, accessToken);
     } catch (error) {
       console.error('Error generating scores after project add:', error);
-      onShowAlert('Score Generation Failed', 'Failed to generate updated scores. Please try again.', 'error');
+      alert('Failed to generate updated scores. Please try again.');
     } finally {
       setIsCalculatingScore(false);
     }
@@ -590,7 +577,7 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
             jobDescription={jobDescription}
             targetRole={targetRole || "Target Role"}
             initialDetailedScore={initialResumeScore}
-            finalDetailedScore={finalDetailedScore}
+            finalDetailedScore={finalResumeScore}
           />
         ) : null
       }
