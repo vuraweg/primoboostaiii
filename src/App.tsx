@@ -16,7 +16,7 @@ import { AuthModal } from './components/auth/AuthModal';
 import { UserProfileManagement } from './components/UserProfileManagement';
 import { SubscriptionPlans } from './components/payment/SubscriptionPlans';
 import { paymentService } from './services/paymentService';
-import { AlertModal } from './components/AlertModal'; // Import AlertModal
+
 
 function App() {
   const { isAuthenticated, user, markProfilePromptSeen } = useAuth();
