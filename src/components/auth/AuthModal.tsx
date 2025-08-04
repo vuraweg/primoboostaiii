@@ -22,9 +22,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onProfileFillRequest = () => {},
   onPromptDismissed = () => {}
 }) => {
-  const { user, isAuthenticated } = useAuth(); // Call useAuth hook
+  const { user, isAuthenticated } = useAuth();
   const [currentView, setCurrentView] = useState<AuthView>(initialView);
-  const [signupEmail, setSignupEmail] = useState<string>(''); // To pass email to success/prompt view
+  const [signupEmail, setSignupEmail] = useState<string>('');
 
   // Handle prompt dismissal when modal is closed while showing postSignupPrompt
   useEffect(() => {
@@ -33,7 +33,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       onPromptDismissed();
       setCurrentView('login'); // Reset to login view for next time
     }
-    // Also reset error/success messages when modal closes
     if (!isOpen) {
       // You might have local state in forms that also need reset,
       // but the main AuthModal state controlled here should be clean.
@@ -43,8 +42,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // NEW useEffect: Auto-close modal on successful authentication
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
-    // Check if authenticated, user object is loaded, modal is open,
-    // AND we are not currently showing the needs-email-verification or post-signup-prompt view
+    console.log('AuthModal useEffect: Running. isAuthenticated:', isAuthenticated, 'user:', user, 'isOpen:', isOpen, 'currentView:', currentView);
+
+    // CRITICAL: If user is authenticated but hasSeenProfilePrompt is still null/undefined,
+    // it means the full profile hasn't loaded yet. We should wait.
+    if (isAuthenticated && user && (user.hasSeenProfilePrompt === null || user.hasSeenProfilePrompt === undefined)) {
+      console.log('AuthModal useEffect: User authenticated, but profile prompt status not yet loaded. Waiting...');
+      // Do not proceed with closing or prompting until hasSeenProfilePrompt is definitively true/false
+      return;
+    }
+
     if (
       isAuthenticated &&
       user &&
