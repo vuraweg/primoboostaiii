@@ -217,7 +217,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <button
                   onClick={() => {
                     onProfileFillRequest();
-                    
+                    onClose();
                   }}
                   className="w-full btn-primary py-3 px-4 rounded-xl font-semibold text-sm transition-colors"
                 >
@@ -226,7 +226,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <button
                   onClick={() => {
                     onPromptDismissed();
-                    onClose();
+                    onCl
                   }}
                   className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-3 px-4 rounded-xl text-sm transition-colors"
                 >
