@@ -144,12 +144,13 @@ serve(async (req) => {
       const normalizedCoupon = couponCode.toLowerCase().trim()
 
       // Backend check: Ensure coupon hasn't been used by this user before
+      // Now checks for both 'success' and 'pending' statuses
       const { data: existingTransaction, error: transactionError } = await supabase
         .from('payment_transactions')
         .select('id')
         .eq('user_id', user.id)
         .eq('coupon_code', normalizedCoupon)
-        .eq('status', 'success') // Only count successful uses
+        .in('status', ['success', 'pending']) // Check for both success and pending
         .limit(1)
 
       if (transactionError) {
@@ -158,7 +159,7 @@ serve(async (req) => {
       }
 
       if (existingTransaction && existingTransaction.length > 0) {
-        throw new Error('This coupon has already been used by your account.')
+        throw new Error('This coupon has already been used by your account or is currently in use for a pending transaction.')
       }
       // End backend check
 
@@ -192,6 +193,30 @@ serve(async (req) => {
       finalAmount += addOnsTotal
     }
 
+    // --- NEW: Create a pending payment_transactions record ---
+    const { data: pendingTransaction, error: pendingTransactionError } = await supabase
+      .from('payment_transactions')
+      .insert({
+        user_id: user.id,
+        plan_id: planId, // Store plan_id for later use in verify-payment
+        amount: finalAmount * 100, // Store the calculated amount in paise
+        currency: 'INR',
+        status: 'pending',
+        coupon_code: appliedCoupon,
+        discount_amount: discountAmount,
+        final_amount: finalAmount * 100,
+        wallet_deduction: walletDeduction * 100 // Store wallet deduction in paise
+      })
+      .select('id')
+      .single();
+
+    if (pendingTransactionError) {
+      console.error('Error creating pending transaction:', pendingTransactionError);
+      throw new Error('Failed to initiate payment transaction.');
+    }
+    const transactionId = pendingTransaction.id;
+    // --- END NEW ---
+
     // Create Razorpay order
     const razorpayKeyId = Deno.env.get('RAZORPAY_KEY_ID')
     const razorpayKeySecret = Deno.env.get('RAZORPAY_KEY_SECRET')
@@ -211,7 +236,8 @@ serve(async (req) => {
         couponCode: appliedCoupon,
         discountAmount: discountAmount,
         walletDeduction: walletDeduction || 0,
-        addOnsTotal: addOnsTotal || 0 // Add addOnsTotal to notes for record-keeping
+        addOnsTotal: addOnsTotal || 0, // Add addOnsTotal to notes for record-keeping
+        transactionId: transactionId // Pass the transactionId to Razorpay notes
       }
     }
     
@@ -234,10 +260,25 @@ serve(async (req) => {
     if (!response.ok) {
       const errorText = await response.text()
       console.error('Razorpay API error:', errorText)
+      // If Razorpay order creation fails, mark the pending transaction as failed
+      await supabase.from('payment_transactions')
+        .update({ status: 'failed' })
+        .eq('id', transactionId);
       throw new Error('Failed to create payment order')
     }
 
     const order = await response.json()
+
+    // Update the pending transaction with the Razorpay order_id
+    const { error: updatePendingError } = await supabase
+      .from('payment_transactions')
+      .update({ order_id: order.id })
+      .eq('id', transactionId);
+
+    if (updatePendingError) {
+      console.error('Error updating pending transaction with order_id:', updatePendingError);
+      // This is a non-critical error, payment can still proceed
+    }
 
     // Log before returning the final response
     console.log(`[${new Date().toISOString()}] - Returning final response. Order ID: ${order.id}`);
@@ -247,7 +288,8 @@ serve(async (req) => {
         orderId: order.id,
         amount: finalAmount,
         keyId: razorpayKeyId,
-        currency: 'INR'
+        currency: 'INR',
+        transactionId: transactionId // Return the transactionId
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
