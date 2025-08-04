@@ -28,6 +28,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [signupEmail, setSignupEmail] = useState<string>(''); // To pass email to success/prompt view
 
   // Effect to update currentView when initialView prop changes
+  // This is the ONLY place currentView should be set based on props.
   useEffect(() => {
     if (isOpen) { // Only update if the modal is actually open
       setCurrentView(initialView);
@@ -42,12 +43,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setCurrentView('login'); // Reset to login view for next time
     }
     // Also reset error/success messages when modal closes
+    // This ensures that if the modal is closed for any reason, its internal view state is reset
+    // so it opens correctly next time based on the initialView prop from App.tsx.
     if (!isOpen && currentView !== 'postSignupPrompt') {
       setCurrentView(initialView); // Reset to initial view when closed
     }
   }, [isOpen, currentView, onPromptDismissed, initialView]);
 
-  // REFINED useEffect: Manage currentView based on auth state and profile prompt status
+  // REMOVE THIS ENTIRE USEEFFECT BLOCK.
+  // This logic is handled by App.tsx and causes race conditions.
+  /*
   useEffect(() => {
     console.log('AuthModal useEffect: Running. isAuthenticated:', isAuthenticated, 'user:', user, 'isOpen:', isOpen, 'currentView:', currentView);
 
@@ -58,21 +63,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
 
     // If user has seen the profile prompt, and the AuthModal is currently open, close it.
-    // This logic is primarily handled by the parent App.tsx, but this ensures consistency if AuthModal is somehow left open.
-    if (user.hasSeenProfilePrompt === true) { // Removed `&& isOpen` as `isOpen` is already checked above
+    if (user.hasSeenProfilePrompt === true) {
       console.log('AuthModal useEffect: User profile complete, ensuring AuthModal is closed.');
-      // This part of the logic is typically handled by the parent App.tsx to close the modal.
-      // If this useEffect is meant to *force* close the modal from within, it would need to call onClose().
-      // For now, just logging as the parent App.tsx is responsible for `setShowAuthModal(false)`.
       setCurrentView('login'); // Ensure internal view is reset
     }
     // If user logs out, ensure AuthModal is closed
-    if (!isAuthenticated) { // Removed `&& isOpen` as `isOpen` is already checked above
+    if (!isAuthenticated) {
       console.log('AuthModal useEffect: User logged out, ensuring AuthModal is closed.');
-      // Similar to above, parent App.tsx handles `setShowAuthModal(false)`.
       setCurrentView('login'); // Ensure internal view is reset
     }
-  }, [isAuthenticated, user, user?.hasSeenProfilePrompt, isOpen]); // Depend on isOpen to re-evaluate when modal opens/closes
+  }, [isAuthenticated, user, user?.hasSeenProfilePrompt, isOpen]);
+  */
 
   // --- CONDITIONAL RETURN IS NOW AFTER ALL HOOKS ---
   if (!isOpen) {
@@ -101,11 +102,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     // We determine if verification is needed within the signup function in AuthContext
     // If not needing verification, isAuthenticated will become true, and the useEffect will handle the close.
     // If needs verification, the AuthModal will switch to a "check your email" message.
-    // The previous AuthModal's internal logic was to change view to 'postSignupPrompt' here
-    // However, the new useEffect takes precedence for immediate signed-in users.
-    // If signup is successful AND it requires email verification (i.e. not auto-signed in),
-    // then this component needs to respond by setting `currentView` to a verification message.
-    // Let's adjust AuthModal's submit handlers to reflect this.
     if (needsVerification) {
       setCurrentView('success'); // Show success message for email verification
     } else {
