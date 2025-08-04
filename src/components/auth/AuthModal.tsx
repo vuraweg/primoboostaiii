@@ -217,7 +217,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <button
                   onClick={() => {
                     onProfileFillRequest();
-                    onClose();
+                    
                   }}
                   className="w-full btn-primary py-3 px-4 rounded-xl font-semibold text-sm transition-colors"
                 >
