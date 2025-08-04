@@ -1,4 +1,3 @@
-// src/services/paymentService.ts
 import { SubscriptionPlan, PaymentData, RazorpayOptions, RazorpayResponse, Subscription } from '../types/payment';
 import { supabase } from '../lib/supabaseClient';
 
@@ -509,9 +508,9 @@ class PaymentService {
           score_checks_used: 0,
           score_checks_total: plan.scoreChecks,
           linkedin_messages_used: 0,
-          linkedin_messages_total: plan.linkedinMessages,
+          linkedinMessagesTotal: plan.linkedinMessages,
           guided_builds_used: 0,
-          guided_builds_total: plan.guidedBuilds,
+          guidedBuildsTotal: plan.guidedBuilds,
           payment_id: null,
           coupon_used: couponCode || null,
           created_at: now.toISOString(),
@@ -590,22 +589,20 @@ class PaymentService {
   }
 
   // Use optimization (decrement count)
-  async useOptimization(userId: string): Promise<{ success: boolean; remaining: number }> {
+  async useOptimization(userId: string): Promise<{ success: boolean; remaining: number; error?: string }> {
     try {
-      // Get active subscription
       const subscription = await this.getUserSubscription(userId);
       
       if (!subscription) {
-        return { success: false, remaining: 0 };
+        return { success: false, remaining: 0, error: 'No active subscription found.' };
       }
 
       const remaining = subscription.optimizationsTotal - subscription.optimizationsUsed;
       
       if (remaining <= 0) {
-        return { success: false, remaining: 0 };
+        return { success: false, remaining: 0, error: 'No optimizations remaining.' };
       }
 
-      // Update optimization count
       const { error } = await supabase
         .from('subscriptions')
         .update({  
@@ -616,35 +613,100 @@ class PaymentService {
 
       if (error) {
         console.error('Error using optimization:', error);
-        return { success: false, remaining: 0 };
+        return { success: false, remaining: 0, error: error.message };
       }
 
       return { success: true, remaining: remaining - 1 };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error using optimization:', error);
-      return { success: false, remaining: 0 };
+      return { success: false, remaining: 0, error: error.message };
     }
   }
 
-  // Check if user can optimize
-  async canOptimize(userId: string): Promise<{ canOptimize: boolean; remaining: number; subscription?: Subscription }> {
+  // Use score check (decrement count)
+  async useScoreCheck(userId: string): Promise<{ success: boolean; remaining: number; error?: string }> {
     try {
       const subscription = await this.getUserSubscription(userId);
-      
       if (!subscription) {
-        return { canOptimize: false, remaining: 0 };
+        return { success: false, remaining: 0, error: 'No active subscription found.' };
       }
+      const remaining = subscription.scoreChecksTotal - subscription.scoreChecksUsed;
+      if (remaining <= 0) {
+        return { success: false, remaining: 0, error: 'No score checks remaining.' };
+      }
+      const { error } = await supabase
+        .from('subscriptions')
+        .update({
+          score_checks_used: subscription.scoreChecksUsed + 1,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', subscription.id);
+      if (error) {
+        console.error('Error using score check:', error);
+        return { success: false, remaining: 0, error: error.message };
+      }
+      return { success: true, remaining: remaining - 1 };
+    } catch (error: any) {
+      console.error('Error using score check:', error);
+      return { success: false, remaining: 0, error: error.message };
+    }
+  }
 
-      const remaining = subscription.optimizationsTotal - subscription.optimizationsUsed;
-      
-      return {  
-        canOptimize: remaining > 0,  
-        remaining,
-        subscription
-      };
-    } catch (error) {
-      console.error('Error checking subscription:', error);
-      return { canOptimize: false, remaining: 0 };
+  // Use LinkedIn message (decrement count)
+  async useLinkedInMessage(userId: string): Promise<{ success: boolean; remaining: number; error?: string }> {
+    try {
+      const subscription = await this.getUserSubscription(userId);
+      if (!subscription) {
+        return { success: false, remaining: 0, error: 'No active subscription found.' };
+      }
+      const remaining = subscription.linkedinMessagesTotal - subscription.linkedinMessagesUsed;
+      if (remaining <= 0) {
+        return { success: false, remaining: 0, error: 'No LinkedIn messages remaining.' };
+      }
+      const { error } = await supabase
+        .from('subscriptions')
+        .update({
+          linkedin_messages_used: subscription.linkedinMessagesUsed + 1,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', subscription.id);
+      if (error) {
+        console.error('Error using LinkedIn message:', error);
+        return { success: false, remaining: 0, error: error.message };
+      }
+      return { success: true, remaining: remaining - 1 };
+    } catch (error: any) {
+      console.error('Error using LinkedIn message:', error);
+      return { success: false, remaining: 0, error: error.message };
+    }
+  }
+
+  // Use guided build (decrement count)
+  async useGuidedBuild(userId: string): Promise<{ success: boolean; remaining: number; error?: string }> {
+    try {
+      const subscription = await this.getUserSubscription(userId);
+      if (!subscription) {
+        return { success: false, remaining: 0, error: 'No active subscription found.' };
+      }
+      const remaining = subscription.guidedBuildsTotal - subscription.guidedBuildsUsed;
+      if (remaining <= 0) {
+        return { success: false, remaining: 0, error: 'No guided builds remaining.' };
+      }
+      const { error } = await supabase
+        .from('subscriptions')
+        .update({
+          guided_builds_used: subscription.guidedBuildsUsed + 1,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', subscription.id);
+      if (error) {
+        console.error('Error using guided build:', error);
+        return { success: false, remaining: 0, error: error.message };
+      }
+      return { success: true, remaining: remaining - 1 };
+    } catch (error: any) {
+      console.error('Error using guided build:', error);
+      return { success: false, remaining: 0, error: error.message };
     }
   }
 
@@ -740,13 +802,10 @@ class PaymentService {
   // Activate free trial for new users
   async activateFreeTrial(userId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      // Check if user already has an active subscription
       const existingSubscription = await this.getUserSubscription(userId);
       if (existingSubscription) {
         return { success: false, error: 'User already has an active subscription' };
       }
-
-      // Free trial no longer available
       return { success: false, error: 'Free trial is no longer available. Please choose a paid plan.' };
     } catch (error) {
       console.error('Error activating free trial:', error);
