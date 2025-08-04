@@ -41,14 +41,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [sessionRefreshTimer, setSessionRefreshTimer] = useState<NodeJS.Timeout | null>(null);
 
   const scheduleSessionRefresh = () => {
+    // Only schedule if authenticated
+    if (!authState.isAuthenticated) {
+      console.log('AuthContext: Not authenticated, not scheduling session refresh.');
+      if (sessionRefreshTimer) clearTimeout(sessionRefreshTimer); // Ensure any existing timer is cleared
+      return;
+    }
+
     if (sessionRefreshTimer) clearTimeout(sessionRefreshTimer);
     const timer = setTimeout(async () => {
       try {
         console.log('AuthContext: Attempting scheduled session refresh...');
         await refreshSession();
-        scheduleSessionRefresh(); // Schedule next refresh
+        scheduleSessionRefresh(); // Schedule next refresh only if successful
       } catch (error) {
         console.error('AuthContext: Scheduled session refresh failed:', error);
+        // If refresh fails, do not reschedule here. The onAuthStateChange listener will handle SIGNED_OUT.
       }
     }, 45 * 60 * 1000); // 45 minutes
     setSessionRefreshTimer(timer);
@@ -171,6 +179,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             ...prev,
             isLoading: false,
           }));
+          scheduleSessionRefresh(); // Reschedule the timer after an automatic token refresh
         } else if (event === 'USER_UPDATED' && session?.user) {
           console.log('AuthContext: USER_UPDATED event. Revalidating user session...');
           revalidateUserSession(); // Revalidate to get updated user profile
@@ -267,6 +276,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  console.log('AuthContext: AuthProvider is rendering and providing context.'); // Added console.log
+
   const value: AuthContextType = {
     ...authState,
     login,
@@ -281,4 +292,3 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-
