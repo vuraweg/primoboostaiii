@@ -308,7 +308,7 @@ export const InputWizard: React.FC<InputWizardProps> = ({
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       {/* Progress Indicator */}
-      <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
+      <div className="bg-white rounded-xl shadow-lg p-3 border border-gray-200">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Resume Optimization </h1>
           <div className="text-sm text-gray-500">
