@@ -126,6 +126,15 @@ function App() {
     }
   };
 
+  // NEW: Function to refresh user subscription data
+  const refreshUserSubscription = async () => {
+    if (isAuthenticated && user) {
+      console.log('App.tsx: Refreshing user subscription...');
+      const sub = await paymentService.getUserSubscription(user.id);
+      setUserSubscription(sub);
+    }
+  };
+
   useEffect(() => {
     fetchSubscription();
   }, [isAuthenticated, user]);
@@ -203,6 +212,7 @@ function App() {
           userSubscription={userSubscription}
           onShowSubscriptionPlans={handleShowSubscriptionPlans}
           onShowAlert={handleShowAlert}
+          refreshUserSubscription={refreshUserSubscription} // ADDED
         />;
       case 'score-checker':
         return <ResumeScoreChecker
@@ -212,6 +222,7 @@ function App() {
           userSubscription={userSubscription}
           onShowSubscriptionPlans={handleShowSubscriptionPlans}
           onShowAlert={handleShowAlert}
+          refreshUserSubscription={refreshUserSubscription} // ADDED
         />;
       case 'optimizer':
         return (
@@ -223,6 +234,7 @@ function App() {
               onNavigateBack={handleNavigateHome}
               onShowSubscriptionPlans={handleShowSubscriptionPlans}
               onShowAlert={handleShowAlert}
+              refreshUserSubscription={refreshUserSubscription} // ADDED
             />
           </main>
         );
@@ -240,6 +252,7 @@ function App() {
           userSubscription={userSubscription}
           onShowSubscriptionPlans={handleShowSubscriptionPlans}
           onShowAlert={handleShowAlert}
+          refreshUserSubscription={refreshUserSubscription} // ADDED
         />;
       default:
         return <HomePage {...homePageProps} />;
@@ -462,3 +475,4 @@ const AuthButtons: React.FC<{
   );
 };
 export default App;
+
