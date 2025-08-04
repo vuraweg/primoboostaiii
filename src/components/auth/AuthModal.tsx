@@ -215,7 +215,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
               <h2 className="text-lg sm:text-2xl font-bold text-gray-900 mb-3">Welcome!</h2>
               <p className="text-sm sm:text-base text-gray-600 leading-relaxed px-4 mb-6">
-                Your account for **{signupEmail}** has been created successfully!
+                Your account for {signupEmail} has been created successfully!
                 Would you like to complete your profile now?
               </p>
               <div className="flex flex-col sm:flex-row gap-3 px-4">
