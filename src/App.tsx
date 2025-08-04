@@ -83,14 +83,7 @@ function App() {
   // Handle profile completion
   const handleProfileCompleted = () => {
     setShowProfileManagement(false);
-    setCurrentPage('new-home'); // ✅ redirect
-
-    // ✅ CRITICAL: Mark profile prompt as seen here
-    if (user) {
-      markProfilePromptSeen(); // 🔥 THIS MUST BE ADDED
-    }
-
-    // ✅ Show success notification
+    setCurrentPage('new-home'); // Redirect to home or a dashboard after profile update
     setSuccessMessage('Profile updated successfully!');
     setShowSuccessNotification(true);
     setTimeout(() => {
@@ -98,7 +91,6 @@ function App() {
       setSuccessMessage('');
     }, 3000);
   };
-
 
   // New function to navigate back to the home page
   const handleNavigateHome = () => {
@@ -129,26 +121,17 @@ function App() {
     setShowAlertModal(true);
   };
 
-  // NEW: Function to refresh user subscription data
-  const refreshUserSubscription = async () => {
-    if (isAuthenticated && user) {
-      console.log('App.tsx: Refreshing user subscription...');
-      const sub = await paymentService.getUserSubscription(user.id);
-      setUserSubscription(sub);
-    }
-  };
 
   // Fetch user subscription on auth state change
-  const fetchSubscription = async () => {
-    if (isAuthenticated && user) {
-      const sub = await paymentService.getUserSubscription(user.id);
-      setUserSubscription(sub);
-    } else {
-      setUserSubscription(null);
-    }
-  };
-  
   useEffect(() => {
+    const fetchSubscription = async () => {
+      if (isAuthenticated && user) {
+        const sub = await paymentService.getUserSubscription(user.id);
+        setUserSubscription(sub);
+      } else {
+        setUserSubscription(null);
+      }
+    };
     fetchSubscription();
   }, [isAuthenticated, user]);
 
@@ -201,17 +184,6 @@ function App() {
     }
   }, [isAuthenticated, user, user?.hasSeenProfilePrompt, isLoading]); // Add isLoading to dependencies
 
-  const handleSubscriptionSuccess = async () => { // Make function async
-    setShowSubscriptionPlans(false);
-    setSuccessMessage('Subscription activated successfully!');
-    setShowSuccessNotification(true);
-    setTimeout(() => {
-      setShowSuccessNotification(false);
-      setSuccessMessage('');
-    }, 3000);
-    await fetchSubscription(); // Re-fetch subscription details
-  };
-
   const renderCurrentPage = (isAuthenticatedProp: boolean) => {
     // Define props for HomePage once to ensure consistency
     const homePageProps = {
@@ -252,7 +224,6 @@ function App() {
               onNavigateBack={handleNavigateHome}
               onShowSubscriptionPlans={handleShowSubscriptionPlans} // Pass onShowSubscriptionPlans
               onShowAlert={handleShowAlert} // Pass handleShowAlert
-              refreshUserSubscription={refreshUserSubscription} // Pass the new function here
             />
           </main>
         );
@@ -423,7 +394,15 @@ function App() {
         <SubscriptionPlans
           isOpen={showSubscriptionPlans}
           onNavigateBack={() => setShowSubscriptionPlans(false)}
-          onSubscriptionSuccess={handleSubscriptionSuccess}
+          onSubscriptionSuccess={() => {
+            setShowSubscriptionPlans(false);
+            setSuccessMessage('Subscription activated successfully!');
+            setShowSuccessNotification(true);
+            setTimeout(() => {
+              setShowSuccessNotification(false);
+              setSuccessMessage('');
+            }, 3000);
+          }}
         />
       )}
 
@@ -522,4 +501,3 @@ const AuthButtons: React.FC<{
 };
 
 export default App;
-
