@@ -190,6 +190,24 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
     }
   };
 
+  // Function to validate current step
+  const validateCurrentStep = (): boolean => {
+    switch (currentStep) {
+      case 0: // Message Type selection
+        return !!formData.messageType;
+      case 1: // Recipient Details
+        return (
+          !!formData.recipientFirstName.trim() &&
+          !!formData.recipientCompany.trim() &&
+          !!formData.recipientJobTitle.trim()
+        );
+      case 2: // Message Details
+        return !!formData.messagePurpose.trim();
+      default:
+        return false;
+    }
+  };
+
   const steps = [
     {
       title: 'Message Type',
@@ -578,7 +596,12 @@ export const LinkedInMessageGenerator: React.FC<LinkedInMessageGeneratorProps> =
               {currentStep < steps.length - 1 ? (
                 <button
                   onClick={() => setCurrentStep(currentStep + 1)}
-                  className="flex items-center space-x-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                  disabled={!validateCurrentStep()} // Disable if current step is not valid
+                  className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                    !validateCurrentStep()
+                      ? 'bg-gray-400 cursor-not-allowed text-white'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
+                  }`}
                 >
                   <span>Next</span>
                   <ArrowRight className="w-5 h-5" />
