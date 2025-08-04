@@ -1,4 +1,3 @@
-// src/components/ResumeScoreChecker.tsx
 import React, { useState } from 'react';
 import {
   Upload,
@@ -70,10 +69,12 @@ export const ResumeScoreChecker: React.FC<ResumeScoreCheckerProps> = ({
       return;
     }
 
+    setScoreResult(null); // Clear previous result before new analysis
+    setIsAnalyzing(true); // Set loading state
+
     const jd = jobDescription.trim() || 'General professional role requiring relevant skills, experience, and qualifications.';
 
     try {
-      setIsAnalyzing(true); // Set loading state
       const result = await getDetailedResumeScore(
         { rawText: resumeText } as any, // Cast to any for now; ideally, extract structured data from resumeText
         jd,
