@@ -182,13 +182,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               // The onSignupSuccess handler needs to manage the AuthModal's internal view state.
               // We'll pass a function that updates AuthModal's state based on signup result.
               onSignupSuccess={(needsVerification: boolean, email: string) => {
-                setSignupEmail(email);
-                if (needsVerification) {
-                  // If verification needed, switch to a view indicating email check
-                  setCurrentView('success'); // Re-using success view for email verification message
-                }
-                // If not needsVerification, isAuthenticated will become true, and the useEffect above will handle closing.
-              }}
+  setSignupEmail(email);
+  if (!needsVerification) {
+    setTimeout(() => {
+      // Let useEffect run and handle profile prompt
+    }, 500); // Delay modal close
+  }
+}}
+
             />
           )}
 
