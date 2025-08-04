@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FileText,
   PlusCircle,
@@ -213,24 +213,51 @@ export const HomePage: React.FC<HomePageProps> = ({
           </h3>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {features.map((feature) => (
-            <button
-              key={feature.id}
-              onClick={() => handleFeatureClick(feature)} // Pass the full feature object
-              className={`card-hover p-6 flex flex-col items-start sm:flex-row sm:items-center justify-between transition-all duration-300 bg-gradient-to-br from-white to-primary-50 border border-secondary-100 shadow-lg hover:shadow-xl group rounded-2xl ${feature.requiresAuth && !isAuthenticated ? 'opacity-70 cursor-not-allowed' : ''}`}
-            >
-              <div className="flex items-center space-x-4">
-                <div className="bg-primary-100 rounded-xl p-3 group-hover:bg-primary-600 group-hover:text-white transition-all duration-300 shadow-sm flex-shrink-0 group-hover:scale-110">
-                  {React.cloneElement(feature.icon, { className: "w-8 h-8" })}
+          {features.map((feature) => {
+            let remainingCount: number | null = null;
+            if (isAuthenticated && userSubscription) {
+              switch (feature.id) {
+                case 'optimizer':
+                  remainingCount = userSubscription.optimizationsTotal - userSubscription.optimizationsUsed;
+                  break;
+                case 'score-checker':
+                  remainingCount = userSubscription.scoreChecksTotal - userSubscription.scoreChecksUsed;
+                  break;
+                case 'guided-builder':
+                  remainingCount = userSubscription.guidedBuildsTotal - userSubscription.guidedBuildsUsed;
+                  break;
+                case 'linkedin-generator':
+                  remainingCount = userSubscription.linkedinMessagesTotal - userSubscription.linkedinMessagesUsed;
+                  break;
+                default:
+                  remainingCount = null;
+              }
+            }
+
+            return (
+              <button
+                key={feature.id}
+                onClick={() => handleFeatureClick(feature)} // Pass the full feature object
+                className={`card-hover p-6 flex flex-col items-start sm:flex-row sm:items-center justify-between transition-all duration-300 bg-gradient-to-br from-white to-primary-50 border border-secondary-100 shadow-lg hover:shadow-xl group rounded-2xl ${feature.requiresAuth && !isAuthenticated ? 'opacity-70 cursor-not-allowed' : ''}`}
+              >
+                <div className="flex items-center space-x-4">
+                  <div className="bg-primary-100 rounded-xl p-3 group-hover:bg-primary-600 group-hover:text-white transition-all duration-300 shadow-sm flex-shrink-0 group-hover:scale-110">
+                    {React.cloneElement(feature.icon, { className: "w-8 h-8" })}
+                  </div>
+                  <div>
+                    <span className="text-lg font-bold text-secondary-900">{feature.title}</span>
+                    <p className="text-sm text-secondary-700">{feature.description}</p>
+                    {isAuthenticated && userSubscription && remainingCount !== null && remainingCount > 0 && (
+                      <p className="text-xs font-medium text-green-600 mt-1">
+                        {remainingCount} remaining
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <span className="text-lg font-bold text-secondary-900">{feature.title}</span>
-                  <p className="text-sm text-secondary-700">{feature.description}</p>
-                </div>
-              </div>
-              <ArrowRight className={`w-6 h-6 text-secondary-400 group-hover:text-primary-600 group-hover:translate-x-1 transition-transform duration-300 flex-shrink-0 ${feature.requiresAuth && !isAuthenticated ? 'opacity-50' : ''}`} />
-            </button>
-          ))}
+                <ArrowRight className={`w-6 h-6 text-secondary-400 group-hover:text-primary-600 group-hover:translate-x-1 transition-transform duration-300 flex-shrink-0 ${feature.requiresAuth && !isAuthenticated ? 'opacity-50' : ''}`} />
+              </button>
+            );
+          })}
         </div>
       </div>
 
