@@ -491,4 +491,4 @@ const AuthButtons: React.FC<{
   );
 };
 
-export default A
+export default App;
