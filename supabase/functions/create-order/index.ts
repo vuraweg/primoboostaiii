@@ -242,7 +242,8 @@ serve(async (req) => {
       .single();
 
     if (transactionError) {
-      console.error(`[${new Date().toISOString()}] - Error inserting pending transaction:`, transactionError); // Log full error object
+      // MODIFIED: Log the full error object for detailed debugging
+      console.error(`[${new Date().toISOString()}] - Error inserting pending transaction:`, transactionError); 
       throw new Error('Failed to initiate payment transaction.');
     }
     const transactionId = transaction.id;
