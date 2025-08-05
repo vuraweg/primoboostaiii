@@ -210,7 +210,7 @@ class PaymentService {
       }
 
       const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.src = '[https://checkout.razorpay.com/v1/checkout.js](https://checkout.razorpay.com/v1/checkout.js)';
       script.onload = () => resolve(true);
       script.onerror = () => resolve(false);
       document.body.appendChild(script);
@@ -314,8 +314,8 @@ class PaymentService {
   }
 
   // Create Razorpay order via backend
-  // Updated return type to include transactionId
-  private async createOrder(planId: string, grandTotal: number, addOnsTotal: number, couponCode?: string, walletDeduction?: number): Promise<{ orderId: string; amount: number; keyId: string; transactionId: string }> {
+  // Updated to accept selectedAddOns
+  private async createOrder(planId: string, grandTotal: number, addOnsTotal: number, couponCode?: string, walletDeduction?: number, selectedAddOns?: { [key: string]: number }): Promise<{ orderId: string; amount: number; keyId: string; transactionId: string }> {
     console.log('createOrder: Function called to create a new order.');
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -332,8 +332,8 @@ class PaymentService {
       
       const fullFunctionUrl = `${supabaseUrl}/functions/v1/create-order`;
       console.log('createOrder: Calling backend function at:', fullFunctionUrl);
-      console.log('createOrder: Access Token (first 10 chars):', session.access_token ? session.access_token.substring(0, 10) + '...' : 'N/A'); // ADDED LOG
-      console.log('createOrder: Request Body:', { planId, amount: grandTotal, addOnsTotal, couponCode, walletDeduction }); // ADDED LOG
+      console.log('createOrder: Access Token (first 10 chars):', session.access_token ? session.access_token.substring(0, 10) + '...' : 'N/A');
+      console.log('createOrder: Request Body:', { planId, amount: grandTotal, addOnsTotal, couponCode, walletDeduction, selectedAddOns });
 
       const response = await fetch(fullFunctionUrl, {
         method: 'POST',
@@ -346,11 +346,12 @@ class PaymentService {
           amount: grandTotal, // Pass the grand total to the backend (already in paise)
           addOnsTotal,
           couponCode: couponCode || undefined,
-          walletDeduction: walletDeduction || 0
+          walletDeduction: walletDeduction || 0,
+          selectedAddOns: selectedAddOns || undefined // ADDED: Pass selectedAddOns to the backend
         }),
       });
 
-      console.log('createOrder: Received response from backend with status:', response.status, response.statusText); // ADDED LOG
+      console.log('createOrder: Received response from backend with status:', response.status, response.statusText);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -428,6 +429,7 @@ class PaymentService {
   }
 
   // Process payment
+  // Updated to accept selectedAddOns
   async processPayment(
     paymentData: PaymentData,
     userEmail: string,
@@ -435,7 +437,8 @@ class PaymentService {
     accessToken: string,
     couponCode?: string,
     walletDeduction?: number,
-    addOnsTotal?: number
+    addOnsTotal?: number,
+    selectedAddOns?: { [key: string]: number } // ADDED: selectedAddOns parameter
   ): Promise<{ success: boolean; subscriptionId?: string; error?: string }> {
     console.log('processPayment: Function called with paymentData:', paymentData);
     // --- NEW LOG: Log walletDeduction received in processPayment ---
@@ -458,7 +461,8 @@ class PaymentService {
       try {
         // Capture transactionId from createOrder response
         // paymentData.amount is already in paise from SubscriptionPlans.tsx
-        orderData = await this.createOrder(paymentData.planId, paymentData.amount, addOnsTotal || 0, couponCode, walletDeduction);
+        // UPDATED: Pass selectedAddOns to createOrder
+        orderData = await this.createOrder(paymentData.planId, paymentData.amount, addOnsTotal || 0, couponCode, walletDeduction, selectedAddOns);
         console.log('processPayment: Order created successfully:', orderData.orderId, 'Amount:', orderData.amount, 'Transaction ID:', orderData.transactionId);
         // NEW LOG: Inspect orderData
         console.log('processPayment: Received orderData from backend:', orderData);
