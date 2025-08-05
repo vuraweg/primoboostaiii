@@ -602,29 +602,40 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
                 </div>
 
                 <div className="border-t border-gray-200 pt-2 sm:pt-3 mt-3">
+                  {/* Wallet balance section, now with a disable condition */}
                   {!loadingWallet && walletBalance > 0 && (
-                    <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className={`mb-3 p-3 rounded-lg ${selectedPlan === 'addon_only_purchase' ? 'bg-gray-100 border-gray-200' : 'bg-green-50 border-green-200'}`}>
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-green-800">Use Wallet Balance</span>
+                        <span className={`text-sm font-medium ${selectedPlan === 'addon_only_purchase' ? 'text-gray-500' : 'text-green-800'}`}>Use Wallet Balance</span>
                         <button
                           onClick={() => setUseWalletBalance((prev) => !prev)}
+                          disabled={selectedPlan === 'addon_only_purchase'}
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            useWalletBalance ? 'bg-green-600' : 'bg-gray-300'
+                            useWalletBalance && selectedPlan !== 'addon_only_purchase' ? 'bg-green-600' : 'bg-gray-300'
                           }`}
                         >
                           <span
                             className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              useWalletBalance ? 'translate-x-6' : 'translate-x-1'
+                              useWalletBalance && selectedPlan !== 'addon_only_purchase' ? 'translate-x-6' : 'translate-x-1'
                             }`}
                           />
                         </button>
                       </div>
-                      <div className="text-sm text-green-700">
-                        Available: ₹{(walletBalance / 100).toFixed(2)}
-                        {useWalletBalance && (
-                          <span className="block mt-1">Using: ₹{(walletDeduction / 100).toFixed(2)}</span>
-                        )}
-                      </div>
+                      {selectedPlan !== 'addon_only_purchase' && (
+                        <div className="text-sm text-green-700">
+                          Available: ₹{(walletBalance / 100).toFixed(2)}
+                          {useWalletBalance && (
+                            <span className="block mt-1">Using: ₹{(walletDeduction / 100).toFixed(2)}</span>
+                          )}
+                        </div>
+                      )}
+                      {/* Added message for add-on-only plan */}
+                      {selectedPlan === 'addon_only_purchase' && (
+                        <div className="text-sm text-gray-500 flex items-center mt-2">
+                          <Info className="w-4 h-4 mr-2" />
+                          <span>Wallet balance cannot be used for add-on only purchases.</span>
+                        </div>
+                      )}
                     </div>
                   )}
 
