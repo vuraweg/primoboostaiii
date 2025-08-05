@@ -1,3 +1,4 @@
+// supabase/functions/create-order/index.ts
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -13,7 +14,7 @@ interface OrderRequest {
   walletDeduction?: number;
   addOnsTotal?: number;
   amount: number;
-  selectedAddOns?: { [key: string]: number }; // ADD THIS LINE
+  selectedAddOns?: { [key: string]: number };
 }
 
 interface PlanConfig {
@@ -108,8 +109,8 @@ serve(async (req) => {
   try {
     // Retrieve addOnsTotal from the request body
     const body: OrderRequest = await req.json();
-    const { planId, couponCode, walletDeduction, addOnsTotal, amount: frontendCalculatedAmount, selectedAddOns } = body; // UPDATE THIS LINE
-    console.log(`[${new Date().toISOString()}] - Request body parsed. planId: ${planId}, couponCode: ${couponCode}, walletDeduction: ${walletDeduction}, addOnsTotal: ${addOnsTotal}, frontendCalculatedAmount: ${frontendCalculatedAmount}, selectedAddOns: ${JSON.stringify(selectedAddOns)}`); // UPDATE LOG
+    const { planId, couponCode, walletDeduction, addOnsTotal, amount: frontendCalculatedAmount, selectedAddOns } = body;
+    console.log(`[${new Date().toISOString()}] - Request body parsed. planId: ${planId}, couponCode: ${couponCode}, walletDeduction: ${walletDeduction}, addOnsTotal: ${addOnsTotal}, frontendCalculatedAmount: ${frontendCalculatedAmount}, selectedAddOns: ${JSON.stringify(selectedAddOns)}`);
 
     // Get user from auth header
     const authHeader = req.headers.get('authorization');
@@ -221,30 +222,31 @@ serve(async (req) => {
 
     // --- NEW: Create a pending payment_transactions record ---
     console.log(`[${new Date().toISOString()}] - Creating pending payment_transactions record.`);
-    console.log(`[${new Date().toISOString()}] - Values for insert: user_id=${user.id}, plan_id=${planId}, status='pending', amount=${plan.price}, currency='INR', coupon_code=${appliedCoupon}, discount_amount=${discountAmount}, final_amount=${finalAmount}`); // ADDED DETAILED LOG
+    console.log(`[${new Date().toISOString()}] - Values for insert: user_id=${user.id}, status='pending', amount=${plan.price}, currency='INR', coupon_code=${appliedCoupon}, discount_amount=${discountAmount}, final_amount=${finalAmount}`);
 
     const { data: transaction, error: transactionError } = await supabase
-  .from('payment_transactions')
-  .insert({
-    user_id: user.id,
-    status: 'pending',
-    amount: plan.price,
-    currency: 'INR',
-    coupon_code: appliedCoupon,
-    discount_amount: discountAmount,
-    final_amount: finalAmount,
-    purchase_type: planId === 'addon_only_purchase' ? 'addon_only' : (Object.keys(selectedAddOns || {}).length > 0 ? 'plan_with_addons' : 'plan'),
-  })
-  .select('id')
-  .single();
-
+      .from('payment_transactions')
+      .insert({
+        user_id: user.id,
+        // REMOVED: plan_id: planId === 'addon_only_purchase' ? null : planId,
+        status: 'pending', // Initial status
+        amount: plan.price, // Original plan price
+        currency: 'INR', // Explicitly set currency as it's not nullable and has a default
+        coupon_code: appliedCoupon, // Save applied coupon code
+        discount_amount: discountAmount, // Save discount amount
+        final_amount: finalAmount, // Final amount after discounts/wallet/addons
+        purchase_type: planId === 'addon_only_purchase' ? 'addon_only' : (Object.keys(selectedAddOns || {}).length > 0 ? 'plan_with_addons' : 'plan'),
+        // payment_id and order_id will be updated by verify-payment function
+      })
+      .select('id') // Select the ID of the newly created row
+      .single();
 
     if (transactionError) {
       console.error(`[${new Date().toISOString()}] - Error inserting pending transaction:`, transactionError); // Log full error object
       throw new Error('Failed to initiate payment transaction.');
     }
     const transactionId = transaction.id;
-    console.log(`[${new Date().toISOString()}] - Pending transaction created with ID: ${transactionId}, coupon_code: ${appliedCoupon}`); // ADDED LOG
+    console.log(`[${new Date().toISOString()}] - Pending transaction created with ID: ${transactionId}, coupon_code: ${appliedCoupon}`);
     // --- END NEW ---
 
     // Create Razorpay order
