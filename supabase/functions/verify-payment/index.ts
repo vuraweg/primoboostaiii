@@ -159,8 +159,12 @@ serve(async (req) => {
     const planId = orderData.notes.planId
     const couponCode = orderData.notes.couponCode
     const discountAmount = orderData.notes.discountAmount || 0
-    const walletDeduction = orderData.notes.walletDeduction || 0
+    const walletDeduction = orderData.notes.walletDeduction || 0 // Retrieve walletDeduction from notes
     const selectedAddOns = JSON.parse(orderData.notes.selectedAddOns || '{}'); // ADD THIS LINE: Parse selectedAddOns
+
+    // --- NEW LOG: Log walletDeduction retrieved from orderData.notes ---
+    console.log(`[${new Date().toISOString()}] - walletDeduction retrieved from orderData.notes: ${walletDeduction}`);
+    // --- END NEW LOG ---
 
     console.log(`[${new Date().toISOString()}] - Attempting to update payment_transactions record with ID: ${transactionId}`);
     const { data: updatedTransaction, error: updateTransactionError } = await supabase
@@ -301,8 +305,9 @@ serve(async (req) => {
     // CRITICAL FIX: Properly record wallet deduction
     if (walletDeduction > 0) {
       console.log(`[${new Date().toISOString()}] - Attempting to record wallet deduction for user: ${user.id}`);
-      console.log(`[${new Date().toISOString()}] - Wallet deduction details: amount=${-(walletDeduction / 100)}, status='completed', transaction_ref=${razorpay_payment_id}`);
-
+      // --- NEW LOG: Log the amount being inserted into wallet_transactions ---
+      console.log(`[${new Date().toISOString()}] - Wallet deduction amount for insert: ${-(walletDeduction / 100)}`);
+      // --- END NEW LOG ---
       const { error: walletError } = await supabase
         .from('wallet_transactions')
         .insert({
