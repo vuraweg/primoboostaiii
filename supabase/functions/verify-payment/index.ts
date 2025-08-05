@@ -243,48 +243,49 @@ serve(async (req) => {
     transactionStatus = "success";
 
     if (Object.keys(selectedAddOns).length > 0) {
-      console.log(`[${new Date().toISOString()}] - Processing add-on credits for user: ${user.id}`);
-      for (const addOnKey in selectedAddOns) {
-        const quantity = selectedAddOns[addOnKey];
-        console.log(`[${new Date().toISOString()}] - Processing add-on with key: ${addOnKey} and quantity: ${quantity}`);
-        if (quantity > 0) {
-          const addOn = addOns.find((a) => a.id === addOnKey);
-          if (!addOn) {
-            console.error(`[${new Date().toISOString()}] - Add-on with ID ${addOnKey} not found in configuration. Skipping.`);
-            continue;
-          }
+     console.log(`[${new Date().toISOString()}] - Processing add-on credits for user: ${user.id}`);
+for (const addOnKey in selectedAddOns) {
+  const quantity = selectedAddOns[addOnKey];
+  console.log(`[${new Date().toISOString()}] - Processing add-on with key: ${addOnKey} and quantity: ${quantity}`);
 
-          console.log(`[${new Date().toISOString()}] - Found addOn config: ${JSON.stringify(addOn)}`);
-          console.log(`[${new Date().toISOString()}] - Looking up addon_type for type_key: ${addOn.type}`);
-          const { data: addonType, error: addonTypeError } = await supabase
-            .from("addon_types")
-            .select("id")
-            .eq("type_key", addOn.type)
-            .single();
+  const addOn = addOns.find((a) => a.id === addOnKey);
+  if (!addOn) {
+    console.error(`[${new Date().toISOString()}] - Add-on with ID ${addOnKey} not found in configuration. Skipping.`);
+    continue;
+  }
+  console.log(`[${new Date().toISOString()}] - Found addOn config: ${JSON.stringify(addOn)}`);
 
-          if (addonTypeError || !addonType) {
-            console.error(`[${new Date().toISOString()}] - Error finding addon_type for key ${addOn.type}:`, addonTypeError);
-            continue;
-          }
-          console.log(`[${new Date().toISOString()}] - Found addon_type with ID: ${addonType.id} for key: ${addOn.type}`);
+  console.log(`[${new Date().toISOString()}] - Looking up addon_type for type_key: ${addOn.type}`);
+  const { data: addonType, error: addonTypeError } = await supabase
+    .from("addon_types")
+    .select("id")
+    .eq("type_key", addOn.type)
+    .single();
 
-          console.log(`[${new Date().toISOString()}] - Preparing to insert add-on credits with values: user_id: ${user.id}, addon_type_id: ${addonType.id}, quantity: ${quantity}, transactionId: ${transactionId}`);
-          const { error: creditInsertError } = await supabase
-            .from("user_addon_credits")
-            .insert({
-              user_id: user.id,
-              addon_type_id: addonType.id,
-              quantity_purchased: quantity,
-              quantity_remaining: quantity,
-              payment_transaction_id: transactionId,
-            });
+  if (addonTypeError || !addonType) {
+    console.error(`[${new Date().toISOString()}] - Error finding addon_type for key ${addOn.type}:`, addonTypeError);
+    continue;
+  }
+  console.log(`[${new Date().toISOString()}] - Found addon_type with ID: ${addonType.id} for key: ${addOn.type}`);
 
-          if (creditInsertError) {
-            console.error(`[${new Date().toISOString()}] - Error inserting add-on credits for ${addOn.type}:`, creditInsertError);
-          } else {
-            console.log(`[${new Date().toISOString()}] - Successfully inserted ${quantity} credits for add-on: ${addOn.type}`);
-          }
-        }
+  console.log(`[${new Date().toISOString()}] - Preparing to insert add-on credits with values: user_id: ${user.id}, addon_type_id: ${addonType.id}, quantity: ${quantity}, transactionId: ${transactionId}`);
+  const { error: creditInsertError } = await supabase
+    .from("user_addon_credits")
+    .insert({
+      user_id: user.id,
+      addon_type_id: addonType.id,
+      quantity_purchased: quantity,
+      quantity_remaining: quantity,
+      payment_transaction_id: transactionId,
+    });
+
+  if (creditInsertError) {
+    console.error(`[${new Date().toISOString()}] - Error inserting add-on credits for ${addOn.type}:`, creditInsertError);
+  } else {
+    console.log(`[${new Date().toISOString()}] - Successfully inserted ${quantity} credits for add-on: ${addOn.type}`);
+  }
+}
+
       }
     }
 
