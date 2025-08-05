@@ -20,13 +20,17 @@ import {
   CheckCircle,
   Loader2,
   Download,
-  Eye
+  Eye,
+  Sparkles,
+  AlertCircle,
+  PlusCircle
 } from 'lucide-react';
 import { UserType, ResumeData } from '../types/resume';
 import { optimizeResume } from '../services/geminiService';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { ResumePreview } from './ResumePreview';
 import { ExportButtons } from './ExportButtons';
+import { paymentService } from '../services/paymentService'; // Import paymentService
 
 interface ContactDetails {
   fullName: string;
@@ -74,14 +78,18 @@ interface FormData {
 
 interface GuidedResumeBuilderProps {
   onNavigateBack: () => void;
-  userSubscription: any; // Assuming a subscription object with guidedBuildsTotal and guidedBuildsUsed
+  userSubscription: any;
   onShowSubscriptionPlans: () => void;
+  onShowAlert: (title: string, message: string, type?: 'info' | 'success' | 'warning' | 'error', actionText?: string, onAction?: () => void) => void;
+  refreshUserSubscription: () => Promise<void>;
 }
 
 export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
   onNavigateBack,
   userSubscription,
   onShowSubscriptionPlans,
+  onShowAlert,
+  refreshUserSubscription,
 }) => {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
@@ -181,14 +189,8 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
     }
   ];
 
-  // Check subscription on mount and whenever the subscription state changes
-// Inside src/components/GuidedResumeBuilder.tsx
-useEffect(() => {
-  if (!userSubscription || (userSubscription.guidedBuildsTotal - userSubscription.guidedBuildsUsed) <= 0) {
-    onShowSubscriptionPlans(); // This is likely the problematic call
-  }
-}, [userSubscription, onShowSubscriptionPlans]); // Or similar dependencies, or no dependencies
-
+  // REMOVED THE useEffect THAT CHECKS SUBSCRIPTION ON MOUNT.
+  // The check is now in the handleBuildResume function.
 
   const updateFormData = (section: keyof FormData, data: any) => {
     setFormData(prev => ({
@@ -250,39 +252,57 @@ useEffect(() => {
 
   const canProceedToNext = () => {
     switch (currentStep) {
-      case 0: // Experience Level
+      case 0:
         return formData.experienceLevel !== '';
-      case 1: // Contact Details
+      case 1:
         return formData.contactDetails.fullName && formData.contactDetails.email;
-      case 2: // Education
+      case 2:
         return formData.education.some(edu => edu.degree && edu.school);
-      case 3: // Work Experience
+      case 3:
         return true;
-      case 4: // Projects
+      case 4:
         return true;
-      case 5: // Skills
+      case 5:
         return Object.values(formData.skills).some(skillArray => skillArray.some(skill => skill.trim() !== ''));
-      case 6: // Additional Sections
+      case 6:
         return true;
-      case 7: // Review & Generate - always can proceed to generate once here
+      case 7:
         return true;
       default:
         return true;
     }
   };
 
-  const generateResume = async () => {
-    if (!userSubscription || userSubscription.guidedBuildsTotal - userSubscription.guidedBuildsUsed <= 0) {
-      onShowSubscriptionPlans();
+  const handleBuildResume = async () => {
+    if (!user) {
+      onShowAlert('Authentication Required', 'Please sign in to use the Guided Resume Builder.', 'error', 'Sign In', () => {});
+      return;
+    }
+
+    if (!userSubscription || (userSubscription.guidedBuildsTotal - userSubscription.guidedBuildsUsed) <= 0) {
+      const planDetails = paymentService.getPlanById(userSubscription?.planId);
+      const planName = planDetails?.name || 'your current plan';
+      const guidedBuildsTotal = planDetails?.guidedBuilds || 0;
+
+      onShowAlert(
+        'Guided Build Credits Exhausted',
+        `You have used all your ${guidedBuildsTotal} Guided Resume Builds from ${planName}. Please upgrade your plan to continue building resumes.`,
+        'warning',
+        'Upgrade Plan',
+        onShowSubscriptionPlans
+      );
+      return;
+    }
+
+    // Basic validation for builder inputs (add more as needed)
+    if (!formData.contactDetails.fullName.trim() || !formData.contactDetails.email.trim()) {
+      onShowAlert('Missing Information', 'Please fill out at least your name and email on the contact details page.', 'warning');
       return;
     }
     
     setIsGenerating(true);
     try {
-      // Construct a basic resume text from form data
       const resumeText = constructResumeText(formData);
-
-      // Use a generic job description for formatting
       const genericJobDescription = "We are looking for a motivated individual with strong technical skills and good communication abilities. The ideal candidate should have relevant education and experience in their field.";
 
       const result = await optimizeResume(
@@ -294,19 +314,34 @@ useEffect(() => {
         formData.contactDetails.phone,
         formData.contactDetails.linkedin,
         formData.contactDetails.github,
-        formData.contactDetails.linkedin, // These last two seem redundant based on your current setup.
-        formData.contactDetails.github,    // You might want to review the optimizeResume signature.
-        '' // No specific target role
+        formData.contactDetails.linkedin,
+        formData.contactDetails.github,
+        ''
       );
 
       setGeneratedResume(result);
       setShowPreview(true);
-    } catch (error) {
+
+      const usageResult = await paymentService.useGuidedBuild(userSubscription.userId);
+      if (usageResult.success) {
+        await refreshUserSubscription();
+        onShowAlert('Resume Built!', 'Your resume has been successfully built and optimized!', 'success');
+      } else {
+        console.error('Failed to decrement guided build usage:', usageResult.error);
+        onShowAlert('Usage Update Failed', 'Your resume was built, but we failed to record usage. Please contact support.', 'error');
+      }
+
+    } catch (error: any) {
       console.error('Error generating resume:', error);
-      alert('Failed to generate resume. Please try again.');
+      onShowAlert('Build Failed', `Failed to generate resume: ${error.message || 'Unknown error'}. Please try again.`, 'error');
     } finally {
       setIsGenerating(false);
     }
+  };
+  
+  const generateResume = () => {
+    // This is now just a wrapper for the new function
+    handleBuildResume();
   };
 
   const constructResumeText = (data: FormData): string => {
@@ -316,8 +351,6 @@ useEffect(() => {
     if (data.contactDetails.location) text += `Location: ${data.contactDetails.location}\n`;
     if (data.contactDetails.linkedin) text += `LinkedIn: ${data.contactDetails.linkedin}\n`;
     if (data.contactDetails.github) text += `GitHub: ${data.contactDetails.github}\n`;
-
-    // Education
     text += '\nEDUCATION:\n';
     data.education.forEach(edu => {
       if (edu.degree.trim() && edu.school.trim()) {
@@ -327,8 +360,6 @@ useEffect(() => {
         text += '\n';
       }
     });
-
-    // Work Experience
     if (data.workExperience.some(exp => exp.role.trim() && exp.company.trim())) {
       text += '\nWORK EXPERIENCE:\n';
       data.workExperience.forEach(exp => {
@@ -340,8 +371,6 @@ useEffect(() => {
         }
       });
     }
-
-    // Projects
     if (data.projects.some(proj => proj.title.trim())) {
       text += '\nPROJECTS:\n';
       data.projects.forEach(proj => {
@@ -353,8 +382,6 @@ useEffect(() => {
         }
       });
     }
-
-    // Skills
     text += '\nSKILLS:\n';
     Object.entries(data.skills).forEach(([category, skills]) => {
       const filteredSkills = skills.filter(skill => skill.trim() !== '');
@@ -362,23 +389,18 @@ useEffect(() => {
         text += `${category}: ${filteredSkills.join(', ')}\n`;
       }
     });
-
-    // Certifications
     if (data.additionalSections.includeCertifications && data.certifications.some(cert => cert.trim())) {
       text += '\nCERTIFICATIONS:\n';
       data.certifications.forEach(cert => {
         if (cert.trim()) text += `• ${cert}\n`;
       });
     }
-
-    // Achievements
     if (data.additionalSections.includeAchievements && data.achievements.some(ach => ach.trim())) {
       text += '\nACHIEVEMENTS:\n';
       data.achievements.forEach(ach => {
         if (ach.trim()) text += `• ${ach}\n`;
       });
     }
-
     return text;
   };
 
@@ -386,7 +408,6 @@ useEffect(() => {
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else if (currentStep === steps.length - 1) {
-      // This is the "Review & Generate" step
       generateResume();
     }
   };
@@ -401,7 +422,6 @@ useEffect(() => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
         <div className="container-responsive py-8">
-          {/* Header */}
           <div className="text-center mb-8">
             <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-200">
               <div className="flex items-center justify-center mb-4">
@@ -411,7 +431,6 @@ useEffect(() => {
                   <p className="text-gray-600 mt-1">Your professional resume is ready for download</p>
                 </div>
               </div>
-
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <button
                   onClick={() => setShowPreview(false)}
@@ -426,15 +445,11 @@ useEffect(() => {
                 >
                   <ArrowLeft className="w-5 h-5" />
                   <span className="block sm:inline">Back to Home</span>
-
                 </button>
               </div>
             </div>
           </div>
-
-          {/* Resume Preview and Export */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Resume Preview */}
             <div className="lg:col-span-2">
               <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
                 <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 border-b border-gray-200">
@@ -446,8 +461,6 @@ useEffect(() => {
                 <ResumePreview resumeData={generatedResume} userType={formData.experienceLevel} />
               </div>
             </div>
-
-            {/* Export Options */}
             <div className="lg:col-span-1">
               <ExportButtons resumeData={generatedResume} userType={formData.experienceLevel} />
             </div>
@@ -459,14 +472,13 @@ useEffect(() => {
 
   const renderStepContent = () => {
     switch (currentStep) {
-      case 0: // Experience Level
+      case 0:
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">What's your experience level?</h2>
               <p className="text-gray-600">This helps us customize your resume format</p>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
                 { id: 'fresher', label: 'Fresher/New Graduate', desc: 'Just graduated or starting career', icon: <GraduationCap className="w-8 h-8" /> },
@@ -494,15 +506,13 @@ useEffect(() => {
             </div>
           </div>
         );
-
-      case 1: // Contact Details
+      case 1:
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Contact Information</h2>
               <p className="text-gray-600">Tell us how employers can reach you</p>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -519,7 +529,6 @@ useEffect(() => {
                   />
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Email Address *
@@ -535,7 +544,6 @@ useEffect(() => {
                   />
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Phone Number
@@ -551,7 +559,6 @@ useEffect(() => {
                   />
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Location
@@ -567,7 +574,6 @@ useEffect(() => {
                   />
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   LinkedIn Profile
@@ -583,7 +589,6 @@ useEffect(() => {
                   />
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   GitHub Profile
@@ -602,15 +607,13 @@ useEffect(() => {
             </div>
           </div>
         );
-
-      case 2: // Education
+      case 2:
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Education Background</h2>
               <p className="text-gray-600">Add your educational qualifications</p>
             </div>
-
             {formData.education.map((edu, index) => (
               <div key={index} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
@@ -624,7 +627,6 @@ useEffect(() => {
                     </button>
                   )}
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Degree *</label>
@@ -636,7 +638,6 @@ useEffect(() => {
                       placeholder="e.g., Bachelor of Science in Computer Science"
                     />
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">School/University *</label>
                     <input
@@ -647,7 +648,6 @@ useEffect(() => {
                       placeholder="e.g., Stanford University"
                     />
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Year</label>
                     <input
@@ -658,7 +658,6 @@ useEffect(() => {
                       placeholder="e.g., 2020-2024"
                     />
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">CGPA/GPA</label>
                     <input
@@ -669,7 +668,6 @@ useEffect(() => {
                       placeholder="e.g., 3.8/4.0"
                     />
                   </div>
-
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
                     <input
@@ -683,7 +681,6 @@ useEffect(() => {
                 </div>
               </div>
             ))}
-
             <button
               onClick={() => addArrayItem('education', { degree: '', school: '', year: '', cgpa: '', location: '' })}
               className="w-full border-2 border-dashed border-gray-300 rounded-xl p-4 text-gray-600 hover:text-gray-800 hover:border-gray-400 transition-colors flex items-center justify-center"
@@ -693,15 +690,13 @@ useEffect(() => {
             </button>
           </div>
         );
-
-      case 3: // Work Experience
+      case 3:
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Work Experience</h2>
               <p className="text-gray-600">Highlight your professional work history</p>
             </div>
-
             {formData.workExperience.map((experience, expIndex) => (
               <div key={expIndex} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
@@ -715,7 +710,6 @@ useEffect(() => {
                     </button>
                   )}
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
@@ -748,7 +742,6 @@ useEffect(() => {
                     />
                   </div>
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Responsibilities / Achievements (Bullet Points)</label>
                   {experience.bullets.map((bullet, bulletIndex) => (
@@ -789,7 +782,6 @@ useEffect(() => {
                 </div>
               </div>
             ))}
-
             <button
               onClick={() => addArrayItem('workExperience', { role: '', company: '', year: '', bullets: [''] })}
               className="w-full border-2 border-dashed border-gray-300 rounded-xl p-4 text-gray-600 hover:text-gray-800 hover:border-gray-400 transition-colors flex items-center justify-center"
@@ -799,15 +791,13 @@ useEffect(() => {
             </button>
           </div>
         );
-
-      case 4: // Projects
+      case 4:
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Projects</h2>
               <p className="text-gray-600">Showcase your personal or academic projects</p>
             </div>
-
             {formData.projects.map((project, projIndex) => (
               <div key={projIndex} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
@@ -821,7 +811,6 @@ useEffect(() => {
                     </button>
                   )}
                 </div>
-
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Project Title *</label>
                   <input
@@ -832,7 +821,6 @@ useEffect(() => {
                     placeholder="e.g., E-commerce Platform"
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Project Details (Bullet Points)</label>
                   {project.bullets.map((bullet, bulletIndex) => (
@@ -873,7 +861,6 @@ useEffect(() => {
                 </div>
               </div>
             ))}
-
             <button
               onClick={() => addArrayItem('projects', { title: '', bullets: [''] })}
               className="w-full border-2 border-dashed border-gray-300 rounded-xl p-4 text-gray-600 hover:text-gray-800 hover:border-gray-400 transition-colors flex items-center justify-center"
@@ -883,15 +870,13 @@ useEffect(() => {
             </button>
           </div>
         );
-
-      case 5: // Skills
+      case 5:
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Your Skills</h2>
               <p className="text-gray-600">List your technical, soft, and other relevant skills</p>
             </div>
-
             {Object.keys(formData.skills).map((category) => (
               <div key={category} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                 <h3 className="font-semibold text-gray-900 mb-4">{category}</h3>
@@ -926,15 +911,13 @@ useEffect(() => {
             ))}
           </div>
         );
-
-      case 6: // Additional Sections
+      case 6:
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Additional Sections</h2>
               <p className="text-gray-600">Include optional sections to enhance your resume</p>
             </div>
-
             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
               {/* Certifications Toggle */}
               <div className="flex items-center justify-between">
@@ -955,7 +938,6 @@ useEffect(() => {
                   className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
               </div>
-
               {formData.additionalSections.includeCertifications && (
                 <div className="space-y-2 pt-4 border-t border-gray-200">
                   <label className="block text-sm font-medium text-gray-700 mb-2">List your certifications (one per line)</label>
@@ -986,7 +968,6 @@ useEffect(() => {
                   </button>
                 </div>
               )}
-
               {/* Achievements Toggle */}
               <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                 <label htmlFor="includeAchievements" className="text-lg font-medium text-gray-900 flex items-center">
@@ -1006,7 +987,6 @@ useEffect(() => {
                   className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
               </div>
-
               {formData.additionalSections.includeAchievements && (
                 <div className="space-y-2 pt-4 border-t border-gray-200">
                   <label className="block text-sm font-medium text-gray-700 mb-2">List your key achievements (one per line)</label>
@@ -1040,15 +1020,13 @@ useEffect(() => {
             </div>
           </div>
         );
-
-      case 7: // Review & Generate
+      case 7:
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Review Your Resume Information</h2>
               <p className="text-gray-600">Please review the details below. If everything looks good, click "Generate Resume"!</p>
             </div>
-
             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-6">
               {/* Contact Details Summary */}
               <div>
@@ -1062,9 +1040,7 @@ useEffect(() => {
                 <p className="text-gray-700"><strong>LinkedIn:</strong> {formData.contactDetails.linkedin || 'N/A'}</p>
                 <p className="text-gray-700"><strong>GitHub:</strong> {formData.contactDetails.github || 'N/A'}</p>
               </div>
-
               <hr className="border-t border-gray-200" />
-
               {/* Education Summary */}
               <div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-3 flex items-center">
@@ -1081,9 +1057,7 @@ useEffect(() => {
                   <p className="text-gray-600 italic">No education details added.</p>
                 )}
               </div>
-
               <hr className="border-t border-gray-200" />
-
               {/* Work Experience Summary */}
               <div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-3 flex items-center">
@@ -1106,9 +1080,7 @@ useEffect(() => {
                   <p className="text-gray-600 italic">No work experience added.</p>
                 )}
               </div>
-
               <hr className="border-t border-gray-200" />
-
               {/* Projects Summary */}
               <div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-3 flex items-center">
@@ -1130,9 +1102,7 @@ useEffect(() => {
                   <p className="text-gray-600 italic">No projects added.</p>
                 )}
               </div>
-
               <hr className="border-t border-gray-200" />
-
               {/* Skills Summary */}
               <div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-3 flex items-center">
@@ -1151,184 +1121,13 @@ useEffect(() => {
                   })
                 )}
               </div>
-
               {(formData.additionalSections.includeCertifications || formData.additionalSections.includeAchievements) && (
                 <hr className="border-t border-gray-200" />
               )}
-
               {/* Certifications Summary */}
               {formData.additionalSections.includeCertifications && (
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-3 flex items-center">
                     <Award className="w-5 h-5 mr-2 text-yellow-500" /> Certifications
                   </h3>
-                  {formData.certifications.length > 0 && formData.certifications.some(cert => cert.trim() !== '') ? (
-                    <ul className="list-disc list-inside text-gray-700 text-sm ml-4">
-                      {formData.certifications.filter(cert => cert.trim() !== '').map((cert, index) => (
-                        <li key={index}>{cert}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-gray-600 italic">No certifications added.</p>
-                  )}
-                </div>
-              )}
-
-              {/* Achievements Summary */}
-              {formData.additionalSections.includeAchievements && (
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-3 flex items-center">
-                    <CheckCircle className="w-5 h-5 mr-2 text-green-500" /> Achievements
-                  </h3>
-                  {formData.achievements.length > 0 && formData.achievements.some(ach => ach.trim() !== '') ? (
-                    <ul className="list-disc list-inside text-gray-700 text-sm ml-4">
-                      {formData.achievements.filter(ach => ach.trim() !== '').map((ach, index) => (
-                        <li key={index}>{ach}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-gray-600 italic">No achievements added.</p>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        );
-
-      default:
-        return (
-          <div className="text-center py-12">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Step Not Implemented</h2>
-            <p className="text-gray-600">This step is currently under development.</p>
-          </div>
-        );
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
-        <div className="container-responsive">
-          <div className="flex items-center justify-between h-16">
-            <button
-              onClick={onNavigateBack}
-              className="mb-6 bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800 shadow-md hover:shadow-lg py-3 px-5 rounded-xl inline-flex items-center space-x-2 transition-all duration-200"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span className="hidden sm:block">Back to Home</span>
-            </button>
-
-            <h1 className="text-lg font-semibold text-gray-900">Resume Builder</h1>
-
-            <div className="text-sm text-gray-500">
-              Step {currentStep + 1} of {steps.length}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Progress Bar */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="container-responsive">
-          <div className="flex items-center py-4 overflow-x-auto">
-            {steps.map((step, index) => (
-              <div key={step.id} className="flex items-center flex-shrink-0">
-                <div className={`flex items-center space-x-2 px-3 py-2 rounded-lg ${
-                  index === currentStep ? 'bg-blue-100 text-blue-700' :
-                  index < currentStep ? 'bg-green-100 text-green-700' :
-                  'text-gray-500'
-                }`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                    index === currentStep ? 'bg-blue-500 text-white' :
-                    index < currentStep ? 'bg-green-500 text-white' :
-                    'bg-gray-200'
-                  }`}>
-                    {index < currentStep ? <CheckCircle className="w-4 h-4" /> : step.icon}
-                  </div>
-                  <span className="font-medium hidden sm:block">{step.title}</span>
-                </div>
-                {index < steps.length - 1 && (
-                  <div className="w-8 h-px bg-gray-300 mx-2"></div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="container-responsive py-8">
-        <div className="max-w-4xl mx-auto">
-          {/* Step Description */}
-          <div className="text-center mb-8">
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-200">
-              <div className="flex items-center justify-center mb-4">
-                <div className="bg-blue-100 w-12 h-12 rounded-full flex items-center justify-center text-blue-600">
-                  {steps[currentStep].icon}
-                </div>
-              </div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">{steps[currentStep].title}</h2>
-              <p className="text-gray-600">{steps[currentStep].description}</p>
-            </div>
-          </div>
-
-          {/* Step Content */}
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 sm:p-8 mb-8">
-            {renderStepContent()}
-          </div>
-
-          {/* Navigation */}
-          <div className="flex justify-between items-center">
-            <button
-              onClick={prevStep}
-              disabled={currentStep === 0}
-              className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
-                currentStep === 0
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : 'bg-gray-600 hover:bg-gray-700 text-white shadow-lg hover:shadow-xl'
-              }`}
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span>Previous</span>
-            </button>
-
-            <div className="text-center">
-              <div className="text-sm text-gray-500 mb-1">Progress</div>
-              <div className="w-48 bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
-                />
-              </div>
-            </div>
-
-            <button
-              onClick={nextStep}
-              disabled={!canProceedToNext() || isGenerating}
-              className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
-                !canProceedToNext() || isGenerating
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : currentStep === steps.length - 1
-                  ? 'bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-xl'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl'
-              }`}
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Generating...</span>
-                </>
-              ) : (
-                <>
-                  <span>{currentStep === steps.length - 1 ? 'Generate Resume' : 'Next'}</span>
-                  <ArrowRight className="w-5 h-5" />
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+                  {formData.certifications.length > 0 && formData.cert
