@@ -346,6 +346,8 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* Additional Features Teaser */}
       <div className="bg-gradient-to-r from-gray-500 to-blue-900 text-white py-16 px-4 sm:px-0">
+        <div className="bg-gradient-to-r from-gray-900 via-customPurple to-blue-900">
+
 
         <div className="container-responsive text-left">
           <div className="max-w-3xl mx-auto">
