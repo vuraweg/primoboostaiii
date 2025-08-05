@@ -204,7 +204,8 @@ serve(async (req) => {
 
     // --- NEW: Create a pending payment_transactions record ---
     console.log(`[${new Date().toISOString()}] - Creating pending payment_transactions record.`);
-    console.log(`[${new Date().toISOString()}] - Inserting with coupon_code: ${appliedCoupon}, discount_amount: ${discountAmount}, final_amount: ${finalAmount}`); // ADDED LOG
+    console.log(`[${new Date().toISOString()}] - Values for insert: user_id=${user.id}, plan_id=${planId}, status='pending', amount=${plan.price}, currency='INR', coupon_code=${appliedCoupon}, discount_amount=${discountAmount}, final_amount=${finalAmount}`); // ADDED DETAILED LOG
+
     const { data: transaction, error: transactionError } = await supabase
       .from('payment_transactions')
       .insert({
@@ -212,7 +213,7 @@ serve(async (req) => {
         plan_id: planId,
         status: 'pending', // Initial status
         amount: plan.price, // Original plan price
-        currency: 'INR',
+        currency: 'INR', // Explicitly set currency as it's not nullable and has a default
         coupon_code: appliedCoupon, // Save applied coupon code
         discount_amount: discountAmount, // Save discount amount
         final_amount: finalAmount, // Final amount after discounts/wallet/addons
@@ -222,7 +223,7 @@ serve(async (req) => {
       .single();
 
     if (transactionError) {
-      console.error(`[${new Date().toISOString()}] - Error inserting pending transaction:`, transactionError);
+      console.error(`[${new Date().toISOString()}] - Error inserting pending transaction:`, transactionError); // Log full error object
       throw new Error('Failed to initiate payment transaction.');
     }
     const transactionId = transaction.id;
