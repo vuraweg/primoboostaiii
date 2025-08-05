@@ -108,8 +108,8 @@ serve(async (req) => {
   try {
     const requestBody: PaymentVerificationRequest = await req.json();
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, transactionId } = requestBody;
-    transactionIdFromRequest = transactionId; // Store it
-    console.log(`[${new Date().toISOString()}] - verify-payment received. transactionId: ${transactionIdFromRequest}`); // ADDED LOG
+    transactionIdFromRequest = transactionId;
+    console.log(`[${new Date().toISOString()}] - verify-payment received. transactionId: ${transactionIdFromRequest}`);
 
     // Get user from auth header
     const authHeader = req.headers.get('authorization')
