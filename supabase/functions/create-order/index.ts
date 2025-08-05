@@ -1,6 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { createHmac } from 'https://deno.land/std@0.168.0/node/crypto.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -104,8 +103,6 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  let transactionId: string | null = null; // Initialize transactionId here
-
   try {
     // Retrieve addOnsTotal from the request body
     const body: OrderRequest = await req.json()
@@ -145,30 +142,7 @@ serve(async (req) => {
 
     if (couponCode) {
       const normalizedCoupon = couponCode.toLowerCase().trim()
-
-      // Backend check: Ensure coupon hasn't been used by this user before
-      // Now checks for both 'success' and 'pending' statuses
-      console.log(`[${new Date().toISOString()}] - Checking coupon usage for user: ${user.id}, coupon: ${normalizedCoupon}`);
-      const { data: existingTransaction, error: transactionError } = await supabase
-        .from('payment_transactions')
-        .select('id, status, coupon_code') // Select more fields for logging
-        .eq('user_id', user.id)
-        .eq('coupon_code', normalizedCoupon)
-        .in('status', ['success', 'pending']) // Check for both success and pending
-        .limit(1);
-
-      if (transactionError) {
-        console.error('Error checking existing coupon usage on backend:', transactionError)
-        throw new Error('Failed to verify coupon usage.')
-      }
-
-      console.log(`[${new Date().toISOString()}] - Coupon check result for user ${user.id}, coupon ${normalizedCoupon}: ${JSON.stringify(existingTransaction)}`);
-
-      if (existingTransaction && existingTransaction.length > 0) {
-        throw new Error('This coupon has already been used by your account or is currently in use for a pending transaction.')
-      }
-      // End backend check
-
+      
       // NEW: full_support coupon - free career_pro_max plan
       if (normalizedCoupon === 'fullsupport' && planId === 'career_pro_max') {
         finalAmount = 0
@@ -199,30 +173,6 @@ serve(async (req) => {
       finalAmount += addOnsTotal
     }
 
-    // --- NEW: Create a pending payment_transactions record ---
-    const { data: pendingTransaction, error: pendingTransactionError } = await supabase
-      .from('payment_transactions')
-      .insert({
-        user_id: user.id,
-        plan_id: planId, // Store plan_id for later use in verify-payment
-        amount: finalAmount * 100, // Store the calculated amount in paise
-        currency: 'INR',
-        status: 'pending',
-        coupon_code: appliedCoupon,
-        discount_amount: discountAmount,
-        final_amount: finalAmount * 100,
-        wallet_deduction: walletDeduction * 100 // Store wallet deduction in paise
-      })
-      .select('id')
-      .single();
-
-    if (pendingTransactionError) {
-      console.error('Error creating pending transaction:', pendingTransactionError);
-      throw new Error('Failed to initiate payment transaction.');
-    }
-    transactionId = pendingTransaction.id;
-    // --- END NEW ---
-
     // Create Razorpay order
     const razorpayKeyId = Deno.env.get('RAZORPAY_KEY_ID')
     const razorpayKeySecret = Deno.env.get('RAZORPAY_KEY_SECRET')
@@ -242,8 +192,7 @@ serve(async (req) => {
         couponCode: appliedCoupon,
         discountAmount: discountAmount,
         walletDeduction: walletDeduction || 0,
-        addOnsTotal: addOnsTotal || 0, // Add addOnsTotal to notes for record-keeping
-        transactionId: transactionId // Pass the transactionId to Razorpay notes
+        addOnsTotal: addOnsTotal || 0 // Add addOnsTotal to notes for record-keeping
       }
     }
     
@@ -266,25 +215,10 @@ serve(async (req) => {
     if (!response.ok) {
       const errorText = await response.text()
       console.error('Razorpay API error:', errorText)
-      // If Razorpay order creation fails, mark the pending transaction as failed
-      await supabase.from('payment_transactions')
-        .update({ status: 'failed' })
-        .eq('id', transactionId);
       throw new Error('Failed to create payment order')
     }
 
     const order = await response.json()
-
-    // Update the pending transaction with the Razorpay order_id
-    const { error: updatePendingError } = await supabase
-      .from('payment_transactions')
-      .update({ order_id: order.id })
-      .eq('id', transactionId);
-
-    if (updatePendingError) {
-      console.error('Error updating pending transaction with order_id:', updatePendingError);
-      // This is a non-critical error, payment can still proceed
-    }
 
     // Log before returning the final response
     console.log(`[${new Date().toISOString()}] - Returning final response. Order ID: ${order.id}`);
@@ -294,8 +228,7 @@ serve(async (req) => {
         orderId: order.id,
         amount: finalAmount,
         keyId: razorpayKeyId,
-        currency: 'INR',
-        transactionId: transactionId // Return the transactionId
+        currency: 'INR'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
