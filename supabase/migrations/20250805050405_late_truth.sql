@@ -25,4 +25,4 @@
     - Add policy for public to read addon types
 
   3. Data Population
-    - Insert all current add-on types with correct type_keys
+    - Insert all current add-on types with correct type_keys*/
