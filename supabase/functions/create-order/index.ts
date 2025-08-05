@@ -155,6 +155,28 @@ serve(async (req) => {
         discountAmount = plan.price
         appliedCoupon = 'first100'
       }
+      // first500 coupon - 98% off lite_check plan only (NEW LOGIC)
+      else if (normalizedCoupon === 'first500' && planId === 'lite_check') {
+        // Check usage limit for first500 coupon
+        const { count, error: countError } = await supabase
+          .from('payment_transactions')
+          .select('id', { count: 'exact' })
+          .eq('coupon_code', 'first500')
+          .in('status', ['success', 'pending']); // Count successful and pending uses
+
+        if (countError) {
+          console.error(`[${new Date().toISOString()}] - Error counting first500 coupon usage:`, countError);
+          throw new Error('Failed to verify coupon usage. Please try again.');
+        }
+
+        if (count && count >= 500) {
+          throw new Error('Coupon "first500" has reached its usage limit.');
+        }
+
+        discountAmount = Math.floor(plan.price * 0.98); // 98% off
+        finalAmount = plan.price - discountAmount; // Should be 1 Rupee (99 - 98)
+        appliedCoupon = 'first500';
+      }
       // worthyone coupon - 50% off career_pro_max plan only
       else if (normalizedCoupon === 'worthyone' && planId === 'career_pro_max') { // Updated planId
         discountAmount = Math.floor(plan.price * 0.5)
