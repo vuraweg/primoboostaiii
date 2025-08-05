@@ -11,7 +11,7 @@ interface OrderRequest {
   couponCode?: string
   walletDeduction?: number
   addOnsTotal?: number
-  amount: number
+  amount: number // This 'amount' is the final calculated amount from the frontend
 }
 
 interface PlanConfig {
@@ -106,8 +106,8 @@ serve(async (req) => {
   try {
     // Retrieve addOnsTotal from the request body
     const body: OrderRequest = await req.json()
-    const { planId, couponCode, walletDeduction, addOnsTotal } = body
-    console.log(`[${new Date().toISOString()}] - Request body parsed. planId: ${planId}, couponCode: ${couponCode}, walletDeduction: ${walletDeduction}, addOnsTotal: ${addOnsTotal}`);
+    const { planId, couponCode, walletDeduction, addOnsTotal, amount: frontendCalculatedAmount } = body // Capture frontend calculated amount
+    console.log(`[${new Date().toISOString()}] - Request body parsed. planId: ${planId}, couponCode: ${couponCode}, walletDeduction: ${walletDeduction}, addOnsTotal: ${addOnsTotal}, frontendCalculatedAmount: ${frontendCalculatedAmount}`);
 
     // Get user from auth header
     const authHeader = req.headers.get('authorization')
@@ -173,6 +173,39 @@ serve(async (req) => {
       finalAmount += addOnsTotal
     }
 
+    // IMPORTANT: Validate that the calculated finalAmount matches the frontend's calculation
+    // This prevents tampering with the price on the client-side.
+    if (finalAmount !== frontendCalculatedAmount) {
+      console.error(`[${new Date().toISOString()}] - Price mismatch detected! Backend calculated: ${finalAmount}, Frontend sent: ${frontendCalculatedAmount}`);
+      throw new Error('Price mismatch detected. Please try again.');
+    }
+
+    // --- NEW: Create a pending payment_transactions record ---
+    console.log(`[${new Date().toISOString()}] - Creating pending payment_transactions record.`);
+    const { data: transaction, error: transactionError } = await supabase
+      .from('payment_transactions')
+      .insert({
+        user_id: user.id,
+        plan_id: planId,
+        status: 'pending', // Initial status
+        amount: plan.price, // Original plan price
+        currency: 'INR',
+        coupon_code: appliedCoupon, // Save applied coupon code
+        discount_amount: discountAmount, // Save discount amount
+        final_amount: finalAmount, // Final amount after discounts/wallet/addons
+        // payment_id and order_id will be updated by verify-payment function
+      })
+      .select('id') // Select the ID of the newly created row
+      .single();
+
+    if (transactionError) {
+      console.error(`[${new Date().toISOString()}] - Error inserting pending transaction:`, transactionError);
+      throw new Error('Failed to initiate payment transaction.');
+    }
+    const transactionId = transaction.id;
+    console.log(`[${new Date().toISOString()}] - Pending transaction created with ID: ${transactionId}`);
+    // --- END NEW ---
+
     // Create Razorpay order
     const razorpayKeyId = Deno.env.get('RAZORPAY_KEY_ID')
     const razorpayKeySecret = Deno.env.get('RAZORPAY_KEY_SECRET')
@@ -192,7 +225,8 @@ serve(async (req) => {
         couponCode: appliedCoupon,
         discountAmount: discountAmount,
         walletDeduction: walletDeduction || 0,
-        addOnsTotal: addOnsTotal || 0 // Add addOnsTotal to notes for record-keeping
+        addOnsTotal: addOnsTotal || 0, // Add addOnsTotal to notes for record-keeping
+        transactionId: transactionId // Pass the transactionId to Razorpay notes
       }
     }
     
@@ -215,20 +249,25 @@ serve(async (req) => {
     if (!response.ok) {
       const errorText = await response.text()
       console.error('Razorpay API error:', errorText)
-      throw new Error('Failed to create payment order')
+      // If Razorpay order creation fails, mark the pending transaction as failed
+      await supabase.from('payment_transactions')
+        .update({ status: 'failed' })
+        .eq('id', transactionId);
+      throw new Error('Failed to create payment order with Razorpay');
     }
 
     const order = await response.json()
 
     // Log before returning the final response
-    console.log(`[${new Date().toISOString()}] - Returning final response. Order ID: ${order.id}`);
+    console.log(`[${new Date().toISOString()}] - Returning final response. Order ID: ${order.id}, Transaction ID: ${transactionId}`);
 
     return new Response(
       JSON.stringify({
         orderId: order.id,
         amount: finalAmount,
         keyId: razorpayKeyId,
-        currency: 'INR'
+        currency: 'INR',
+        transactionId: transactionId // Return the transactionId to the frontend
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
