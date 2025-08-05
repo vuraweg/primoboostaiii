@@ -14,13 +14,10 @@ import {
   MapPin,
   Linkedin,
   Github,
-  Calendar,
-  Building,
-  FileText,
   CheckCircle,
   Loader2,
-  Download,
-  Eye
+  FileText,
+  Eye,
 } from 'lucide-react';
 import { UserType, ResumeData } from '../types/resume';
 import { optimizeResume } from '../services/geminiService';
@@ -75,16 +72,19 @@ interface FormData {
 
 interface GuidedResumeBuilderProps {
   onNavigateBack: () => void;
-  userSubscription: any; // Assuming a subscription object with guidedBuildsTotal and guidedBuildsUsed
+  userSubscription: {
+    guidedBuildsTotal: number;
+    guidedBuildsUsed: number;
+  };
   onShowSubscriptionPlans: () => void;
-  onRefreshSubscription: () => void; // NEW: Added function to refresh subscription state
+  onRefreshSubscription: () => void;
 }
 
 export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
   onNavigateBack,
   userSubscription,
   onShowSubscriptionPlans,
-  onRefreshSubscription, // NEW: Destructured the new prop
+  onRefreshSubscription,
 }) => {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
@@ -100,89 +100,303 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
       phone: user?.phone || '',
       location: '',
       linkedin: user?.linkedin || '',
-      github: user?.github || ''
+      github: user?.github || '',
     },
     education: [{
       degree: '',
       school: '',
       year: '',
       cgpa: '',
-      location: ''
+      location: '',
     }],
     workExperience: [{
       role: '',
       company: '',
       year: '',
-      bullets: ['']
+      bullets: [''],
     }],
     projects: [{
       title: '',
-      bullets: ['']
+      bullets: [''],
     }],
     skills: {
       'Programming Languages': [''],
       'Frameworks & Libraries': [''],
       'Tools & Technologies': [''],
-      'Soft Skills': ['']
+      'Soft Skills': [''],
     },
     certifications: [''],
     achievements: [''],
     additionalSections: {
       includeCertifications: false,
-      includeAchievements: false
-    }
+      includeAchievements: false,
+    },
   });
 
-const steps: Step[] = [
-  {
-    id: 'experience',
-    title: 'Experience Level',
-    icon: <User className="w-5 h-5" />,
-    description: 'Tell us about your professional background',
-  },
-  {
-    id: 'contact',
-    title: 'Contact Details',
-    icon: <Mail className="w-5 h-5" />,
-    description: 'Your basic information and contact details',
-  },
-  {
-    id: 'education',
-    title: 'Education',
-    icon: <GraduationCap className="w-5 h-5" />,
-    description: 'Your academic background and qualifications',
-  },
-  {
-    id: 'experience-work',
-    title: 'Work Experience',
-    icon: <Briefcase className="w-5 h-5" />,
-    description: 'Your professional experience and internships',
-  },
-  {
-    id: 'projects',
-    title: 'Projects',
-    icon: <Code className="w-5 h-5" />,
-    description: 'Your personal and academic projects',
-  },
-  {
-    id: 'skills',
-    title: 'Skills',
-    icon: <Award className="w-5 h-5" />,
-    description: 'Your technical and soft skills',
-  },
-  {
-    id: 'additional',
-    title: 'Additional Sections',
-    icon: <Plus className="w-5 h-5" />,
-    description: 'Optional sections like certifications and achievements',
-  },
-  {
-    id: 'review',
-    title: 'Review & Generate',
-    icon: <CheckCircle className="w-5 h-5" />,
-    description: 'Review your information and generate your resume',
-  }
-];
+  const steps = [
+    {
+      id: 'experience',
+      title: 'Experience Level',
+      icon: <User className="w-5 h-5" />,
+      description: 'Tell us about your professional background',
+    },
+    {
+      id: 'contact',
+      title: 'Contact Details',
+      icon: <Mail className="w-5 h-5" />,
+      description: 'Your basic information and contact details',
+    },
+    {
+      id: 'education',
+      title: 'Education',
+      icon: <GraduationCap className="w-5 h-5" />,
+      description: 'Your academic background and qualifications',
+    },
+    {
+      id: 'experience-work',
+      title: 'Work Experience',
+      icon: <Briefcase className="w-5 h-5" />,
+      description: 'Your professional experience and internships',
+    },
+    {
+      id: 'projects',
+      title: 'Projects',
+      icon: <Code className="w-5 h-5" />,
+      description: 'Your personal and academic projects',
+    },
+    {
+      id: 'skills',
+      title: 'Skills',
+      icon: <Award className="w-5 h-5" />,
+      description: 'Your technical and soft skills',
+    },
+    {
+      id: 'additional',
+      title: 'Additional Sections',
+      icon: <Plus className="w-5 h-5" />,
+      description: 'Optional sections like certifications and achievements',
+    },
+    {
+      id: 'review',
+      title: 'Review & Generate',
+      icon: <CheckCircle className="w-5 h-5" />,
+      description: 'Review your information and generate your resume',
+    },
+  ];
+
+  const updateFormData = (section: keyof FormData, data: any) => {
+    setFormData(prev => ({
+      ...prev,
+      [section]: data,
+    }));
+  };
+
+  const addArrayItem = (section: keyof FormData, item: any) => {
+    setFormData(prev => ({
+      ...prev,
+      [section]: [...(prev[section] as any[]), item],
+    }));
+  };
+
+  const removeArrayItem = (section: keyof FormData, index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      [section]: (prev[section] as any[]).filter((_, i) => i !== index),
+    }));
+  };
+
+  const updateArrayItem = (section: keyof FormData, index: number, data: any) => {
+    setFormData(prev => ({
+      ...prev,
+      [section]: (prev[section] as any[]).map((item, i) => i === index ? data : item),
+    }));
+  };
+
+  const updateSkills = (category: string, index: number, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      skills: {
+        ...prev.skills,
+        [category]: prev.skills[category].map((skill, i) => i === index ? value : skill),
+      },
+    }));
+  };
+
+  const addSkill = (category: string) => {
+    setFormData(prev => ({
+      ...prev,
+      skills: {
+        ...prev.skills,
+        [category]: [...prev.skills[category], ''],
+      },
+    }));
+  };
+
+  const removeSkill = (category: string, index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      skills: {
+        ...prev.skills,
+        [category]: prev.skills[category].filter((_, i) => i !== index),
+      },
+    }));
+  };
+
+  const canProceedToNext = () => {
+    switch (currentStep) {
+      case 0: // Experience Level
+        return formData.experienceLevel !== '';
+      case 1: // Contact Details
+        return formData.contactDetails.fullName && formData.contactDetails.email;
+      case 2: // Education
+        return formData.education.some(edu => edu.degree && edu.school);
+      case 3: // Work Experience
+        return true;
+      case 4: // Projects
+        return true;
+      case 5: // Skills
+        return Object.values(formData.skills).some(skillArray => skillArray.some(skill => skill.trim() !== ''));
+      case 6: // Additional Sections
+        return true;
+      case 7: // Review & Generate - always can proceed to generate once here
+        return true;
+      default:
+        return true;
+    }
+  };
+
+  const generateResume = async () => {
+    if (!user) {
+      // Handle unauthenticated user case
+      alert('You must be logged in to generate a resume.');
+      onNavigateBack();
+      return;
+    }
+
+    if (!userSubscription || userSubscription.guidedBuildsTotal - userSubscription.guidedBuildsUsed <= 0) {
+      onShowSubscriptionPlans();
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      // Use the service to decrement the guided build count
+      const useBuildResult = await paymentService.useGuidedBuild(user.id);
+      if (!useBuildResult.success) {
+        throw new Error(useBuildResult.error || 'Failed to use guided build credit.');
+      }
+      
+      // NEW: Call the refresh function to update the subscription state in the parent component
+      onRefreshSubscription();
+
+      // Construct a basic resume text from form data
+      const resumeText = constructResumeText(formData);
+
+      // Use a generic job description for formatting
+      const genericJobDescription = "We are looking for a motivated individual with strong technical skills and good communication abilities. The ideal candidate should have relevant education and experience in their field.";
+
+      const result = await optimizeResume(
+        resumeText,
+        genericJobDescription,
+        formData.experienceLevel,
+        formData.contactDetails.fullName,
+        formData.contactDetails.email,
+        formData.contactDetails.phone,
+        formData.contactDetails.linkedin,
+        formData.contactDetails.github,
+      );
+
+      setGeneratedResume(result);
+      setShowPreview(true);
+    } catch (error) {
+      console.error('Error generating resume:', error);
+      alert('Failed to generate resume. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const constructResumeText = (data: FormData): string => {
+    let text = `Name: ${data.contactDetails.fullName}\n`;
+    text += `Email: ${data.contactDetails.email}\n`;
+    text += `Phone: ${data.contactDetails.phone}\n`;
+    if (data.contactDetails.location) text += `Location: ${data.contactDetails.location}\n`;
+    if (data.contactDetails.linkedin) text += `LinkedIn: ${data.contactDetails.linkedin}\n`;
+    if (data.contactDetails.github) text += `GitHub: ${data.contactDetails.github}\n`;
+
+    // Education
+    text += '\nEDUCATION:\n';
+    data.education.forEach(edu => {
+      if (edu.degree.trim() && edu.school.trim()) {
+        text += `${edu.degree} from ${edu.school} (${edu.year})`;
+        if (edu.cgpa.trim()) text += ` - CGPA: ${edu.cgpa}`;
+        if (edu.location.trim()) text += ` - ${edu.location}`;
+        text += '\n';
+      }
+    });
+
+    // Work Experience
+    if (data.workExperience.some(exp => exp.role.trim() && exp.company.trim())) {
+      text += '\nWORK EXPERIENCE:\n';
+      data.workExperience.forEach(exp => {
+        if (exp.role.trim() && exp.company.trim()) {
+          text += `${exp.role} at ${exp.company} (${exp.year})\n`;
+          exp.bullets.forEach(bullet => {
+            if (bullet.trim()) text += `• ${bullet}\n`;
+          });
+        }
+      });
+    }
+
+    // Projects
+    if (data.projects.some(proj => proj.title.trim())) {
+      text += '\nPROJECTS:\n';
+      data.projects.forEach(proj => {
+        if (proj.title.trim()) {
+          text += `${proj.title}\n`;
+          proj.bullets.forEach(bullet => {
+            if (bullet.trim()) text += `• ${bullet}\n`;
+          });
+        }
+      });
+    }
+
+    // Skills
+    text += '\nSKILLS:\n';
+    Object.entries(data.skills).forEach(([category, skills]) => {
+      const filteredSkills = skills.filter(skill => skill.trim() !== '');
+      if (filteredSkills.length > 0) {
+        text += `${category}: ${filteredSkills.join(', ')}\n`;
+      }
+    });
+
+    // Certifications
+    if (data.additionalSections.includeCertifications && data.certifications.some(cert => cert.trim())) {
+      text += '\nCERTIFICATIONS:\n';
+      data.certifications.forEach(cert => {
+        if (cert.trim()) text += `• ${cert}\n`;
+      });
+    }
+
+    // Achievements
+    if (data.additionalSections.includeAchievements && data.achievements.some(ach => ach.trim())) {
+      text += '\nACHIEVEMENTS:\n';
+      data.achievements.forEach(ach => {
+        if (ach.trim()) text += `• ${ach}\n`;
+      });
+    }
+
+    return text;
+  };
+
+  const nextStep = () => {
+    if (currentStep < steps.length - 1) {
+      setCurrentStep(currentStep + 1);
+    } else if (currentStep === steps.length - 1) {
+      // This is the "Review & Generate" step
+      generateResume();
+    }
+  };
 
   const prevStep = () => {
     if (currentStep > 0) {
@@ -204,7 +418,6 @@ const steps: Step[] = [
                   <p className="text-gray-600 mt-1">Your professional resume is ready for download</p>
                 </div>
               </div>
-
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <button
                   onClick={() => setShowPreview(false)}
@@ -219,7 +432,6 @@ const steps: Step[] = [
                 >
                   <ArrowLeft className="w-5 h-5" />
                   <span className="block sm:inline">Back to Home</span>
-
                 </button>
               </div>
             </div>
@@ -259,12 +471,11 @@ const steps: Step[] = [
               <h2 className="text-2xl font-bold text-gray-900 mb-2">What's your experience level?</h2>
               <p className="text-gray-600">This helps us customize your resume format</p>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
                 { id: 'fresher', label: 'Fresher/New Graduate', desc: 'Just graduated or starting career', icon: <GraduationCap className="w-8 h-8" /> },
                 { id: 'student', label: 'Student', desc: 'Currently studying, seeking internships', icon: <User className="w-8 h-8" /> },
-                { id: 'experienced', label: 'Experienced Professional', desc: '1+ years of work experience', icon: <Briefcase className="w-8 h-8" /> }
+                { id: 'experienced', label: 'Experienced Professional', desc: '1+ years of work experience', icon: <Briefcase className="w-8 h-8" /> },
               ].map((option) => (
                 <button
                   key={option.id}
@@ -295,7 +506,6 @@ const steps: Step[] = [
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Contact Information</h2>
               <p className="text-gray-600">Tell us how employers can reach you</p>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -312,7 +522,6 @@ const steps: Step[] = [
                   />
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Email Address *
@@ -328,7 +537,6 @@ const steps: Step[] = [
                   />
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Phone Number
@@ -344,7 +552,6 @@ const steps: Step[] = [
                   />
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Location
@@ -360,7 +567,6 @@ const steps: Step[] = [
                   />
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   LinkedIn Profile
@@ -376,7 +582,6 @@ const steps: Step[] = [
                   />
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   GitHub Profile
@@ -403,7 +608,6 @@ const steps: Step[] = [
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Education Background</h2>
               <p className="text-gray-600">Add your educational qualifications</p>
             </div>
-
             {formData.education.map((edu, index) => (
               <div key={index} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
@@ -417,7 +621,6 @@ const steps: Step[] = [
                     </button>
                   )}
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Degree *</label>
@@ -429,7 +632,6 @@ const steps: Step[] = [
                       placeholder="e.g., Bachelor of Science in Computer Science"
                     />
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">School/University *</label>
                     <input
@@ -440,7 +642,6 @@ const steps: Step[] = [
                       placeholder="e.g., Stanford University"
                     />
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Year</label>
                     <input
@@ -451,7 +652,6 @@ const steps: Step[] = [
                       placeholder="e.g., 2020-2024"
                     />
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">CGPA/GPA</label>
                     <input
@@ -462,7 +662,6 @@ const steps: Step[] = [
                       placeholder="e.g., 3.8/4.0"
                     />
                   </div>
-
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
                     <input
@@ -476,7 +675,6 @@ const steps: Step[] = [
                 </div>
               </div>
             ))}
-
             <button
               onClick={() => addArrayItem('education', { degree: '', school: '', year: '', cgpa: '', location: '' })}
               className="w-full border-2 border-dashed border-gray-300 rounded-xl p-4 text-gray-600 hover:text-gray-800 hover:border-gray-400 transition-colors flex items-center justify-center"
@@ -494,7 +692,6 @@ const steps: Step[] = [
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Work Experience</h2>
               <p className="text-gray-600">Highlight your professional work history</p>
             </div>
-
             {formData.workExperience.map((experience, expIndex) => (
               <div key={expIndex} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
@@ -508,7 +705,6 @@ const steps: Step[] = [
                     </button>
                   )}
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
@@ -541,7 +737,6 @@ const steps: Step[] = [
                     />
                   </div>
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Responsibilities / Achievements (Bullet Points)</label>
                   {experience.bullets.map((bullet, bulletIndex) => (
@@ -582,7 +777,6 @@ const steps: Step[] = [
                 </div>
               </div>
             ))}
-
             <button
               onClick={() => addArrayItem('workExperience', { role: '', company: '', year: '', bullets: [''] })}
               className="w-full border-2 border-dashed border-gray-300 rounded-xl p-4 text-gray-600 hover:text-gray-800 hover:border-gray-400 transition-colors flex items-center justify-center"
@@ -600,7 +794,6 @@ const steps: Step[] = [
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Projects</h2>
               <p className="text-gray-600">Showcase your personal or academic projects</p>
             </div>
-
             {formData.projects.map((project, projIndex) => (
               <div key={projIndex} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
@@ -614,7 +807,6 @@ const steps: Step[] = [
                     </button>
                   )}
                 </div>
-
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Project Title *</label>
                   <input
@@ -625,7 +817,6 @@ const steps: Step[] = [
                     placeholder="e.g., E-commerce Platform"
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Project Details (Bullet Points)</label>
                   {project.bullets.map((bullet, bulletIndex) => (
@@ -666,7 +857,6 @@ const steps: Step[] = [
                 </div>
               </div>
             ))}
-
             <button
               onClick={() => addArrayItem('projects', { title: '', bullets: [''] })}
               className="w-full border-2 border-dashed border-gray-300 rounded-xl p-4 text-gray-600 hover:text-gray-800 hover:border-gray-400 transition-colors flex items-center justify-center"
@@ -684,7 +874,6 @@ const steps: Step[] = [
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Your Skills</h2>
               <p className="text-gray-600">List your technical, soft, and other relevant skills</p>
             </div>
-
             {Object.keys(formData.skills).map((category) => (
               <div key={category} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                 <h3 className="font-semibold text-gray-900 mb-4">{category}</h3>
@@ -727,7 +916,6 @@ const steps: Step[] = [
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Additional Sections</h2>
               <p className="text-gray-600">Include optional sections to enhance your resume</p>
             </div>
-
             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
               {/* Certifications Toggle */}
               <div className="flex items-center justify-between">
@@ -748,7 +936,6 @@ const steps: Step[] = [
                   className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
               </div>
-
               {formData.additionalSections.includeCertifications && (
                 <div className="space-y-2 pt-4 border-t border-gray-200">
                   <label className="block text-sm font-medium text-gray-700 mb-2">List your certifications (one per line)</label>
@@ -779,7 +966,6 @@ const steps: Step[] = [
                   </button>
                 </div>
               )}
-
               {/* Achievements Toggle */}
               <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                 <label htmlFor="includeAchievements" className="text-lg font-medium text-gray-900 flex items-center">
@@ -799,7 +985,6 @@ const steps: Step[] = [
                   className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
               </div>
-
               {formData.additionalSections.includeAchievements && (
                 <div className="space-y-2 pt-4 border-t border-gray-200">
                   <label className="block text-sm font-medium text-gray-700 mb-2">List your key achievements (one per line)</label>
@@ -857,9 +1042,7 @@ const steps: Step[] = [
               <ArrowLeft className="w-5 h-5" />
               <span className="hidden sm:block">Back to Home</span>
             </button>
-
             <h1 className="text-lg font-semibold text-gray-900">Resume Builder</h1>
-
             <div className="text-sm text-gray-500">
               Step {currentStep + 1} of {steps.length}
             </div>
@@ -931,7 +1114,6 @@ const steps: Step[] = [
               <ArrowLeft className="w-5 h-5" />
               <span>Previous</span>
             </button>
-
             <div className="text-center">
               <div className="text-sm text-gray-500 mb-1">Progress</div>
               <div className="w-48 bg-gray-200 rounded-full h-2">
@@ -941,7 +1123,6 @@ const steps: Step[] = [
                 />
               </div>
             </div>
-
             <button
               onClick={nextStep}
               disabled={!canProceedToNext() || isGenerating}
