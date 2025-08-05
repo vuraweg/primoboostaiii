@@ -56,13 +56,15 @@ interface UserProfileManagementProps {
   onClose: () => void;
   viewMode?: 'profile' | 'wallet';
   walletRefreshKey?: number;
+  setWalletRefreshKey?: React.Dispatch<React.SetStateAction<number>>; // Add setter prop
 }
 
 export const UserProfileManagement: React.FC<UserProfileManagementProps> = ({
   isOpen,
   onClose,
   viewMode = 'profile',
-  walletRefreshKey
+  walletRefreshKey,
+  setWalletRefreshKey // Destructure setter prop
 }) => {
   const { user, revalidateUserSession, markProfilePromptSeen } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
