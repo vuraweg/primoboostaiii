@@ -1,6 +1,7 @@
+// supabase/functions/verify-payment/index.ts
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { createHmac } from 'https://deno.land/std@0.168.0/node/crypto.ts'
+import { createClient } 'https://esm.sh/@supabase/supabase-js@2'
+import { createHmac } 'https://deno.land/std@0.168.0/node/crypto.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -160,7 +161,6 @@ serve(async (req) => {
     const discountAmount = orderData.notes.discountAmount || 0
     const walletDeduction = orderData.notes.walletDeduction || 0
     const selectedAddOns = JSON.parse(orderData.notes.selectedAddOns || '{}'); // ADD THIS LINE: Parse selectedAddOns
-    const selectedAddOns = JSON.parse(orderData.notes.selectedAddOns || '{}');
 
     console.log(`[${new Date().toISOString()}] - Attempting to update payment_transactions record with ID: ${transactionId}`);
     const { data: updatedTransaction, error: updateTransactionError } = await supabase
@@ -250,41 +250,6 @@ serve(async (req) => {
       }
     }
 
-    if (Object.keys(selectedAddOns).length > 0) {
-      console.log(`[${new Date().toISOString()}] - Processing add-on credits for user: ${user.id}`);
-      for (const addOnKey in selectedAddOns) {
-        const quantity = selectedAddOns[addOnKey];
-        if (quantity > 0) {
-          const { data: addonType, error: addonTypeError } = await supabase
-            .from('addon_types')
-            .select('id')
-            .eq('type_key', addOnKey)
-            .single();
-
-          if (addonTypeError || !addonType) {
-            console.error(`[${new Date().toISOString()}] - Error finding addon_type for key ${addOnKey}:`, addonTypeError);
-            continue;
-          }
-
-          const { error: creditInsertError } = await supabase
-            .from('user_addon_credits')
-            .insert({
-              user_id: user.id,
-              addon_type_id: addonType.id,
-              quantity_purchased: quantity,
-              quantity_remaining: quantity,
-              payment_transaction_id: transactionId,
-            });
-
-          if (creditInsertError) {
-            console.error(`[${new Date().toISOString()}] - Error inserting add-on credits for ${addOnKey}:`, creditInsertError);
-          } else {
-            console.log(`[${new Date().toISOString()}] - Granted ${quantity} credits for add-on: ${addOnKey}`);
-          }
-        }
-      }
-    }
-
     if (planId && planId !== 'addon_only_purchase') {
       const plan = plans.find(p => p.id === planId)
       if (!plan) {
@@ -331,17 +296,12 @@ serve(async (req) => {
     } else {
       // If it was an add-on only purchase, ensure subscriptionId is null
       subscriptionId = null;
-    } else {
-      subscriptionId = null;
     }
 
     // CRITICAL FIX: Properly record wallet deduction
     if (walletDeduction > 0) {
-      console.log('Attempting to record wallet deduction:', {
-        userId: user.id,
-        walletDeduction: walletDeduction,
-        negativeAmount: -(walletDeduction / 100)
-      });
+      console.log(`[${new Date().toISOString()}] - Attempting to record wallet deduction for user: ${user.id}`);
+      console.log(`[${new Date().toISOString()}] - Wallet deduction details: amount=${-(walletDeduction / 100)}, status='completed', transaction_ref=${razorpay_payment_id}`);
 
       const { error: walletError } = await supabase
         .from('wallet_transactions')
@@ -360,9 +320,9 @@ serve(async (req) => {
         })
 
       if (walletError) {
-        console.error('Wallet deduction recording error:', walletError);
+        console.error(`[${new Date().toISOString()}] - Wallet deduction recording error:`, walletError);
       } else {
-        console.log('Wallet deduction successfully recorded.');
+        console.log(`[${new Date().toISOString()}] - Wallet deduction successfully recorded.`);
       }
     }
 
