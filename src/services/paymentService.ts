@@ -137,7 +137,8 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
   {
     id: 'experience',
     title: 'Experience Level',
-    icon: (<User className="w-5 h-5" />),
+   icon: React.createElement(User, { className: 'w-5 h-5' }),
+
     description: 'Tell us about your professional background'
   },
   {
