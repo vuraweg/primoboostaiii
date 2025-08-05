@@ -225,7 +225,7 @@ serve(async (req) => {
         status: "success",
         order_id: razorpay_order_id,
         wallet_deduction_amount: walletDeduction / 100, // Correctly store in rupees
-        coupon_used: couponCode,
+        coupon_code: couponCode,
         discount_amount: discountAmount,
       })
       .eq("id", transactionId)
