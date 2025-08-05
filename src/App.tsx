@@ -45,6 +45,9 @@ function App() {
   // NEW: State to track if we're in the post-signup profile flow
   const [isPostSignupProfileFlow, setIsPostSignupProfileFlow] = useState(false);
 
+  // NEW: State for refreshing wallet balance in UserProfileManagement
+  const [walletRefreshKey, setWalletRefreshKey] = useState(0);
+
   const handleMobileMenuToggle = () => {
     setShowMobileMenu(!showMobileMenu);
   };
@@ -119,6 +122,7 @@ function App() {
       setSuccessMessage('');
     }, 3000);
     await fetchSubscription();
+    setWalletRefreshKey(prev => prev + 1); // Trigger wallet refresh
   };
 
   const fetchSubscription = async () => {
@@ -381,6 +385,8 @@ function App() {
         isOpen={showProfileManagement}
         onClose={() => setShowProfileManagement(false)}
         viewMode={profileViewMode}
+        walletRefreshKey={walletRefreshKey} // Pass walletRefreshKey
+        setWalletRefreshKey={setWalletRefreshKey} // Pass setWalletRefreshKey
       />
       {showSubscriptionPlans && (
         <SubscriptionPlans
