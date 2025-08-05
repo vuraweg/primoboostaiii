@@ -182,14 +182,13 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
   ];
 
   // Check subscription on mount and whenever the subscription state changes
-  useEffect(() => {
-    if (userSubscription) {
-      const remainingBuilds = userSubscription.guidedBuildsTotal - userSubscription.guidedBuildsUsed;
-      if (remainingBuilds <= 0) {
-        onShowSubscriptionPlans();
-      }
-    }
-  }, [userSubscription, onShowSubscriptionPlans]);
+// Inside src/components/GuidedResumeBuilder.tsx
+useEffect(() => {
+  if (!userSubscription || (userSubscription.guidedBuildsTotal - userSubscription.guidedBuildsUsed) <= 0) {
+    onShowSubscriptionPlans(); // This is likely the problematic call
+  }
+}, [userSubscription, onShowSubscriptionPlans]); // Or similar dependencies, or no dependencies
+
 
   const updateFormData = (section: keyof FormData, data: any) => {
     setFormData(prev => ({
