@@ -474,12 +474,13 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
                 {plan.popular && (
                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
   <span
-    className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-2 lg:px-4 py-1 lg:py-2 rounded-full text-xs lg:text-sm font-bold shadow-lg"
-    style={{ fontSize: '8px' }}
+    className="inline-flex items-center bg-gradient-to-r from-green-500 to-emerald-500 text-white px-2 lg:px-4 py-1 lg:py-2 rounded-full text-xs lg:text-sm font-bold shadow-lg"
+    style={{ fontSize: '10px', lineHeight: '1rem' }}
   >
-    🏆 Most Popular
+    <span className="mr-1 text-sm">🏆</span> Most Popular
   </span>
 </div>
+
 
                 )}
                 <div className="p-3 lg:p-6">
