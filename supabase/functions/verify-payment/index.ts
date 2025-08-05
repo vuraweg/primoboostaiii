@@ -12,7 +12,7 @@ interface PaymentVerificationRequest {
   razorpay_order_id: string
   razorpay_payment_id: string
   razorpay_signature: string
-  transactionId: string // ADDED: transactionId to request
+  transactionId: string
 }
 
 interface PlanConfig {
@@ -33,9 +33,9 @@ const plans: PlanConfig[] = [
     name: 'Career Pro Max',
     price: 1999,
     duration: 'One-time Purchase',
-    optimizations: 50, // Updated
+    optimizations: 50,
     scoreChecks: 50,
-    linkedinMessages: Infinity, // Updated
+    linkedinMessages: Infinity,
     guidedBuilds: 5,
     durationInHours: 24 * 365 * 10
   },
@@ -44,9 +44,9 @@ const plans: PlanConfig[] = [
     name: 'Career Boost+',
     price: 1499,
     duration: 'One-time Purchase',
-    optimizations: 30, // Updated
+    optimizations: 30,
     scoreChecks: 30,
-    linkedinMessages: Infinity, // Updated
+    linkedinMessages: Infinity,
     guidedBuilds: 3,
     durationInHours: 24 * 365 * 10
   },
@@ -55,7 +55,7 @@ const plans: PlanConfig[] = [
     name: 'Pro Resume Kit',
     price: 999,
     duration: 'One-time Purchase',
-    optimizations: 20, // Updated
+    optimizations: 20,
     scoreChecks: 20,
     linkedinMessages: 100,
     guidedBuilds: 2,
@@ -88,7 +88,7 @@ const plans: PlanConfig[] = [
     name: 'Lite Check',
     price: 99,
     duration: 'One-time Purchase',
-    optimizations: 2, // Updated
+    optimizations: 2,
     scoreChecks: 2,
     linkedinMessages: 10,
     guidedBuilds: 0,
@@ -101,17 +101,16 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  let transactionStatus = 'failed'; // Default status if anything goes wrong
-  let subscriptionId: string | null = null;
-  let transactionIdFromRequest: string | null = null; // Capture transactionId early
+  let transactionStatus = 'failed'
+  let subscriptionId: string | null = null
+  let transactionIdFromRequest: string | null = null
 
   try {
-    const requestBody: PaymentVerificationRequest = await req.json();
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, transactionId } = requestBody;
-    transactionIdFromRequest = transactionId;
-    console.log(`[${new Date().toISOString()}] - verify-payment received. transactionId: ${transactionIdFromRequest}`);
+    const requestBody: PaymentVerificationRequest = await req.json()
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, transactionId } = requestBody
+    transactionIdFromRequest = transactionId
+    console.log(`[${new Date().toISOString()}] - verify-payment received. transactionId: ${transactionIdFromRequest}`)
 
-    // Get user from auth header
     const authHeader = req.headers.get('authorization')
     if (!authHeader) {
       throw new Error('No authorization header')
@@ -128,7 +127,6 @@ serve(async (req) => {
       throw new Error('Invalid user token')
     }
 
-    // Verify payment signature
     const razorpayKeySecret = Deno.env.get('RAZORPAY_KEY_SECRET')
     if (!razorpayKeySecret) {
       throw new Error('Razorpay secret not configured')
@@ -143,7 +141,6 @@ serve(async (req) => {
       throw new Error('Invalid payment signature')
     }
 
-    // Get order details from Razorpay
     const razorpayKeyId = Deno.env.get('RAZORPAY_KEY_ID')
     const auth = btoa(`${razorpayKeyId}:${razorpayKeySecret}`)
     
@@ -161,85 +158,114 @@ serve(async (req) => {
     const planId = orderData.notes.planId
     const couponCode = orderData.notes.couponCode
     const discountAmount = orderData.notes.discountAmount || 0
-    const walletDeduction = orderData.notes.walletDeduction || 0 // This comes as an integer representing paise
+    const walletDeduction = orderData.notes.walletDeduction || 0
+    const selectedAddOns = JSON.parse(orderData.notes.selectedAddOns || '{}');
 
-    // Get plan configuration
-    const plan = plans.find(p => p.id === planId)
-    if (!plan) {
-      throw new Error('Invalid plan')
-    }
-
-    // --- NEW: Update the existing pending payment_transactions record ---
-    // This update now correctly targets the record created by the create-order function
-    console.log(`[${new Date().toISOString()}] - Attempting to update payment_transactions record with ID: ${transactionId}`); // ADDED LOG
+    console.log(`[${new Date().toISOString()}] - Attempting to update payment_transactions record with ID: ${transactionId}`);
     const { data: updatedTransaction, error: updateTransactionError } = await supabase
       .from('payment_transactions')
       .update({
         payment_id: razorpay_payment_id,
-        status: 'success', // Mark as success
-        order_id: razorpay_order_id, // Ensure order_id is set
-        // The amount, currency, coupon_code, discount_amount, final_amount are already set
-        // during the initial insert in create-order, but we can re-confirm/update if needed.
-        // For now, we rely on the initial insert for these values.
+        status: 'success',
+        order_id: razorpay_order_id,
       })
-      .eq('id', transactionId) // Identify the record by the passed transactionId
-      .select()
-      .single();
-
-    if (updateTransactionError) {
-      console.error('Error updating payment transaction to success:', updateTransactionError);
-      throw new Error('Failed to update payment transaction status.');
-    }
-    console.log(`[${new Date().toISOString()}] - Payment transaction updated to success. Record ID: ${updatedTransaction.id}, coupon_code: ${updatedTransaction.coupon_code}`); // ADDED LOG
-    transactionStatus = 'success'; // Set status for final response
-
-    // Create subscription
-    const { data: subscription, error: subscriptionError } = await supabase
-      .from('subscriptions')
-      .insert({
-        user_id: user.id,
-        plan_id: planId,
-        status: 'active',
-        start_date: new Date().toISOString(),
-        end_date: new Date(new Date().getTime() + (plan.durationInHours * 60 * 60 * 1000)).toISOString(),
-        optimizations_used: 0,
-        optimizations_total: plan.optimizations,
-        score_checks_used: 0,
-        score_checks_total: plan.scoreChecks, // Use plan.scoreChecks
-        linkedin_messages_used: 0,
-        linkedin_messages_total: plan.linkedinMessages, // Use plan.linkedinMessages
-        guided_builds_used: 0,
-        guided_builds_total: plan.guidedBuilds, // Use plan.guidedBuilds
-        payment_id: razorpay_payment_id,
-        coupon_used: couponCode
-      })
+      .eq('id', transactionId)
       .select()
       .single()
 
-    if (subscriptionError) {
-      console.error('Subscription creation error:', subscriptionError)
-      throw new Error('Failed to create subscription')
+    if (updateTransactionError) {
+      console.error('Error updating payment transaction to success:', updateTransactionError)
+      throw new Error('Failed to update payment transaction status.')
     }
-    subscriptionId = subscription.id; // Capture subscription ID
+    console.log(`[${new Date().toISOString()}] - Payment transaction updated to success. Record ID: ${updatedTransaction.id}, coupon_code: ${updatedTransaction.coupon_code}`);
+    transactionStatus = 'success'
+    
+    if (Object.keys(selectedAddOns).length > 0) {
+      console.log(`[${new Date().toISOString()}] - Processing add-on credits for user: ${user.id}`);
+      for (const addOnKey in selectedAddOns) {
+        const quantity = selectedAddOns[addOnKey];
+        if (quantity > 0) {
+          const { data: addonType, error: addonTypeError } = await supabase
+            .from('addon_types')
+            .select('id')
+            .eq('type_key', addOnKey)
+            .single();
 
-    // Update the payment transaction with the subscription_id
-    const { error: updateSubscriptionIdError } = await supabase
-      .from('payment_transactions')
-      .update({ subscription_id: subscription.id })
-      .eq('id', transactionId);
+          if (addonTypeError || !addonType) {
+            console.error(`[${new Date().toISOString()}] - Error finding addon_type for key ${addOnKey}:`, addonTypeError);
+            continue;
+          }
 
-    if (updateSubscriptionIdError) {
-      console.error('Error updating payment transaction with subscription_id:', updateSubscriptionIdError);
-      // Non-critical error, payment is already successful
+          const { error: creditInsertError } = await supabase
+            .from('user_addon_credits')
+            .insert({
+              user_id: user.id,
+              addon_type_id: addonType.id,
+              quantity_purchased: quantity,
+              quantity_remaining: quantity,
+              payment_transaction_id: transactionId,
+            });
+
+          if (creditInsertError) {
+            console.error(`[${new Date().toISOString()}] - Error inserting add-on credits for ${addOnKey}:`, creditInsertError);
+          } else {
+            console.log(`[${new Date().toISOString()}] - Granted ${quantity} credits for add-on: ${addOnKey}`);
+          }
+        }
+      }
     }
 
-    // Record wallet usage if applicable
+    if (planId && planId !== 'addon_only_purchase') {
+      const plan = plans.find(p => p.id === planId)
+      if (!plan) {
+        throw new Error('Invalid plan')
+      }
+
+      const { data: subscription, error: subscriptionError } = await supabase
+        .from('subscriptions')
+        .insert({
+          user_id: user.id,
+          plan_id: planId,
+          status: 'active',
+          start_date: new Date().toISOString(),
+          end_date: new Date(new Date().getTime() + (plan.durationInHours * 60 * 60 * 1000)).toISOString(),
+          optimizations_used: 0,
+          optimizations_total: plan.optimizations,
+          score_checks_used: 0,
+          score_checks_total: plan.scoreChecks,
+          linkedin_messages_used: 0,
+          linkedin_messages_total: plan.linkedinMessages,
+          guided_builds_used: 0,
+          guided_builds_total: plan.guidedBuilds,
+          payment_id: razorpay_payment_id,
+          coupon_used: couponCode
+        })
+        .select()
+        .single()
+
+      if (subscriptionError) {
+        console.error('Subscription creation error:', subscriptionError)
+        throw new Error('Failed to create subscription')
+      }
+      subscriptionId = subscription.id
+
+      const { error: updateSubscriptionIdError } = await supabase
+        .from('payment_transactions')
+        .update({ subscription_id: subscription.id })
+        .eq('id', transactionId)
+
+      if (updateSubscriptionIdError) {
+        console.error('Error updating payment transaction with subscription_id:', updateSubscriptionIdError);
+      }
+    } else {
+      subscriptionId = null;
+    }
+
     if (walletDeduction > 0) {
-      // NEW LOG: Confirm walletDeduction value before insertion
       console.log('Attempting to record wallet deduction:', {
         userId: user.id,
-        walletDeduction: walletDeduction, // This is in paise
-        negativeAmount: -(walletDeduction / 100) // Convert to rupees for better readability in log
+        walletDeduction: walletDeduction,
+        negativeAmount: -(walletDeduction / 100)
       });
 
       const { error: walletError } = await supabase
@@ -247,29 +273,25 @@ serve(async (req) => {
         .insert({
           user_id: user.id,
           type: 'purchase_use',
-          amount: -(walletDeduction / 100), // Convert paise to rupees (as your UI expects rupees for balance)
+          amount: -(walletDeduction / 100),
           status: 'completed',
           transaction_ref: razorpay_payment_id,
           activity_details: {
-            subscription_id: subscription.id,
+            subscription_id: subscriptionId,
             plan_id: planId,
-            // original_amount in paise from orderData + walletDeduction in paise
             original_amount: (orderData.amount / 100) + (walletDeduction / 100)
           }
         })
-        .throwOnError(); // NEW: Explicitly throw on error for logging
+        .throwOnError();
 
       if (walletError) {
         console.error('Wallet deduction recording error (after throwOnError):', walletError);
-        // The .throwOnError() should handle this, but keeping for explicit catch context
       } else {
         console.log('Wallet deduction successfully recorded.');
       }
     }
 
-    // Handle referral commission (10% of original plan price)
     try {
-      // Get user profile to check if they were referred
       const { data: userProfile, error: profileError } = await supabase
         .from('user_profiles')
         .select('referred_by')
@@ -277,7 +299,6 @@ serve(async (req) => {
         .single()
 
       if (!profileError && userProfile?.referred_by) {
-        // Find the referrer's profile using the referral code
         const { data: referrerProfile, error: referrerError } = await supabase
           .from('user_profiles')
           .select('id')
@@ -285,18 +306,15 @@ serve(async (req) => {
           .single()
 
         if (!referrerError && referrerProfile) {
-          // Calculate 10% commission on original plan price
-          // Ensure plan.price is in rupees, commission should also be in rupees
-          const commissionAmount = Math.floor(plan.price * 0.1) // This seems to be in rupees already
+          const commissionAmount = Math.floor(plan.price * 0.1)
 
-          // Add commission to referrer's wallet
           const { error: commissionError } = await supabase
             .from('wallet_transactions')
             .insert({
               user_id: referrerProfile.id,
               source_user_id: user.id,
               type: 'referral',
-              amount: commissionAmount, // Assuming this is already in rupees
+              amount: commissionAmount,
               status: 'completed',
               transaction_ref: `referral_${razorpay_payment_id}`,
               activity_details: {
@@ -306,7 +324,7 @@ serve(async (req) => {
                 commission_rate: 0.1
               }
             })
-            .throwOnError(); // NEW: Explicitly throw on error for logging
+            .throwOnError();
 
           if (commissionError) {
             console.error('Referral commission error (after throwOnError):', commissionError);
@@ -317,14 +335,13 @@ serve(async (req) => {
       }
     } catch (referralError) {
       console.error('Referral processing error:', referralError);
-      // Don't fail the payment if referral processing fails
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        subscriptionId: subscription.id,
-        message: 'Payment verified and subscription created successfully'
+        subscriptionId: subscriptionId,
+        message: 'Payment verified and credits granted successfully'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -334,11 +351,9 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Payment verification error:', error)
-    // If an error occurs during verification, update the pending transaction to 'failed'
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    // Use the captured transactionIdFromRequest
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
     if (transactionIdFromRequest) {
       await supabase.from('payment_transactions')
         .update({ status: 'failed' })
@@ -357,4 +372,3 @@ serve(async (req) => {
     )
   }
 })
-
