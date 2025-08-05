@@ -16,6 +16,7 @@ class PaymentService {
   private readonly COUPON_FIRST100_CODE = 'first100';
   private readonly COUPON_WORTHYONE_CODE = 'worthyone';
   private readonly COUPON_FULL_SUPPORT_CODE = 'fullsupport'; // NEW: Full Support Coupon
+  private readonly COUPON_FIRST500_CODE = 'first500'; // NEW: First 500 Coupon
 
   // Updated subscription plans - New structure
   private readonly plans: SubscriptionPlan[] = [
@@ -281,6 +282,16 @@ class PaymentService {
         finalAmount: 0,
         discountAmount: plan.price,
         couponApplied: this.COUPON_FIRST100_CODE
+      };
+    }
+
+    // first500 coupon - 98% off lite_check plan only (NEW LOGIC)
+    if (normalizedCoupon === this.COUPON_FIRST500_CODE && planId === 'lite_check') {
+      const discountAmount = Math.floor(plan.price * 0.98); // 98% off
+      return {
+        finalAmount: plan.price - discountAmount, // Should be 1 Rupee (99 - 98)
+        discountAmount: discountAmount,
+        couponApplied: this.COUPON_FIRST500_CODE
       };
     }
 
