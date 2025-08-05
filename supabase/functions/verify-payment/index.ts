@@ -103,9 +103,12 @@ serve(async (req) => {
 
   let transactionStatus = 'failed'; // Default status if anything goes wrong
   let subscriptionId: string | null = null;
+  let transactionIdFromRequest: string | null = null; // Capture transactionId early
 
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, transactionId }: PaymentVerificationRequest = await req.json()
+    const requestBody: PaymentVerificationRequest = await req.json();
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, transactionId } = requestBody;
+    transactionIdFromRequest = transactionId; // Store it
 
     // Get user from auth header
     const authHeader = req.headers.get('authorization')
@@ -166,17 +169,16 @@ serve(async (req) => {
     }
 
     // --- NEW: Update the existing pending payment_transactions record ---
+    // This update now correctly targets the record created by the create-order function
     const { data: updatedTransaction, error: updateTransactionError } = await supabase
       .from('payment_transactions')
       .update({
         payment_id: razorpay_payment_id,
         status: 'success', // Mark as success
         order_id: razorpay_order_id, // Ensure order_id is set
-        amount: orderData.amount, // Update with final amount from Razorpay
-        currency: orderData.currency, // Update currency
-        coupon_code: couponCode, // Ensure coupon code is set
-        discount_amount: discountAmount, // Ensure discount is set
-        final_amount: orderData.amount // Ensure final amount is set
+        // The amount, currency, coupon_code, discount_amount, final_amount are already set
+        // during the initial insert in create-order, but we can re-confirm/update if needed.
+        // For now, we rely on the initial insert for these values.
       })
       .eq('id', transactionId) // Identify the record by the passed transactionId
       .select()
@@ -233,7 +235,7 @@ serve(async (req) => {
       // NEW LOG: Confirm walletDeduction value before insertion
       console.log('Attempting to record wallet deduction:', {
         userId: user.id,
-        walletDeduction: walletDeduction, // This is still in paise
+        walletDeduction: walletDeduction, // This is in paise
         negativeAmount: -(walletDeduction / 100) // Convert to rupees for better readability in log
       });
 
@@ -333,12 +335,11 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const { transactionId } = await req.json(); // Re-parse to get transactionId
-
-    if (transactionId) {
+    // Use the captured transactionIdFromRequest
+    if (transactionIdFromRequest) {
       await supabase.from('payment_transactions')
         .update({ status: 'failed' })
-        .eq('id', transactionId);
+        .eq('id', transactionIdFromRequest);
     }
 
     return new Response(
