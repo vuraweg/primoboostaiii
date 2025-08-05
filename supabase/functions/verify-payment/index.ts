@@ -248,6 +248,7 @@ serve(async (req) => {
           })
           .eq('id', existingSubscription.id);
       }
+    }
 
     if (Object.keys(selectedAddOns).length > 0) {
       console.log(`[${new Date().toISOString()}] - Processing add-on credits for user: ${user.id}`);
