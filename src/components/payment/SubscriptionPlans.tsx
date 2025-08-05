@@ -56,7 +56,8 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
   onShowAlert, // ADDED: Destructure onShowAlert
 }) => {
   const { user } = useAuth();
-  const [selectedPlan, setSelectedPlan] = useState<string>('pro_pack');
+  // MODIFIED: Change initial state to 'career_boost_plus'
+  const [selectedPlan, setSelectedPlan] = useState<string>('career_boost_plus');
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(2);
   const [couponCode, setCouponCode] = useState('');
@@ -72,7 +73,6 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
   const plans: SubscriptionPlan[] = paymentService.getPlans();
   const addOns: AddOn[] = paymentService.getAddOns();
 
-  // MOVE THIS BLOCK UP HERE
   const allPlansWithAddOnOption = [
     {
       id: 'addon_only_purchase',
@@ -97,13 +97,9 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
     },
     ...plans
   ];
-  // END OF MOVED BLOCK
 
-  useEffect(() => {
-    if (allPlansWithAddOnOption.length > 0) {
-      setSelectedPlan(allPlansWithAddOnOption[currentSlide]?.id || allPlansWithAddOnOption[0].id);
-    }
-  }, [currentSlide, allPlansWithAddOnOption]);
+  // REMOVED: The useEffect block that sets selectedPlan based on currentSlide.
+  // This was causing the selected plan to be overwritten by the carousel's state.
 
   useEffect(() => {
     if (user && isOpen) {
