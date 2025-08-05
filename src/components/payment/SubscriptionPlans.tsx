@@ -1,1132 +1,742 @@
-// src/services/paymentService.ts
-import { SubscriptionPlan, PaymentData, RazorpayOptions, RazorpayResponse, Subscription } from '../types/payment';
-import { supabase } from '../lib/supabaseClient';
+// src/components/payment/SubscriptionPlans.tsx
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  Check,
+  Star,
+  Zap,
+  Crown,
+  Clock,
+  X, // Ensure X is imported
+  Tag,
+  Sparkles,
+  ArrowRight,
+  Info,
+  ChevronLeft,
+  ChevronRight,
+  Timer,
+  Target,
+  Rocket,
+  Briefcase,
+  Infinity,
+  CheckCircle,
+  AlertCircle,
+  Wrench,
+  Gift,
+  Plus,
+} from 'lucide-react';
+import { SubscriptionPlan } from '../../types/payment';
+import { paymentService } from '../../services/paymentService';
+import { supabase } from '../../lib/supabaseClient';
+import { useAuth } from '../../contexts/AuthContext';
 
-declare global {
-  interface Window {
-    Razorpay: any; // Declare Razorpay to be available on the window object
-  }
+interface SubscriptionPlansProps {
+  isOpen: boolean;
+  onNavigateBack: () => void;
+  onSubscriptionSuccess: () => void;
+  // ADDED: onShowAlert prop
+  onShowAlert: (title: string, message: string, type?: 'info' | 'success' | 'warning' | 'error', actionText?: string, onAction?: () => void) => void;
 }
 
-class PaymentService {
-  // Get Razorpay key from environment variables
-  private readonly RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID; // Removed hardcoded fallback
-  
-  // Coupon codes
-  private readonly COUPON_FIRST100_CODE = 'first100';
-  private readonly COUPON_WORTHYONE_CODE = 'worthyone';
-  private readonly COUPON_FULL_SUPPORT_CODE = 'fullsupport'; // NEW: Full Support Coupon
-  private readonly COUPON_FIRST500_CODE = 'first500'; // NEW: First 500 Coupon
+type AddOn = {
+  id: string;
+  name: string;
+  price: number;
+};
 
-  // Updated subscription plans - New structure
-  private readonly plans: SubscriptionPlan[] = [
+type AppliedCoupon = {
+  code: string;
+  discount: number; // In paise
+  finalAmount: number; // In paise
+};
+
+export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
+  isOpen,
+  onNavigateBack,
+  onSubscriptionSuccess,
+  onShowAlert, // ADDED: Destructure onShowAlert
+}) => {
+  const { user } = useAuth();
+  // MODIFIED: Change initial state to 'career_boost_plus'
+  const [selectedPlan, setSelectedPlan] = useState<string>('career_boost_plus');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(2);
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
+  const [couponError, setCouponError] = useState('');
+  const [walletBalance, setWalletBalance] = useState<number>(0); // Stored in paise
+  const [useWalletBalance, setUseWalletBalance] = useState<boolean>(false);
+  const [loadingWallet, setLoadingWallet] = useState<boolean>(true);
+  const [showAddOns, setShowAddOns] = useState<boolean>(false);
+  const [selectedAddOns, setSelectedAddOns] = useState<{ [key: string]: number }>({});
+  const carouselRef = useRef<HTMLDivElement>(null);
+
+  const plans: SubscriptionPlan[] = paymentService.getPlans();
+  const addOns: AddOn[] = paymentService.getAddOns();
+
+  const allPlansWithAddOnOption = [
     {
-      id: 'career_pro_max',
-      name: '💎 Career Pro Max',
-      price: 1999,
+      id: 'addon_only_purchase',
+      name: '🛒 Add-ons Only',
+      price: 0,
       duration: 'One-time Purchase',
-      optimizations: 50, // Updated from 30
-      scoreChecks: 50,
-      linkedinMessages: 999999999, // Unlimited
-      guidedBuilds: 5,
-      tag: 'Serious job seekers & job switchers',
-      tagColor: 'text-purple-800 bg-purple-100',
-      gradient: 'from-purple-500 to-indigo-500',
-      icon: 'crown',
-      features: [
-        '✅ 3 Months LinkedIn Premium',
-        '✅ 50 JD-Based Optimizations',
-        '✅ 5 Guided Resume Builds',
-        '✅ 50 Resume Score Checks',
-        '✅ Unlimited LinkedIn Messages (1 Month)',
-        '✅ 1 Resume Guidance Session (Live)',
-        '✅ Job Application Tutorial Video'
-      ],
-      popular: true
-    },
-    {
-      id: 'career_boost_plus',
-      name: '⭐ Career Boost+',
-      price: 1499,
-      duration: 'One-time Purchase',
-      optimizations: 30, // Updated
-      scoreChecks: 30,
-      linkedinMessages: 999999999, // Updated
-      guidedBuilds: 3,
-      tag: 'Active job seekers',
-      tagColor: 'text-blue-800 bg-blue-100',
-      gradient: 'from-blue-500 to-cyan-500',
-      icon: 'zap',
-      features: [
-        '✅ 30 JD-Based Optimizations',
-        '✅ 3 Guided Resume Builds',
-        '✅ 30 Resume Score Checks',
-        '✅ Unlimited LinkedIn Messages (1 Month)',
-        '✅ 1 Resume Guidance Session (Live)'
-      ]
-    },
-    {
-      id: 'pro_resume_kit',
-      name: '🔥 Pro Resume Kit',
-      price: 999,
-      duration: 'One-time Purchase',
-      optimizations: 20, // Updated
-      scoreChecks: 20,
-      linkedinMessages: 100,
-      guidedBuilds: 2,
-      tag: 'Freshers & intern seekers',
-      tagColor: 'text-orange-800 bg-orange-100',
-      gradient: 'from-orange-500 to-red-500',
-      icon: 'rocket',
-      features: [
-        '✅ 20 JD-Based Optimizations',
-        '✅ 2 Guided Resume Builds',
-        '✅ 20 Resume Score Checks',
-        '✅ 100 LinkedIn Messages'
-      ]
-    },
-    {
-      id: 'smart_apply_pack',
-      name: '⚡ Smart Apply Pack',
-      price: 499,
-      duration: 'One-time Purchase',
-      optimizations: 10,
-      scoreChecks: 10,
-      linkedinMessages: 50,
-      guidedBuilds: 1,
-      tag: 'Targeted resume improvement',
-      tagColor: 'text-green-800 bg-green-100',
-      gradient: 'from-green-500 to-emerald-500',
-      icon: 'target',
-      features: [
-        '✅ 10 JD-Based Optimizations',
-        '✅ 2 Guided Resume Build',
-        '✅ 10 Resume Score Checks',
-        '✅ 50 LinkedIn Messages'
-      ]
-    },
-    {
-      id: 'resume_fix_pack',
-      name: '🛠 Resume Fix Pack',
-      price: 199,
-      duration: 'One-time Purchase',
-      optimizations: 5,
-      scoreChecks: 2,
+      optimizations: 0,
+      scoreChecks: 0,
       linkedinMessages: 0,
       guidedBuilds: 0,
-      tag: 'Quick fixes for job applications',
+      tag: 'Buy individual features',
       tagColor: 'text-gray-800 bg-gray-100',
       gradient: 'from-gray-500 to-gray-700',
-      icon: 'wrench',
+      icon: 'gift',
       features: [
-        '✅ 5 JD-Based Optimizations',
-        '✅ 2 Resume Score Checks',
-        '✅ 1 Guided Resume Build'
-      ]
+        '✅ Purchase only what you need',
+        '✅ No monthly commitment',
+        '✅ Credits never expire',
+        '✅ Mix and match features'
+      ],
+      popular: false
     },
-    {
-      id: 'lite_check',
-      name: '🎯 Lite Check',
-      price: 99,
-      duration: 'One-time Purchase',
-      optimizations: 2, // Updated
-      scoreChecks: 2,
-      linkedinMessages: 10,
-      guidedBuilds: 0,
-      tag: 'First-time premium users',
-      tagColor: 'text-teal-800 bg-teal-100',
-      gradient: 'from-teal-500 to-blue-500',
-      icon: 'check_circle',
-      features: [
-        '✅ 2 JD-Based Optimizations',
-        '✅ 2 Resume Score Checks',
-        '✅ 10 LinkedIn Messages'
-      ]
-    }
+    ...plans
   ];
 
-  // Add-on products for individual purchases
-  private readonly addOns = [
-    {
-      id: 'jd_optimization_single',
-      name: 'JD-Based Optimization (1x)',
-      price: 49,
-      type: 'optimization',
-      quantity: 1
-    },
-    {
-      id: 'guided_resume_build_single',
-      name: 'Guided Resume Build (1x)',
-      price: 99,
-      type: 'guided_build',
-      quantity: 1
-    },
-    {
-      id: 'resume_score_check_single',
-      name: 'Resume Score Check (1x)',
-      price: 19,
-      type: 'score_check',
-      quantity: 1
-    },
-    {
-      id: 'linkedin_messages_50',
-      name: 'LinkedIn Messages (50x)',
-      price: 29,
-      type: 'linkedin_messages',
-      quantity: 50
-    },
-    {
-      id: 'linkedin_optimization_single',
-      name: 'LinkedIn Optimization (1x Review)',
-      price: 199,
-      type: 'linkedin_optimization',
-      quantity: 1
-    },
-    {
-      id: 'resume_guidance_session',
-      name: 'Resume Guidance Session (Live)',
-      price: 299,
-      type: 'guidance_session',
-      quantity: 1
+  // REMOVED: The useEffect block that sets selectedPlan based on currentSlide.
+  // This was causing the selected plan to be overwritten by the carousel's state.
+
+  useEffect(() => {
+    if (user && isOpen) {
+      fetchWalletBalance();
     }
-  ];
+  }, [user, isOpen]);
 
-  // Get all add-ons
-  getAddOns() {
-    return this.addOns;
+  const fetchWalletBalance = async () => {
+    if (!user) return;
+    setLoadingWallet(true);
+    try {
+      const { data: transactions, error } = await supabase
+        .from('wallet_transactions')
+        .select('amount, status')
+        .eq('user_id', user.id);
+      if (error) {
+        console.error('Error fetching wallet balance:', error);
+        return;
+      }
+      const completed = (transactions || []).filter((t: any) => t.status === 'completed');
+      // Wallet balance is stored in Rupees in DB, convert to paise for internal use
+      const balance = completed.reduce((sum: number, tr: any) => sum + parseFloat(tr.amount), 0) * 100;
+      setWalletBalance(Math.max(0, balance));
+    } catch (err) {
+      console.error('Error fetching wallet data:', err);
+    } finally {
+      setLoadingWallet(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  const getPlanIcon = (iconType: string) => {
+    switch (iconType) {
+      case 'crown':
+        return <Crown className="w-5 h-5 sm:w-6 sm:h-6" />;
+      case 'zap':
+        return <Zap className="w-5 h-5 sm:w-6 sm:h-6" />;
+      case 'rocket':
+        return <Rocket className="w-5 h-5 sm:w-6 sm:h-6" />;
+      case 'target':
+        return <Target className="w-5 h-5 sm:w-6 sm:h-6" />;
+      case 'wrench':
+        return <Wrench className="w-5 h-5 sm:w-6 sm:h-6" />;
+      case 'check_circle':
+        return <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6" />;
+      case 'gift':
+        return <Gift className="w-5 h-5 sm:w-6 sm:h-6" />;
+      case 'briefcase':
+        return <Briefcase className="w-5 h-5 sm:w-6 sm:h-6" />;
+      case 'infinity':
+        return <Infinity className="w-5 h-5 sm:w-6 sm:h-6" />;
+      default:
+        return <Star className="w-5 h-5 sm:w-6 sm:h-6" />;
+    }
+  };
+
+  const nextSlide = () => {
+    setCurrentSlide((prev) => (prev + 1) % allPlansWithAddOnOption.length);
+  };
+
+  const prevSlide = () => {
+    setCurrentSlide((prev) => (prev - 1 + allPlansWithAddOnOption.length) % allPlansWithAddOnOption.length);
+  };
+
+  const goToSlide = (index: number) => {
+    // This function is currently empty, it should be implemented if you want to jump to a specific slide
+    // For now, it's not used by the current carousel navigation.
+    // If you intend to use it, you would set setCurrentSlide(index);
+  };
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      setCouponError('Please enter a coupon code');
+      return;
+    }
+    // paymentService.applyCoupon returns amounts in paise
+    const result = await paymentService.applyCoupon(selectedPlan, couponCode.trim(), user?.id || null);
+    if (result.couponApplied) {
+      setAppliedCoupon({
+        code: result.couponApplied,
+        discount: result.discountAmount,
+        finalAmount: result.finalAmount,
+      });
+      setCouponError('');
+      // ADDED: Show success alert for coupon application
+      onShowAlert('Coupon Applied!', `Coupon "${result.couponApplied}" applied successfully. You saved ₹${(result.discount / 100).toFixed(2)}!`, 'success');
+    } else {
+      setCouponError(result.error || 'Invalid coupon code or not applicable to selected plan');
+      setAppliedCoupon(null);
+      // ADDED: Show error alert for coupon application failure
+      onShowAlert('Coupon Error', result.error || 'Invalid coupon code or not applicable to selected plan', 'warning');
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode('');
+    setCouponError('');
+  };
+
+  const selectedPlanData = allPlansWithAddOnOption.find((p) => p.id === selectedPlan);
+
+  // Calculate add-ons total in paise
+  const addOnsTotal = Object.entries(selectedAddOns).reduce((total, [addOnId, qty]) => {
+    const addOn = paymentService.getAddOnById(addOnId);
+    return total + (addOn ? addOn.price * 100 * qty : 0); // Multiply addOn.price by 100
+  }, 0);
+
+  // Plan price in paise
+  let planPrice = (selectedPlanData?.price || 0) * 100; // Convert plan price to paise
+  if (appliedCoupon) {
+    planPrice = appliedCoupon.finalAmount; // appliedCoupon.finalAmount is already in paise
   }
 
-  // Get add-on by ID
-  getAddOnById(addOnId: string) {
-    return this.addOns.find(addon => addon.id === addOnId) || null;
-  }
+  // Wallet deduction in paise
+  const walletDeduction = useWalletBalance ? Math.min(walletBalance, planPrice) : 0; // walletBalance is in paise
 
-  // Load Razorpay script
-  private loadRazorpayScript(): Promise<boolean> {
-    return new Promise((resolve) => {
-      if (window.Razorpay) {
-        resolve(true);
+  // Final plan price after wallet deduction, in paise
+  const finalPlanPrice = Math.max(0, planPrice - walletDeduction);
+
+  // Grand total in paise
+  const grandTotal = finalPlanPrice + addOnsTotal;
+
+  const handlePayment = async () => {
+    if (!user || !selectedPlanData) return;
+    setIsProcessing(true);
+    try {
+      // Retrieve the session and access token
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      console.log('SubscriptionPlans: session object after getSession:', session);
+      console.log('SubscriptionPlans: session.access_token after getSession:', session?.access_token);
+
+      if (sessionError || !session || !session.access_token) {
+        console.error('SubscriptionPlans: No active session found for payment:', sessionError);
+        // Optionally, show an error message to the user or redirect to login
+        onShowAlert('Authentication Required', 'Please log in to complete your purchase.', 'error', 'Sign In', () => {}); // Use onShowAlert
+        setIsProcessing(false);
         return;
       }
 
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
-      document.body.appendChild(script);
-    });
-  }
+      const accessToken = session.access_token;
 
-  // Get all subscription plans
-  getPlans(): SubscriptionPlan[] {
-    return this.plans;
-  }
+      console.log('SubscriptionPlans: Value of accessToken before calling processPayment:', accessToken);
 
-  // Get plan by ID
-  getPlanById(planId: string): SubscriptionPlan | null {
-    return this.plans.find(plan => plan.id === planId) || null;
-  }
-
-  // Apply coupon code
-  async applyCoupon(planId: string, couponCode: string, userId: string | null): Promise<{ finalAmount: number; discountAmount: number; couponApplied: string | null; error?: string }> {
-    const plan = this.getPlanById(planId);
-    if (!plan) {
-      return { finalAmount: 0, discountAmount: 0, couponApplied: null, error: 'Plan not found.' };
-    }
-
-    const normalizedCoupon = couponCode.toLowerCase().trim();
-
-    // Check if user has already used this coupon (frontend check)
-    if (userId) {
-      const { data, error } = await supabase
-        .from('payment_transactions')
-        .select('id')
-        .eq('user_id', userId)
-        .in('status', ['success', 'failed']) // MODIFIED: Check for both 'success' and 'failed' statuses
-        .eq('coupon_code', normalizedCoupon)
-        .limit(1);
-
-      if (error) {
-        console.error('Error checking coupon usage on frontend:', error);
-        // Continue without applying coupon if there's a database error
-        return {
-          finalAmount: plan.price * 100, // Return in paise
-          discountAmount: 0,
-          couponApplied: null,
-          error: 'Failed to verify coupon usage. Please try again.'
-        };
-      }
-
-      if (data && data.length > 0) {
-        return {
-          finalAmount: plan.price * 100, // Return in paise
-          discountAmount: 0,
-          couponApplied: null,
-          error: 'This coupon has already been used by your account.'
-        };
-      }
-    }
-
-    // NEW: full_support coupon - free career_pro_max plan
-    if (normalizedCoupon === this.COUPON_FULL_SUPPORT_CODE && planId === 'career_pro_max') {
-      return {
-        finalAmount: 0,
-        discountAmount: plan.price * 100, // Return in paise
-        couponApplied: this.COUPON_FULL_SUPPORT_CODE
-      };
-    }
-
-    // first100 coupon - free lite_check plan only
-    if (normalizedCoupon === this.COUPON_FIRST100_CODE && planId === 'lite_check') {
-      return {
-        finalAmount: 0,
-        discountAmount: plan.price * 100, // Return in paise
-        couponApplied: this.COUPON_FIRST100_CODE
-      };
-    }
-
-    // first500 coupon - 98% off lite_check plan only (NEW LOGIC)
-    if (normalizedCoupon === this.COUPON_FIRST500_CODE && planId === 'lite_check') {
-      const discountAmount = Math.floor(plan.price * 100 * 0.98); // Calculate in paise
-      return {
-        finalAmount: (plan.price * 100) - discountAmount, // Calculate in paise
-        discountAmount: discountAmount,
-        couponApplied: this.COUPON_FIRST500_CODE
-      };
-    }
-
-    // worthyone coupon - 50% off career_pro_max plan only
-    if (normalizedCoupon === this.COUPON_WORTHYONE_CODE && planId === 'career_pro_max') {
-      const discountAmount = Math.floor(plan.price * 100 * 0.5); // Calculate in paise
-      return {
-        finalAmount: (plan.price * 100) - discountAmount, // Calculate in paise
-        discountAmount: discountAmount,
-        couponApplied: this.COUPON_WORTHYONE_CODE
-      };
-    }
-
-    // Invalid or no coupon
-    return {
-      finalAmount: plan.price * 100, // Return in paise
-      discountAmount: 0,
-      couponApplied: null
-    };
-  }
-
-  // Create Razorpay order via backend
-  // Updated return type to include transactionId
-  private async createOrder(planId: string, grandTotal: number, addOnsTotal: number, couponCode?: string, walletDeduction?: number): Promise<{ orderId: string; amount: number; keyId: string; transactionId: string }> {
-    console.log('createOrder: Function called to create a new order.');
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.error('createOrder: User not authenticated.');
-        throw new Error('User not authenticated');
-      }
-
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      if (!supabaseUrl) {
-        console.error('createOrder: Supabase URL not configured.');
-        throw new Error('Supabase URL not configured');
-      }
-      
-      const fullFunctionUrl = `${supabaseUrl}/functions/v1/create-order`;
-      console.log('createOrder: Calling backend function at:', fullFunctionUrl);
-      console.log('createOrder: Access Token (first 10 chars):', session.access_token ? session.access_token.substring(0, 10) + '...' : 'N/A'); // ADDED LOG
-      console.log('createOrder: Request Body:', { planId, amount: grandTotal, addOnsTotal, couponCode, walletDeduction }); // ADDED LOG
-
-      const response = await fetch(fullFunctionUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          planId,
-          amount: grandTotal, // Pass the grand total to the backend (already in paise)
-          addOnsTotal,
-          couponCode: couponCode || undefined,
-          walletDeduction: walletDeduction || 0
-        }),
-      });
-
-      console.log('createOrder: Received response from backend with status:', response.status, response.statusText); // ADDED LOG
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('createOrder: Backend returned an error:', errorData);
-        throw new Error(errorData.error || 'Failed to create payment order');
-      }
-
-      const orderResult = await response.json();
-      console.log('createOrder: Order created successfully with Order ID:', orderResult.orderId);
-      return orderResult;
-    } catch (error) {
-      console.error('createOrder: Error creating order:', error);
-      throw new Error('Failed to create payment order');
-    }
-  }
-
-  /**
-   * Verifies a Razorpay payment by calling a Supabase Edge Function.
-   * Now accepts transactionId to update the pending record.
-   */
-  private async verifyPayment(
-    razorpay_order_id: string,
-    razorpay_payment_id: string,
-    razorpay_signature: string,
-    accessToken: string,
-    transactionId: string // ADDED: transactionId parameter
-  ): Promise<{ success: boolean; subscriptionId?: string; error?: string }> {
-    console.log('verifyPayment: STARTING FUNCTION EXECUTION (with explicit access token).');
-    try {
-      console.log('verifyPayment: Checking provided access token parameter...');
-      if (!accessToken) {
-        console.error('verifyPayment: Access token NOT provided as a parameter. Throwing error.');
-        throw new Error('User not authenticated: Access token missing');
-      }
-      console.log('verifyPayment: Access Token explicitly provided and present.');
-
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      if (!supabaseUrl) {
-        console.error('verifyPayment: Supabase URL is not configured. Throwing error.');
-        throw new Error('Supabase URL not configured');
-      }
-
-      const fullFunctionUrl = `${supabaseUrl}/functions/v1/verify-payment`;
-      console.log('verifyPayment: Full function URL for fetch:', fullFunctionUrl);
-      console.log('📱 Full function URL for mobile (using VITE_SUPABASE_URL):', fullFunctionUrl);
-
-      const response = await fetch(fullFunctionUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          razorpay_order_id,
-          razorpay_payment_id,
-          razorpay_signature,
-          transactionId // ADDED: Pass transactionId to the backend
-        }),
-      });
-
-      console.log('verifyPayment: Received response from verify-payment Edge Function. Status:', response.status);
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('verifyPayment: Edge Function error response:', errorData);
-        throw new Error(errorData.error || 'Payment verification failed');
-      }
-
-      const finalResult = await response.json();
-      console.log('verifyPayment: Final verification result:', finalResult);
-      return finalResult;
-    } catch (error) {
-      console.error('verifyPayment: Caught error in main try-catch block:', error);
-      return { success: false, error: 'Payment verification failed due to network or server error.' };
-    }
-  }
-
-  // Process payment
-  async processPayment(
-    paymentData: PaymentData,
-    userEmail: string,
-    userName: string,
-    accessToken: string,
-    couponCode?: string,
-    walletDeduction?: number,
-    addOnsTotal?: number
-  ): Promise<{ success: boolean; subscriptionId?: string; error?: string }> {
-    console.log('processPayment: Function called with paymentData:', paymentData);
-    try {
-      console.log('processPayment: Attempting to load Razorpay script...');
-      const scriptLoaded = await this.loadRazorpayScript();
-      if (!scriptLoaded) {
-        console.error('processPayment: Failed to load payment gateway script.');
-        throw new Error('Failed to load payment gateway');
-      }
-      console.log('processPayment: Razorpay script loaded successfully.');
-
-      console.log('processPayment: User session and access token obtained from calling component.');
-      console.log('processPayment: User Access Token (first 10 chars):', accessToken ? accessToken.substring(0, 10) + '...' : 'N/A (undefined/null)');
-      
-      console.log('processPayment: Calling createOrder to initiate a new Razorpay order...');
-      let orderData;
-      try {
-        // Capture transactionId from createOrder response
-        // paymentData.amount is already in paise from SubscriptionPlans.tsx
-        orderData = await this.createOrder(paymentData.planId, paymentData.amount, addOnsTotal || 0, couponCode, walletDeduction);
-        console.log('processPayment: Order created successfully:', orderData.orderId, 'Amount:', orderData.amount, 'Transaction ID:', orderData.transactionId);
-        // NEW LOG: Inspect orderData
-        console.log('processPayment: Received orderData from backend:', orderData);
-      } catch (createOrderError) {
-        console.error('processPayment: Error creating order via backend:', createOrderError);
-        throw new Error(`Failed to create payment order: ${createOrderError instanceof Error ? createOrderError.message : String(createOrderError)}`);
-      }
-
-      return new Promise((resolve) => {
-        const options: RazorpayOptions = {
-          key: orderData.keyId,
-          amount: orderData.amount, // Amount is already in paise
-          currency: paymentData.currency,
-          name: 'Resume Optimizer',
-          description: `Subscription for ${this.getPlanById(paymentData.planId)?.name}`,
-          order_id: orderData.orderId,
-          handler: async (response: RazorpayResponse) => {
-            console.log('Razorpay handler fired. Response:', response);
-            try {
-              console.log('Attempting to verify payment with Supabase Edge Function...');
-              const verificationResult = await this.verifyPayment(
-                response.razorpay_order_id,
-                response.razorpay_payment_id,
-                response.razorpay_signature,
-                accessToken,
-                orderData.transactionId // ADDED: Pass transactionId to verifyPayment
-              );
-              console.log('Verification result from verifyPayment:', verificationResult);
-              resolve(verificationResult);
-            } catch (error) {
-              console.error('Error during payment verification in handler:', error);
-              console.error('Detailed verification error:', error instanceof Error ? error.message : String(error));
-              resolve({ success: false, error: 'Payment verification failed' });
-            }
-          },
-          prefill: {
-            name: userName,
-            email: userEmail,
-          },
-          theme: {
-            color: '#2563eb',
-          },
-          modal: {
-            ondismiss: () => {
-              console.log('Razorpay modal dismissed by user.');
-              // If user dismisses, mark the pending transaction as failed
-              supabase.from('payment_transactions')
-                .update({ status: 'failed' })
-                .eq('id', orderData.transactionId)
-                .then(({ error }) => {
-                  if (error) console.error('Error updating pending transaction to failed on dismiss:', error);
-                });
-              resolve({ success: false, error: 'Payment cancelled by user' });
-            },
-          },
-        };
-
-        // NEW LOG: Inspect options object
-        console.log('processPayment: Razorpay options object:', options);
-
-        const razorpay = new window.Razorpay(options);
-        // NEW LOG: Inspect razorpay instance
-        console.log('processPayment: Razorpay instance created:', razorpay);
-
-        console.log('processPayment: Attempting to open Razorpay modal...');
-        razorpay.open();
-        console.log('processPayment: Razorpay modal opened (or attempted to open).');
-      });
-    } catch (error) {
-      console.error('Payment processing error in processPayment (outer catch block):', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Payment processing failed' };
-    }
-  }
-
-  // New method to process free subscriptions
-  async processFreeSubscription(planId: string, userId: string, couponCode?: string, addOnsTotal?: number, selectedAddOns?: { [key: string]: number }): Promise<{ success: boolean; subscriptionId?: string; error?: string }> {
-    try {
-      // CRITICAL FIX: Always create a payment_transactions record for zero-amount purchases
-      // This prevents coupon reuse and ensures proper tracking
-      const { data: transactionRecord, error: transactionError } = await supabase
-        .from('payment_transactions')
-        .insert({
-          user_id: userId,
-          plan_id: planId === 'addon_only_purchase' ? null : planId,
-          status: 'success', // Mark as successful immediately for free transactions
-          amount: 0, // Zero amount for free transactions (in paise)
+      if (grandTotal === 0) {
+        // CRITICAL FIX: For zero-amount transactions, still call processFreeSubscription with selectedAddOns
+        const result = await paymentService.processFreeSubscription(
+          selectedPlan,
+          user.id,
+          appliedCoupon ? appliedCoupon.code : undefined,
+          addOnsTotal, // addOnsTotal is already in paise
+          selectedAddOns // Pass selectedAddOns to processFreeSubscription
+        );
+        if (result.success) {
+          // CRITICAL FIX: Refresh wallet balance after any successful payment
+          await fetchWalletBalance();
+          onSubscriptionSuccess();
+          onShowAlert('Subscription Activated!', 'Your free plan has been activated successfully.', 'success'); // Use onShowAlert
+        } else {
+          console.error(result.error || 'Failed to activate free plan.');
+          onShowAlert('Activation Failed', result.error || 'Failed to activate free plan.', 'error'); // Use onShowAlert
+        }
+      } else {
+        const paymentData = {
+          planId: selectedPlan,
+          amount: grandTotal, // grandTotal is already in paise
           currency: 'INR',
-          coupon_code: couponCode,
-          discount_amount: 0, // Zero discount for free transactions (in paise)
-          final_amount: 0, // Zero final amount for free transactions (in paise)
-          purchase_type: planId === 'addon_only_purchase' ? 'addon_only' : 'plan',
-          payment_id: `free_${Date.now()}`, // Generate a unique payment ID for free transactions
-          order_id: `order_free_${Date.now()}`,
-        })
-        .select()
-        .single();
-
-      if (transactionError) {
-        console.error('Error creating free transaction record:', transactionError);
-        throw new Error('Failed to record free transaction');
-      }
-
-      // CRITICAL FIX: Process add-on credits for free transactions too
-      if (selectedAddOns && Object.keys(selectedAddOns).length > 0) {
-        console.log('Processing add-on credits for free transaction...');
-        for (const addOnKey in selectedAddOns) {
-          const quantity = selectedAddOns[addOnKey];
-          if (quantity > 0) {
-            // Get addon type
-            const { data: addonType, error: addonTypeError } = await supabase
-              .from('addon_types')
-              .select('id')
-              .eq('type_key', addOnKey)
-              .single();
-
-            if (addonTypeError || !addonType) {
-              console.error(`Error finding addon_type for key ${addOnKey}:`, addonTypeError);
-              continue;
-            }
-
-            // Insert credits
-            const { error: creditInsertError } = await supabase
-              .from('user_addon_credits')
-              .insert({
-                user_id: userId,
-                addon_type_id: addonType.id,
-                quantity_purchased: quantity,
-                quantity_remaining: quantity,
-                payment_transaction_id: transactionRecord.id,
-              });
-
-            if (creditInsertError) {
-              console.error(`Error inserting add-on credits for ${addOnKey}:`, creditInsertError);
-            } else {
-              console.log(`Granted ${quantity} credits for add-on: ${addOnKey}`);
-            }
-          }
+        };
+        const result = await paymentService.processPayment(
+          paymentData,
+          user.email,
+          user.name,
+          accessToken, // Pass the access token here
+          appliedCoupon ? appliedCoupon.code : undefined,
+          walletDeduction, // walletDeduction is already in paise
+          addOnsTotal, // addOnsTotal is already in paise
+          selectedAddOns // CRITICAL FIX: Pass selectedAddOns to processPayment
+        );
+        if (result.success) {
+          // CRITICAL FIX: Refresh wallet balance after any successful payment
+          await fetchWalletBalance();
+          onSubscriptionSuccess();
+          onShowAlert('Payment Successful!', 'Your subscription has been activated.', 'success'); // Use onShowAlert
+        } else {
+          console.error(result.error || 'Payment failed.');
+          onShowAlert('Payment Failed', result.error || 'Payment processing failed. Please try again.', 'error'); // Use onShowAlert
         }
       }
-
-      // If it's an add-on only purchase, don't create a subscription
-      if (planId === 'addon_only_purchase') {
-        return { success: true, subscriptionId: undefined };
-      }
-
-      const plan = this.getPlanById(planId);
-      if (!plan) {
-        return { success: false, error: 'Plan not found' };
-      }
-
-      const now = new Date();
-      let endDate = new Date(now);
-
-      // Determine end date based on plan duration
-      if (plan.duration.toLowerCase().includes('lifetime')) {
-        endDate.setFullYear(now.getFullYear() + 100);
-      } else if (plan.duration.toLowerCase().includes('year')) {
-        const years = parseInt(plan.duration.split(' ')[0]);
-        endDate.setFullYear(now.getFullYear() + years);
-      } else if (plan.duration.toLowerCase().includes('month')) {
-        const months = parseInt(plan.duration.split(' ')[0]);
-        endDate.setMonth(now.getMonth() + months);
-      } else {
-        endDate.setFullYear(now.getFullYear() + 1);
-      }
-
-      const { data, error } = await supabase
-        .from('subscriptions')
-        .insert({
-          user_id: userId,
-          plan_id: plan.id,
-          status: 'active',
-          start_date: now.toISOString(),
-          end_date: endDate.toISOString(),
-          optimizations_used: 0,
-          optimizations_total: plan.optimizations,
-          score_checks_used: 0,
-          score_checks_total: plan.scoreChecks,
-          linkedin_messages_used: 0,
-          linkedin_messages_total: plan.linkedinMessages,
-          guided_builds_used: 0,
-          guided_builds_total: plan.guidedBuilds,
-          payment_id: null,
-          coupon_used: couponCode, // Pass couponCode here
-          created_at: now.toISOString(),
-          updated_at: now.toISOString(),
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error creating free subscription:', error);
-        throw new Error(error.message || 'Failed to create free subscription');
-      }
-
-      return { success: true, subscriptionId: data.id };
-
     } catch (error) {
-      console.error('Error in processFreeSubscription:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Failed to process free subscription' };
+      console.error('Payment process error:', error);
+      onShowAlert('Payment Error', error instanceof Error ? error.message : 'An unexpected error occurred during payment.', 'error'); // Use onShowAlert
+    } finally {
+      setIsProcessing(false);
     }
-  }
+  };
 
-  // Get user's active subscription from Supabase
-  async getUserSubscription(userId: string): Promise<Subscription | null> {
-    try {
-      // Fetch all subscriptions for the user that are not cancelled
-      const { data, error } = await supabase
-        .from('subscriptions')
-        .select(`
-          id,
-          user_id,
-          plan_id,
-          status,
-          start_date,
-          end_date,
-          optimizations_used,
-          optimizations_total,
-          score_checks_used,
-          score_checks_total,
-          linkedin_messages_used,
-          linkedin_messages_total,
-          guided_builds_used,
-          guided_builds_total,
-          payment_id,
-          coupon_used
-        `)
-        .eq('user_id', userId)
-        .neq('status', 'cancelled') // Exclude cancelled subscriptions
-        .order('end_date', { ascending: false }); // Order by end date to prioritize newer plans
+  const handleAddOnQuantityChange = (addOnId: string, quantity: number) => {
+    setSelectedAddOns((prev) => ({
+      ...prev,
+      [addOnId]: Math.max(0, quantity),
+    }));
+  };
 
-      if (error) {
-        console.error('Error getting subscriptions:', error);
-        return null;
-      }
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-2 sm:p-4 backdrop-blur-sm">
+      <div className="bg-white rounded-xl sm:rounded-2xl lg:rounded-3xl w-full max-w-7xl max-h-[95vh] overflow-y-auto flex flex-col">
+        <div className="relative bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 px-3 sm:px-6 py-4 sm:py-8 border-b border-gray-100 flex-shrink-0">
+          {/* Back button */}
+          <button
+            onClick={onNavigateBack}
+            className="absolute top-2 sm:top-4 left-2 sm:left-4 w-10 h-10 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-white/50 z-10 min-w-[44px] min-h-[44px]"
+          >
+            <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
+          </button>
 
-      if (!data || data.length === 0) {
-        return null; // No subscriptions found
-      }
+          {/* New X (close) button */}
+          <button
+            onClick={onNavigateBack}
+            className="absolute top-2 sm:top-4 right-2 sm:right-4 w-10 h-10 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-white/50 z-10 min-w-[44px] min-h-[44px]"
+          >
+            <X className="w-5 h-5 sm:w-6 sm:h-6" />
+          </button>
 
-      // Initialize combined totals
-      let combinedOptimizationsUsed = 0;
-      let combinedOptimizationsTotal = 0;
-      let combinedScoreChecksUsed = 0;
-      let combinedScoreChecksTotal = 0;
-      let combinedLinkedinMessagesUsed = 0;
-      let combinedLinkedinMessagesTotal = 0;
-      let combinedGuidedBuildsUsed = 0;
-      let combinedGuidedBuildsTotal = 0;
-      let latestEndDate: Date | null = null;
-      let overallStatus: 'active' | 'expired' | 'cancelled' = 'expired'; // Default to expired if no credits
+          <div className="text-center max-w-4xl mx-auto px-8">
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 w-12 h-12 sm:w-20 sm:h-20 rounded-xl sm:rounded-3xl flex items-center justify-center mx-auto mb-3 sm:mb-6 shadow-lg">
+              <Sparkles className="w-6 h-6 sm:w-10 sm:h-10 text-white" />
+            </div>
+            <h1 className="text-lg sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2 sm:mb-3">
+              🏆 Ultimate Resume & Job Prep Plans
+            </h1>
+            <p className="text-sm sm:text-lg lg:text-xl text-gray-600 mb-3 sm:mb-6">
+              AI-powered resume optimization with secure payment
+            </p>
+          </div>
+        </div>
 
-      // Aggregate credits from all relevant subscriptions
-      for (const sub of data) {
-        // Only consider credits from plans that are not yet fully used or have future end dates
-        // This logic assumes that once a plan is "used up" (used >= total), its credits are no longer available.
-        // If credits should persist even after a plan's individual usage is maxed out, this logic needs adjustment.
-        
-        // For combining, we sum up all totals and all used amounts.
-        // The "remaining" will be calculated from these combined totals.
-        combinedOptimizationsUsed += sub.optimizations_used;
-        combinedOptimizationsTotal += sub.optimizations_total;
-        combinedScoreChecksUsed += sub.score_checks_used;
-        combinedScoreChecksTotal += sub.score_checks_total;
-        combinedLinkedinMessagesUsed += sub.linkedin_messages_used;
-        combinedLinkedinMessagesTotal += sub.linkedin_messages_total;
-        combinedGuidedBuildsUsed += sub.guided_builds_used;
-        combinedGuidedBuildsTotal += sub.guided_builds_total;
+        <div className="p-3 sm:p-6 lg:p-8 overflow-y-auto flex-1">
+          {/* Mobile Carousel */}
+          <div className="block md:hidden mb-4 sm:mb-8">
+            <div className="relative">
+              <div className="overflow-hidden rounded-xl sm:rounded-3xl">
+                <div
+                  ref={carouselRef}
+                  className="flex transition-transform duration-300 ease-in-out"
+                  style={{ transform: `translateX(-${currentSlide * 100}%)` }}
+                >
+                  {allPlansWithAddOnOption.map((plan, index) => (
+                    <div key={plan.id} className="w-full flex-shrink-0 px-2 sm:px-4">
+                      <div
+                        className={`relative rounded-xl sm:rounded-3xl border-2 transition-all duration-300 ${
+                          selectedPlan === plan.id
+                            ? 'border-indigo-500 shadow-2xl shadow-indigo-500/20 ring-4 ring-indigo-100'
+                            : 'border-gray-200'
+                        } ${plan.popular ? 'ring-2 ring-green-500 ring-offset-4' : ''}`}
+                        onClick={() => setSelectedPlan(plan.id)}
+                      >
+                        {plan.popular && (
+                          <div className="absolute -top-2 sm:-top-4 left-1/2 transform -translate-x-1/2">
+                            <span className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-3 sm:px-6 py-1 sm:py-2 rounded-full text-xs font-bold shadow-lg">
+                              🏆 Most Popular
+                            </span>
+                          </div>
+                        )}
+                        <div className="p-3 sm:p-6">
+                          <div className="text-center mb-3 sm:mb-6">
+                            <div
+                              className={`bg-gradient-to-r ${plan.gradient || ''} w-10 h-10 sm:w-16 sm:h-16 rounded-lg sm:rounded-2xl flex items-center justify-center mx-auto mb-2 sm:mb-4 text-white shadow-lg`}
+                            >
+                              {getPlanIcon(plan.icon || '')}
+                            </div>
+                            <div
+                              className={`inline-flex items-center px-2 sm:px-3 py-1 rounded-full text-xs font-medium border mb-2 sm:mb-3 ${
+                                plan.tagColor || ''
+                              }`}
+                            >
+                              {plan.tag}
+                            </div>
+                            <h3 className="text-base sm:text-xl font-bold text-gray-900 mb-2">{plan.name}</h3>
+                            <div className="text-center mb-2 sm:mb-4">
+                              <span className="text-xl sm:text-3xl font-bold text-gray-900">
+                                ₹{plan.price}
+                              </span>
+                              <span className="text-gray-600 ml-1 text-xs sm:text-base">
+                                /{plan.duration.toLowerCase()}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg sm:rounded-2xl p-2 sm:p-4 text-center mb-3 sm:mb-6">
+                            <div className="text-lg sm:text-2xl font-bold text-indigo-600">{plan.optimizations}</div>
+                            <div className="text-xs sm:text-sm text-gray-600">Resume Credits</div>
+                          </div>
+                          <ul className="space-y-1 sm:space-y-3 mb-3 sm:mb-6 max-h-32 sm:max-h-none overflow-y-auto sm:overflow-visible">
+                            {plan.features.slice(0, 4).map((feature: string, fi: number) => (
+                              <li key={fi} className="flex items-start">
+                                <Check className="w-3 h-3 sm:w-5 sm:h-5 text-emerald-500 mr-2 sm:mr-3 mt-0.5 flex-shrink-0" />
+                                <span className="text-gray-700 text-xs sm:text-sm break-words">{feature}</span>
+                              </li>
+                            ))}
+                          </ul>
+                          {/* ADDED: Select Plan button for mobile carousel */}
+                          <button
+                            onClick={() => setSelectedPlan(plan.id)}
+                            className={`w-full py-2 sm:py-3 px-2 sm:px-4 rounded-lg sm:rounded-xl font-semibold transition-all duration-300 text-xs sm:text-base min-h-[44px] mt-2 ${
+                              selectedPlan === plan.id
+                                ? `bg-gradient-to-r ${plan.gradient || ''} text-white shadow-lg transform scale-105`
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            {selectedPlan === plan.id ? (
+                              <span className="flex items-center justify-center">
+                                <Check className="w-3 h-3 sm:w-5 h-5 mr-1 sm:mr-2" />
+                                Selected
+                              </span>
+                            ) : (
+                              'Select Plan'
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <button
+                onClick={prevSlide}
+                className="absolute left-1 sm:left-2 top-1/2 transform -translate-y-1/2 bg-white/90 hover:bg-white text-gray-700 p-2 rounded-full shadow-lg transition-all duration-200 z-10 min-w-[44px] min-h-[44px] flex items-center justify-center"
+              >
+                <ChevronLeft className="w-4 h-4 sm:w-6 h-6" />
+              </button>
+              <button
+                onClick={nextSlide}
+                className="absolute right-1 sm:right-2 top-1/2 transform -translate-y-1/2 bg-white/90 hover:bg-white text-gray-700 p-2 rounded-full shadow-lg transition-all duration-200 z-10 min-w-[44px] min-h-[44px] flex items-center justify-center"
+              >
+                <ChevronRight className="w-4 h-4 sm:w-6 h-6" />
+              </button>
+              <div className="flex justify-center space-x-2 mt-3 sm:mt-6">
+                {allPlansWithAddOnOption.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => goToSlide(idx)}
+                    className={`w-2 h-2 sm:w-3 h-3 rounded-full transition-all duration-200 ${
+                      idx === currentSlide ? 'bg-indigo-600 scale-125' : 'bg-gray-300 hover:bg-gray-400'
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
 
-        // Determine the latest end date among all non-cancelled subscriptions
-        const currentEndDate = new Date(sub.end_date);
-        if (!latestEndDate || currentEndDate > latestEndDate) {
-          latestEndDate = currentEndDate;
-        }
-      }
+          {/* Desktop Grid */}
+          <div className="hidden md:grid grid-cols-2 lg:grid-cols-6 gap-3 lg:gap-6 mb-4 lg:mb-8">
+            {allPlansWithAddOnOption.map((plan) => (
+              <div
+                key={plan.id}
+                className={`relative rounded-xl lg:rounded-3xl border-2 transition-all duration-300 cursor-pointer transform hover:scale-105 ${
+                  selectedPlan === plan.id
+                    ? 'border-indigo-500 shadow-2xl shadow-indigo-500/20 ring-4 ring-indigo-100'
+                    : 'border-gray-200 hover:border-indigo-300 hover:shadow-xl'
+                } ${plan.popular ? 'ring-2 ring-green-500 ring-offset-4' : ''}`}
+                onClick={() => setSelectedPlan(plan.id)}
+              >
+                {plan.popular && (
+                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                    <span className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-3 lg:px-6 py-1 lg:py-2 rounded-full text-xs lg:text-sm font-bold shadow-lg">
+                      🏆 Most Popular
+                    </span>
+                  </div>
+                )}
+                <div className="p-3 lg:p-6">
+                  <div className="text-center mb-3 lg:mb-6">
+                    <div
+                      className={`bg-gradient-to-r ${plan.gradient || ''} w-10 h-10 lg:w-16 h-16 rounded-lg lg:rounded-2xl flex items-center justify-center mx-auto mb-2 lg:mb-4 text-white shadow-lg`}
+                    >
+                      {getPlanIcon(plan.icon || '')}
+                    </div>
+                    <div
+                      className={`inline-flex items-center px-2 lg:px-3 py-1 rounded-full text-xs font-medium border mb-1 lg:mb-3 ${
+                        plan.tagColor || ''
+                      }`}
+                    >
+                      {plan.tag}
+                    </div>
+                    <h3 className="text-sm lg:text-xl font-bold text-gray-900 mb-2 break-words">{plan.name}</h3>
+                    <div className="text-center mb-2 lg:mb-4">
+                      <span className="text-lg lg:text-3xl font-bold text-gray-900">₹{plan.price}</span>
+                      <span className="text-gray-600 ml-1 text-xs lg:text-base">
+                        /{plan.duration.toLowerCase()}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg lg:rounded-2xl p-2 lg:p-4 text-center mb-3 lg:mb-6">
+                    <div className="text-lg lg:text-2xl font-bold text-indigo-600">{plan.optimizations}</div>
+                    <div className="text-xs lg:text-sm text-gray-600">Resume Credits</div>
+                  </div>
+                  <ul className="space-y-1 lg:space-y-3 mb-3 lg:mb-6 max-h-24 lg:max-h-none overflow-y-auto lg:overflow-visible">
+                    {plan.features.slice(0, 4).map((feature: string, index: number) => (
+                      <li key={index} className="flex items-start">
+                        <Check className="w-3 h-3 lg:w-5 h-5 text-emerald-500 mr-1 lg:mr-3 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-700 text-xs lg:text-sm break-words">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    className={`w-full py-2 lg:py-3 px-2 lg:px-4 rounded-lg lg:rounded-xl font-semibold transition-all duration-300 text-xs lg:text-base min-h-[44px] ${
+                      selectedPlan === plan.id
+                        ? `bg-gradient-to-r ${plan.gradient || ''} text-white shadow-lg transform scale-105`
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {selectedPlan === plan.id ? (
+                      <span className="flex items-center justify-center">
+                        <Check className="w-3 h-3 lg:w-5 h-5 mr-1 lg:mr-2" />
+                        Selected
+                      </span>
+                    ) : (
+                      'Select Plan'
+                    )}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
 
-      // Determine overall status based on combined remaining credits and end date
-      const now = new Date();
-      const hasRemainingCredits = 
-        (combinedOptimizationsTotal - combinedOptimizationsUsed > 0) ||
-        (combinedScoreChecksTotal - combinedScoreChecksUsed > 0) ||
-        (combinedLinkedinMessagesTotal - combinedLinkedinMessagesUsed > 0) ||
-        (combinedGuidedBuildsTotal - combinedGuidedBuildsUsed > 0);
+          {/* Payment Summary */}
+          <div className="max-w-2xl mx-auto mt-4 sm:mt-6">
+            <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-lg sm:rounded-2xl p-3 sm:p-6 mb-3 sm:mb-6 border border-gray-200">
+              <h3 className="text-base sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4 flex items-center">
+                <Crown className="w-4 h-4 sm:w-5 h-5 mr-2 text-indigo-600" />
+                Payment Summary
+              </h3>
+              <div className="space-y-2 sm:space-y-3 text-sm sm:text-base">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-700">Selected Plan:</span>
+                  <span className="font-semibold break-words text-right">{selectedPlanData?.name}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-700">Credits:</span>
+                  <span className="font-semibold">{selectedPlanData?.optimizations} Resume Credits</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-700">Duration:</span>
+                  <span className="font-semibold">{selectedPlanData?.duration}</span>
+                </div>
 
-      if (hasRemainingCredits && latestEndDate && latestEndDate > now) {
-        overallStatus = 'active';
-      } else if (hasRemainingCredits && (!latestEndDate || latestEndDate <= now)) {
-        // If credits remain but all plans are expired, consider it active until credits are used
-        // This is a business logic decision. If credits should expire with the plan, remove this branch.
-        overallStatus = 'active'; // Credits persist beyond plan end date
-      } else {
-        overallStatus = 'expired';
-      }
+                <div className="border-t border-gray-200 pt-3 mt-3">
+                  {!appliedCoupon ? (
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="text"
+                        value={couponCode}
+                        onChange={(e) => setCouponCode(e.target.value)}
+                        placeholder="Enter coupon code"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm min-h-[44px]"
+                        onKeyPress={(e) => e.key === 'Enter' && handleApplyCoupon()}
+                      />
+                      <button
+                        onClick={handleApplyCoupon}
+                        className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition-colors text-sm min-h-[44px]"
+                      >
+                        Apply Coupon
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <CheckCircle className="w-4 h-4 text-green-600 mr-2" />
+                          <span className="text-green-800 font-medium text-sm">
+                            Coupon "{appliedCoupon.code}" applied
+                          </span>
+                        </div>
+                        <button
+                          onClick={handleRemoveCoupon}
+                          className="text-green-600 hover:text-green-800 text-sm underline"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <div className="text-green-700 text-sm mt-1">
+                        You saved ₹{(appliedCoupon.discount / 100).toFixed(2)}!
+                      </div>
+                    </div>
+                  )}
+                  {couponError && (
+                    <div className="text-red-600 text-sm flex items-center mt-1">
+                      <AlertCircle className="w-4 h-4 mr-1" />
+                      {couponError}
+                    </div>
+                  )}
+                </div>
 
+                <div className="border-t border-gray-200 pt-2 sm:pt-3 mt-3">
+                  {!loadingWallet && walletBalance > 0 && (
+                    <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-green-800">Use Wallet Balance</span>
+                        <button
+                          onClick={() => setUseWalletBalance((prev) => !prev)}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                            useWalletBalance ? 'bg-green-600' : 'bg-gray-300'
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              useWalletBalance ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                      <div className="text-sm text-green-700">
+                        Available: ₹{(walletBalance / 100).toFixed(2)}
+                        {useWalletBalance && (
+                          <span className="block mt-1">Using: ₹{(walletDeduction / 100).toFixed(2)}</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
-      // Return a synthetic subscription object
-      return {
-        id: 'combined-subscription', // A unique ID for the combined view
-        userId: userId,
-        planId: 'combined', // Indicates this is a combined view
-        status: overallStatus,
-        startDate: data[data.length - 1].start_date, // Oldest start date
-        endDate: latestEndDate ? latestEndDate.toISOString() : new Date().toISOString(), // Latest end date
-        optimizationsUsed: combinedOptimizationsUsed,
-        optimizationsTotal: combinedOptimizationsTotal,
-        scoreChecksUsed: combinedScoreChecksUsed,
-        scoreChecksTotal: combinedScoreChecksTotal,
-        linkedinMessagesUsed: combinedLinkedinMessagesUsed,
-        linkedinMessagesTotal: combinedLinkedinMessagesTotal,
-        guidedBuildsUsed: combinedGuidedBuildsUsed,
-        guidedBuildsTotal: combinedGuidedBuildsTotal,
-        paymentId: null, // Not applicable for combined
-        couponUsed: null, // Not applicable for combined
-      };
+                  {appliedCoupon && appliedCoupon.discount > 0 && (
+                    <div className="flex justify-between items-center text-sm text-gray-600 mb-2">
+                      <span>Original Price:</span>
+                      <span className="line-through">₹{selectedPlanData?.price}</span>
+                    </div>
+                  )}
+                  {appliedCoupon && appliedCoupon.discount > 0 && (
+                    <div className="flex justify-between items-center text-sm text-green-600 mb-2">
+                      <span>Discount:</span>
+                      <span>-₹{(appliedCoupon.discount / 100).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {useWalletBalance && walletDeduction > 0 && (
+                    <div className="flex justify-between items-center text-sm text-blue-600 mb-2">
+                      <span>Wallet Balance Applied:</span>
+                      <span>-₹{(walletDeduction / 100).toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center text-base sm:text-xl font-bold">
+                    <span>Total Amount:</span>
+                    <span className="text-indigo-600">₹{(grandTotal / 100).toFixed(2)}</span>
+                  </div>
+                  {addOnsTotal > 0 && (
+                    <div className="text-sm text-gray-600 mt-2">
+                      Plan: ₹{(finalPlanPrice / 100).toFixed(2)} + Add-ons: ₹{(addOnsTotal / 100).toFixed(2)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
 
-    } catch (error) {
-      console.error('Error getting user subscription:', error);
-      return null;
-    }
-  }
+            {/* Add-ons */}
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg sm:rounded-2xl p-3 sm:p-6 mb-3 sm:mb-6 border border-blue-200">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base sm:text-xl font-semibold text-gray-900 flex items-center">
+                  <Plus className="w-4 h-4 sm:w-5 h-5 mr-2 text-blue-600" />
+                  🛒 Add-Ons (Optional)
+                </h3>
+                <button
+                  onClick={() => setShowAddOns((prev) => !prev)}
+                  className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+                >
+                  {showAddOns ? 'Hide' : 'Show'} Add-ons
+                </button>
+              </div>
+              {showAddOns && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                  {addOns.map((addOn) => (
+                    <div
+                      key={addOn.id}
+                      className="bg-white rounded-lg p-3 sm:p-4 border border-gray-200 flex flex-col"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <h4 className="font-medium text-gray-900 text-sm">{addOn.name}</h4>
+                          <p className="text-blue-600 font-semibold">₹{addOn.price}</p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() =>
+                              handleAddOnQuantityChange(addOn.id, (selectedAddOns[addOn.id] || 0) - 1)
+                            }
+                            className="w-8 h-8 bg-gray-200 hover:bg-gray-300 rounded-full flex items-center justify-center text-gray-600"
+                          >
+                            -
+                          </button>
+                          <span className="w-8 text-center font-medium">{selectedAddOns[addOn.id] || 0}</span>
+                          <button
+                            onClick={() =>
+                              handleAddOnQuantityChange(addOn.id, (selectedAddOns[addOn.id] || 0) + 1)
+                            }
+                            className="w-8 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
-  // Use optimization (decrement count)
-  async useOptimization(userId: string): Promise<{ success: boolean; remaining: number; error?: string }> {
-    try {
-      // Fetch all active/upgraded subscriptions
-      const { data, error } = await supabase
-        .from('subscriptions')
-        .select(`
-          id,
-          optimizations_used,
-          optimizations_total
-        `)
-        .eq('user_id', userId)
-        .neq('status', 'cancelled')
-        .order('end_date', { ascending: false }); // Prioritize newer plans for usage
-
-      if (error) {
-        console.error('Error fetching subscriptions for usage:', error);
-        return { success: false, remaining: 0, error: 'Failed to fetch subscriptions for usage.' };
-      }
-
-      if (!data || data.length === 0) {
-        return { success: false, remaining: 0, error: 'No active subscription found.' };
-      }
-
-      let totalRemaining = 0;
-      let subscriptionToUpdate: { id: string; optimizations_used: number; optimizations_total: number } | null = null;
-
-      // Find a subscription with remaining credits to decrement
-      for (const sub of data) {
-        const remainingInSub = sub.optimizations_total - sub.optimizations_used;
-        if (remainingInSub > 0) {
-          subscriptionToUpdate = sub;
-          break; // Found a sub to use
-        }
-      }
-
-      if (!subscriptionToUpdate) {
-        return { success: false, remaining: 0, error: 'No optimizations remaining across all plans.' };
-      }
-
-      // Decrement the chosen subscription
-      const { error: updateError } = await supabase
-        .from('subscriptions')
-        .update({
-          optimizations_used: subscriptionToUpdate.optimizations_used + 1,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', subscriptionToUpdate.id);
-
-      if (updateError) {
-        console.error('Error using optimization:', updateError);
-        return { success: false, remaining: 0, error: updateError.message };
-      }
-
-      // Recalculate total remaining across all plans after update
-      const updatedCombinedSubscription = await this.getUserSubscription(userId);
-      totalRemaining = (updatedCombinedSubscription?.optimizationsTotal || 0) - (updatedCombinedSubscription?.optimizationsUsed || 0);
-
-      return { success: true, remaining: totalRemaining };
-    } catch (error: any) {
-      console.error('Error using optimization:', error);
-      return { success: false, remaining: 0, error: error.message };
-    }
-  }
-
-  // Use score check (decrement count)
-  async useScoreCheck(userId: string): Promise<{ success: boolean; remaining: number; error?: string }> {
-    try {
-      const { data, error } = await supabase
-        .from('subscriptions')
-        .select(`
-          id,
-          score_checks_used,
-          score_checks_total
-        `)
-        .eq('user_id', userId)
-        .neq('status', 'cancelled')
-        .order('end_date', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching subscriptions for usage:', error);
-        return { success: false, remaining: 0, error: 'Failed to fetch subscriptions for usage.' };
-      }
-
-      if (!data || data.length === 0) {
-        return { success: false, remaining: 0, error: 'No active subscription found.' };
-      }
-
-      let totalRemaining = 0;
-      let subscriptionToUpdate: { id: string; score_checks_used: number; score_checks_total: number } | null = null;
-
-      for (const sub of data) {
-        const remainingInSub = sub.score_checks_total - sub.score_checks_used;
-        if (remainingInSub > 0) {
-          subscriptionToUpdate = sub;
-          break;
-        }
-      }
-
-      if (!subscriptionToUpdate) {
-        return { success: false, remaining: 0, error: 'No score checks remaining across all plans.' };
-      }
-
-      const { error: updateError } = await supabase
-        .from('subscriptions')
-        .update({
-          score_checks_used: subscriptionToUpdate.score_checks_used + 1,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', subscriptionToUpdate.id);
-
-      if (updateError) {
-        console.error('Error using score check:', updateError);
-        return { success: false, remaining: 0, error: updateError.message };
-      }
-
-      const updatedCombinedSubscription = await this.getUserSubscription(userId);
-      totalRemaining = (updatedCombinedSubscription?.scoreChecksTotal || 0) - (updatedCombinedSubscription?.scoreChecksUsed || 0);
-
-      return { success: true, remaining: totalRemaining };
-    } catch (error: any) {
-      console.error('Error using score check:', error);
-      return { success: false, remaining: 0, error: error.message };
-    }
-  }
-
-  // Use LinkedIn message (decrement count)
-  async useLinkedInMessage(userId: string): Promise<{ success: boolean; remaining: number; error?: string }> {
-    try {
-      const { data, error } = await supabase
-        .from('subscriptions')
-        .select(`
-          id,
-          linkedin_messages_used,
-          linkedin_messages_total
-        `)
-        .eq('user_id', userId)
-        .neq('status', 'cancelled')
-        .order('end_date', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching subscriptions for usage:', error);
-        return { success: false, remaining: 0, error: 'Failed to fetch subscriptions for usage.' };
-      }
-
-      if (!data || data.length === 0) {
-        return { success: false, remaining: 0, error: 'No active subscription found.' };
-      }
-
-      let totalRemaining = 0;
-      let subscriptionToUpdate: { id: string; linkedin_messages_used: number; linkedin_messages_total: number } | null = null;
-
-      for (const sub of data) {
-        const remainingInSub = sub.linkedin_messages_total - sub.linkedin_messages_used;
-        if (remainingInSub > 0) {
-          subscriptionToUpdate = sub;
-          break;
-        }
-      }
-
-      if (!subscriptionToUpdate) {
-        return { success: false, remaining: 0, error: 'No LinkedIn messages remaining across all plans.' };
-      }
-
-      const { error: updateError } = await supabase
-        .from('subscriptions')
-        .update({
-          linkedin_messages_used: subscriptionToUpdate.linkedin_messages_used + 1,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', subscriptionToUpdate.id);
-
-      if (updateError) {
-        console.error('Error using LinkedIn message:', updateError);
-        return { success: false, remaining: 0, error: updateError.message };
-      }
-
-      const updatedCombinedSubscription = await this.getUserSubscription(userId);
-      totalRemaining = (updatedCombinedSubscription?.linkedinMessagesTotal || 0) - (updatedCombinedSubscription?.linkedinMessagesUsed || 0);
-
-      return { success: true, remaining: totalRemaining };
-    } catch (error: any) {
-      console.error('Error using LinkedIn message:', error);
-      return { success: false, remaining: 0, error: error.message };
-    }
-  }
-
-  // Use guided build (decrement count)
-  async useGuidedBuild(userId: string): Promise<{ success: boolean; remaining: number; error?: string }> {
-    try {
-      const { data, error } = await supabase
-        .from('subscriptions')
-        .select(`
-          id,
-          guided_builds_used,
-          guided_builds_total
-        `)
-        .eq('user_id', userId)
-        .neq('status', 'cancelled')
-        .order('end_date', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching subscriptions for usage:', error);
-        return { success: false, remaining: 0, error: 'Failed to fetch subscriptions for usage.' };
-      }
-
-      if (!data || data.length === 0) {
-        return { success: false, remaining: 0, error: 'No active subscription found.' };
-      }
-
-      let totalRemaining = 0;
-      let subscriptionToUpdate: { id: string; guided_builds_used: number; guided_builds_total: number } | null = null;
-
-      for (const sub of data) {
-        const remainingInSub = sub.guided_builds_total - sub.guided_builds_used;
-        if (remainingInSub > 0) {
-          subscriptionToUpdate = sub;
-          break;
-        }
-      }
-
-      if (!subscriptionToUpdate) {
-        return { success: false, remaining: 0, error: 'No guided builds remaining across all plans.' };
-      }
-
-      const { error: updateError } = await supabase
-        .from('subscriptions')
-        .update({
-          guided_builds_used: subscriptionToUpdate.guided_builds_used + 1,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', subscriptionToUpdate.id);
-
-      if (updateError) {
-        console.error('Error using guided build:', updateError);
-        return { success: false, remaining: 0, error: updateError.message };
-      }
-
-      const updatedCombinedSubscription = await this.getUserSubscription(userId);
-      totalRemaining = (updatedCombinedSubscription?.guidedBuildsTotal || 0) - (updatedCombinedSubscription?.guidedBuildsUsed || 0);
-
-      return { success: true, remaining: totalRemaining };
-    } catch (error: any) {
-      console.error('Error using guided build:', error);
-      return { success: false, remaining: 0, error: error.message };
-    }
-  }
-
-  // Get subscription history
-  async getSubscriptionHistory(userId: string): Promise<Subscription[]> {
-    try {
-      const { data, error } = await supabase
-        .from('subscriptions')
-        .select(`
-          *,
-          optimizations_used,
-          optimizations_total,
-          score_checks_used,
-          score_checks_total,
-          linkedin_messages_used,
-          linkedin_messages_total,
-          guided_builds_used,
-          guided_builds_total,
-        `)
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error getting subscription history:', error);
-        return [];
-      }
-
-      return data.map(sub => ({
-        id: sub.id,
-        userId: sub.user_id,
-        planId: sub.plan_id,
-        status: sub.status,
-        startDate: sub.start_date,
-        endDate: sub.end_date,
-        optimizationsUsed: sub.optimizations_used,
-        optimizationsTotal: sub.optimizations_total,
-        paymentId: sub.payment_id,
-        couponUsed: sub.coupon_used,
-        scoreChecksUsed: sub.score_checks_used,
-        scoreChecksTotal: sub.score_checks_total,
-        linkedinMessagesUsed: sub.linkedin_messages_used,
-        linkedinMessagesTotal: sub.linkedin_messages_total,
-        guidedBuildsUsed: sub.guided_builds_used,
-        guidedBuildsTotal: sub.guided_builds_total
-      }));
-    } catch (error) {
-      console.error('Error getting subscription history:', error);
-      return [];
-    }
-  }
-
-  // Get payment transactions
-  async getPaymentHistory(userId: string): Promise<any[]> {
-    try {
-      const { data, error } = await supabase
-        .from('payment_transactions')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error getting payment history:', error);
-        return [];
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error getting payment history:', error);
-      return [];
-    }
-  }
-
-  // Cancel subscription
-  async cancelSubscription(subscriptionId: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      const { error } = await supabase
-        .from('subscriptions')
-        .update({ status: 'cancelled' })
-        .eq('id', subscriptionId);
-
-      if (error) {
-        console.error('Error cancelling subscription:', error);
-        return { success: false, error: 'Failed to cancel subscription' };
-      }
-
-      return { success: true };
-    } catch (error) {
-      console.error('Error cancelling subscription:', error);
-      return { success: false, error: 'Failed to cancel subscription' };
-    }
-  }
-
-  // Activate free trial for new users
-  async activateFreeTrial(userId: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      const existingSubscription = await this.getUserSubscription(userId);
-      if (existingSubscription) {
-        return { success: false, error: 'User already has an active subscription' };
-      }
-      return { success: false, error: 'Free trial is no longer available. Please choose a paid plan.' };
-    } catch (error) {
-      console.error('Error activating free trial:', error);
-      return { success: false, error: 'Failed to activate free trial' };
-    }
-  }
-}
-
-export const paymentService = new PaymentService();
+            {/* Payment Button */}
+            <div className="text-center px-2 sm:px-0">
+              <button
+                onClick={handlePayment}
+                disabled={isProcessing}
+                className={`w-full max-w-md mx-auto py-3 sm:py-4 px-4 sm:px-8 rounded-lg sm:rounded-2xl font-bold text-sm sm:text-lg transition-all duration-300 flex items-center justify-center space-x-2 sm:space-x-3 min-h-[44px] ${
+                  isProcessing
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-xl hover:shadow-2xl transform hover:scale-105'
+                }`}
+              >
+                {isProcessing ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 sm:h-6 h-6 border-2 border-white border-t-transparent" />
+                    <span className="break-words">Processing Payment...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 sm:w-6 h-6 flex-shrink-0" />
+                    <span className="break-words text-center">
+                      {grandTotal === 0 ? 'Get Free Plan' : `Pay ₹${(grandTotal / 100).toFixed(2)} - Start Optimizing`}
+                    </span>
+                    <ArrowRight className="w-3 h-3 sm:w-5 h-5 flex-shrink-0" />
+                  </>
+                )}
+              </button>
+              <p className="text-gray-500 text-xs sm:text-sm mt-3 sm:mt-4 flex items-center justify-center break-words px-4">
+                <Info className="w-3 h-3 sm:w-4 h-4 mr-1 flex-shrink-0" />
+                <span>Secure payment powered by Razorpay • 256-bit SSL encryption</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
