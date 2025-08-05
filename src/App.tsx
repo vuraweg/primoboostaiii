@@ -385,7 +385,10 @@ function App() {
       {showSubscriptionPlans && (
         <SubscriptionPlans
           isOpen={showSubscriptionPlans}
-          onNavigateBack={() => setShowSubscriptionPlans(false)}
+          onNavigateBack={() => {
+            setShowSubscriptionPlans(false);
+            setCurrentPage('new-home'); // ADDED: Navigate back to home page
+          }}
           onSubscriptionSuccess={handleSubscriptionSuccess}
           onShowAlert={handleShowAlert} 
         />
