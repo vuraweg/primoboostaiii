@@ -45,8 +45,8 @@ type AddOn = {
 
 type AppliedCoupon = {
   code: string;
-  discount: number;
-  finalAmount: number;
+  discount: number; // In paise
+  finalAmount: number; // In paise
 };
 
 export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
@@ -63,7 +63,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
   const [couponError, setCouponError] = useState('');
-  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [walletBalance, setWalletBalance] = useState<number>(0); // Stored in paise
   const [useWalletBalance, setUseWalletBalance] = useState<boolean>(false);
   const [loadingWallet, setLoadingWallet] = useState<boolean>(true);
   const [showAddOns, setShowAddOns] = useState<boolean>(false);
@@ -120,7 +120,8 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
         return;
       }
       const completed = (transactions || []).filter((t: any) => t.status === 'completed');
-      const balance = completed.reduce((sum: number, tr: any) => sum + parseFloat(tr.amount), 0);
+      // Wallet balance is stored in Rupees in DB, convert to paise for internal use
+      const balance = completed.reduce((sum: number, tr: any) => sum + parseFloat(tr.amount), 0) * 100;
       setWalletBalance(Math.max(0, balance));
     } catch (err) {
       console.error('Error fetching wallet data:', err);
@@ -175,6 +176,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
       setCouponError('Please enter a coupon code');
       return;
     }
+    // paymentService.applyCoupon returns amounts in paise
     const result = await paymentService.applyCoupon(selectedPlan, couponCode.trim(), user?.id || null);
     if (result.couponApplied) {
       setAppliedCoupon({
@@ -184,7 +186,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
       });
       setCouponError('');
       // ADDED: Show success alert for coupon application
-      onShowAlert('Coupon Applied!', `Coupon "${result.couponApplied}" applied successfully. You saved ₹${result.discount}!`, 'success');
+      onShowAlert('Coupon Applied!', `Coupon "${result.couponApplied}" applied successfully. You saved ₹${(result.discount / 100).toFixed(2)}!`, 'success');
     } else {
       setCouponError(result.error || 'Invalid coupon code or not applicable to selected plan');
       setAppliedCoupon(null);
@@ -201,17 +203,25 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
 
   const selectedPlanData = allPlansWithAddOnOption.find((p) => p.id === selectedPlan);
 
+  // Calculate add-ons total in paise
   const addOnsTotal = Object.entries(selectedAddOns).reduce((total, [addOnId, qty]) => {
     const addOn = paymentService.getAddOnById(addOnId);
-    return total + (addOn ? addOn.price * qty : 0);
+    return total + (addOn ? addOn.price * 100 * qty : 0); // Multiply addOn.price by 100
   }, 0);
 
-  let planPrice = selectedPlanData?.price || 0;
+  // Plan price in paise
+  let planPrice = (selectedPlanData?.price || 0) * 100; // Convert plan price to paise
   if (appliedCoupon) {
-    planPrice = appliedCoupon.finalAmount;
+    planPrice = appliedCoupon.finalAmount; // appliedCoupon.finalAmount is already in paise
   }
-  const walletDeduction = useWalletBalance ? Math.min(walletBalance, planPrice) : 0;
+
+  // Wallet deduction in paise
+  const walletDeduction = useWalletBalance ? Math.min(walletBalance, planPrice) : 0; // walletBalance is in paise
+
+  // Final plan price after wallet deduction, in paise
   const finalPlanPrice = Math.max(0, planPrice - walletDeduction);
+
+  // Grand total in paise
   const grandTotal = finalPlanPrice + addOnsTotal;
 
   const handlePayment = async () => {
@@ -242,7 +252,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
           selectedPlan,
           user.id,
           appliedCoupon ? appliedCoupon.code : undefined,
-          addOnsTotal,
+          addOnsTotal, // addOnsTotal is already in paise
           selectedAddOns // Pass selectedAddOns to processFreeSubscription
         );
         if (result.success) {
@@ -257,7 +267,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
       } else {
         const paymentData = {
           planId: selectedPlan,
-          amount: grandTotal,
+          amount: grandTotal, // grandTotal is already in paise
           currency: 'INR',
         };
         const result = await paymentService.processPayment(
@@ -266,8 +276,8 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
           user.name,
           accessToken, // Pass the access token here
           appliedCoupon ? appliedCoupon.code : undefined,
-          walletDeduction,
-          addOnsTotal,
+          walletDeduction, // walletDeduction is already in paise
+          addOnsTotal, // addOnsTotal is already in paise
           selectedAddOns // CRITICAL FIX: Pass selectedAddOns to processPayment
         );
         if (result.success) {
@@ -571,7 +581,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
                         </button>
                       </div>
                       <div className="text-green-700 text-sm mt-1">
-                        You saved ₹{appliedCoupon.discount}!
+                        You saved ₹{(appliedCoupon.discount / 100).toFixed(2)}!
                       </div>
                     </div>
                   )}
@@ -602,9 +612,9 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
                         </button>
                       </div>
                       <div className="text-sm text-green-700">
-                        Available: ₹{walletBalance.toFixed(2)}
+                        Available: ₹{(walletBalance / 100).toFixed(2)}
                         {useWalletBalance && (
-                          <span className="block mt-1">Using: ₹{walletDeduction.toFixed(2)}</span>
+                          <span className="block mt-1">Using: ₹{(walletDeduction / 100).toFixed(2)}</span>
                         )}
                       </div>
                     </div>
@@ -619,22 +629,22 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
                   {appliedCoupon && appliedCoupon.discount > 0 && (
                     <div className="flex justify-between items-center text-sm text-green-600 mb-2">
                       <span>Discount:</span>
-                      <span>-₹{appliedCoupon.discount}</span>
+                      <span>-₹{(appliedCoupon.discount / 100).toFixed(2)}</span>
                     </div>
                   )}
                   {useWalletBalance && walletDeduction > 0 && (
                     <div className="flex justify-between items-center text-sm text-blue-600 mb-2">
                       <span>Wallet Balance Applied:</span>
-                      <span>-₹{walletDeduction.toFixed(2)}</span>
+                      <span>-₹{(walletDeduction / 100).toFixed(2)}</span>
                     </div>
                   )}
                   <div className="flex justify-between items-center text-base sm:text-xl font-bold">
                     <span>Total Amount:</span>
-                    <span className="text-indigo-600">₹{grandTotal.toFixed(2)}</span>
+                    <span className="text-indigo-600">₹{(grandTotal / 100).toFixed(2)}</span>
                   </div>
                   {addOnsTotal > 0 && (
                     <div className="text-sm text-gray-600 mt-2">
-                      Plan: ₹{finalPlanPrice.toFixed(2)} + Add-ons: ₹{addOnsTotal.toFixed(2)}
+                      Plan: ₹{(finalPlanPrice / 100).toFixed(2)} + Add-ons: ₹{(addOnsTotal / 100).toFixed(2)}
                     </div>
                   )}
                 </div>
@@ -713,7 +723,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
                   <>
                     <Sparkles className="w-4 h-4 sm:w-6 h-6 flex-shrink-0" />
                     <span className="break-words text-center">
-                      {grandTotal === 0 ? 'Get Free Plan' : `Pay ₹${grandTotal.toFixed(2)} - Start Optimizing`}
+                      {grandTotal === 0 ? 'Get Free Plan' : `Pay ₹${(grandTotal / 100).toFixed(2)} - Start Optimizing`}
                     </span>
                     <ArrowRight className="w-3 h-3 sm:w-5 h-5 flex-shrink-0" />
                   </>
