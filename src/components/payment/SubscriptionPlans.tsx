@@ -472,11 +472,15 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
                 onClick={() => setSelectedPlan(plan.id)}
               >
                 {plan.popular && (
-                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                    <span className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-3 lg:px-6 py-1 lg:py-2 rounded-full text-xs lg:text-sm font-bold shadow-lg   style={{ fontSize: '8px' }}">
-                      🏆 Most Popular
-                    </span>
-                  </div>
+                 <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+  <span
+    className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-2 lg:px-4 py-1 lg:py-2 rounded-full text-xs lg:text-sm font-bold shadow-lg"
+    style={{ fontSize: '8px' }}
+  >
+    🏆 Most Popular
+  </span>
+</div>
+
                 )}
                 <div className="p-3 lg:p-6">
                   <div className="text-center mb-3 lg:mb-6">
