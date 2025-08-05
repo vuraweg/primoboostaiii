@@ -224,21 +224,20 @@ serve(async (req) => {
     console.log(`[${new Date().toISOString()}] - Values for insert: user_id=${user.id}, plan_id=${planId}, status='pending', amount=${plan.price}, currency='INR', coupon_code=${appliedCoupon}, discount_amount=${discountAmount}, final_amount=${finalAmount}`); // ADDED DETAILED LOG
 
     const { data: transaction, error: transactionError } = await supabase
-      .from('payment_transactions')
-      .insert({
-        user_id: user.id,
-        plan_id: planId === 'addon_only_purchase' ? null : planId,
-        status: 'pending', // Initial status
-        amount: plan.price, // Original plan price
-        currency: 'INR', // Explicitly set currency as it's not nullable and has a default
-        coupon_code: appliedCoupon, // Save applied coupon code
-        discount_amount: discountAmount, // Save discount amount
-        final_amount: finalAmount, // Final amount after discounts/wallet/addons
-        purchase_type: planId === 'addon_only_purchase' ? 'addon_only' : (Object.keys(selectedAddOns || {}).length > 0 ? 'plan_with_addons' : 'plan'),
-        // payment_id and order_id will be updated by verify-payment function
-      })
-      .select('id') // Select the ID of the newly created row
-      .single();
+  .from('payment_transactions')
+  .insert({
+    user_id: user.id,
+    status: 'pending',
+    amount: plan.price,
+    currency: 'INR',
+    coupon_code: appliedCoupon,
+    discount_amount: discountAmount,
+    final_amount: finalAmount,
+    purchase_type: planId === 'addon_only_purchase' ? 'addon_only' : (Object.keys(selectedAddOns || {}).length > 0 ? 'plan_with_addons' : 'plan'),
+  })
+  .select('id')
+  .single();
+
 
     if (transactionError) {
       console.error(`[${new Date().toISOString()}] - Error inserting pending transaction:`, transactionError); // Log full error object
