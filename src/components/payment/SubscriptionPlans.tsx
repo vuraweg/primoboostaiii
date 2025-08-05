@@ -227,6 +227,11 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
   const handlePayment = async () => {
     if (!user || !selectedPlanData) return;
     setIsProcessing(true);
+
+    // --- NEW LOG: Log walletDeduction before processing payment ---
+    console.log('SubscriptionPlans: walletDeduction before payment processing:', walletDeduction);
+    // --- END NEW LOG ---
+
     try {
       // Retrieve the session and access token
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -396,7 +401,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
                           <ul className="space-y-1 sm:space-y-3 mb-3 sm:mb-6 max-h-32 sm:max-h-none overflow-y-auto sm:overflow-visible">
                             {plan.features.slice(0, 4).map((feature: string, fi: number) => (
                               <li key={fi} className="flex items-start">
-                                <Check className="w-3 h-3 sm:w-5 sm:h-5 text-emerald-500 mr-2 sm:mr-3 mt-0.5 flex-shrink-0" />
+                                <Check className="w-3 h-3 sm:w-5 h-5 text-emerald-500 mr-2 sm:mr-3 mt-0.5 flex-shrink-0" />
                                 <span className="text-gray-700 text-xs sm:text-sm break-words">{feature}</span>
                               </li>
                             ))}
@@ -740,3 +745,4 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
     </div>
   );
 };
+
