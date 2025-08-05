@@ -243,6 +243,7 @@ serve(async (req) => {
       console.log(`[${new Date().toISOString()}] - Processing add-on credits for user: ${user.id}`);
       for (const addOnKey in selectedAddOns) {
         const quantity = selectedAddOns[addOnKey];
+        console.log(`[${new Date().toISOString()}] - Processing add-on with key: ${addOnKey} and quantity: ${quantity}`);
         if (quantity > 0) {
           const addOn = addOns.find((a) => a.id === addOnKey);
           if (!addOn) {
@@ -250,6 +251,7 @@ serve(async (req) => {
             continue;
           }
 
+          console.log(`[${new Date().toISOString()}] - Looking up addon_type for type_key: ${addOn.type}`);
           const { data: addonType, error: addonTypeError } = await supabase
             .from("addon_types")
             .select("id")
@@ -260,7 +262,9 @@ serve(async (req) => {
             console.error(`[${new Date().toISOString()}] - Error finding addon_type for key ${addOn.type}:`, addonTypeError);
             continue;
           }
+          console.log(`[${new Date().toISOString()}] - Found addon_type with ID: ${addonType.id} for key: ${addOn.type}`);
 
+          console.log(`[${new Date().toISOString()}] - Preparing to insert add-on credits with values: user_id: ${user.id}, addon_type_id: ${addonType.id}, quantity: ${quantity}, transactionId: ${transactionId}`);
           const { error: creditInsertError } = await supabase
             .from("user_addon_credits")
             .insert({
