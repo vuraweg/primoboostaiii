@@ -321,6 +321,8 @@ class PaymentService {
       
       const fullFunctionUrl = `${supabaseUrl}/functions/v1/create-order`;
       console.log('createOrder: Calling backend function at:', fullFunctionUrl);
+      console.log('createOrder: Access Token (first 10 chars):', session.access_token ? session.access_token.substring(0, 10) + '...' : 'N/A'); // ADDED LOG
+      console.log('createOrder: Request Body:', { planId, amount: grandTotal, addOnsTotal, couponCode, walletDeduction }); // ADDED LOG
 
       const response = await fetch(fullFunctionUrl, {
         method: 'POST',
@@ -337,7 +339,7 @@ class PaymentService {
         }),
       });
 
-      console.log('createOrder: Received response from backend with status:', response.status);
+      console.log('createOrder: Received response from backend with status:', response.status, response.statusText); // ADDED LOG
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
