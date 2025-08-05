@@ -73,10 +73,10 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
   const addOns: AddOn[] = paymentService.getAddOns();
 
   useEffect(() => {
-    if (plans.length > 0) {
-      setSelectedPlan(plans[currentSlide]?.id || plans[0].id);
+    if (allPlansWithAddOnOption.length > 0) {
+      setSelectedPlan(allPlansWithAddOnOption[currentSlide]?.id || allPlansWithAddOnOption[0].id);
     }
-  }, [currentSlide, plans]);
+  }, [currentSlide, allPlansWithAddOnOption]);
 
   useEffect(() => {
     if (user && isOpen) {
@@ -134,11 +134,11 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
   };
 
   const nextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % plans.length);
+    setCurrentSlide((prev) => (prev + 1) % allPlansWithAddOnOption.length);
   };
 
   const prevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + plans.length) % plans.length);
+    setCurrentSlide((prev) => (prev - 1 + allPlansWithAddOnOption.length) % allPlansWithAddOnOption.length);
   };
 
   const goToSlide = (index: number) => {
@@ -176,7 +176,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
     setCouponError('');
   };
 
-  const selectedPlanData = plans.find((p) => p.id === selectedPlan);
+  const selectedPlanData = allPlansWithAddOnOption.find((p) => p.id === selectedPlan);
 
   const addOnsTotal = Object.entries(selectedAddOns).reduce((total, [addOnId, qty]) => {
     const addOn = paymentService.getAddOnById(addOnId);
@@ -214,13 +214,17 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
       console.log('SubscriptionPlans: Value of accessToken before calling processPayment:', accessToken);
 
       if (grandTotal === 0) {
+        // CRITICAL FIX: For zero-amount transactions, still call processFreeSubscription with selectedAddOns
         const result = await paymentService.processFreeSubscription(
           selectedPlan,
           user.id,
           appliedCoupon ? appliedCoupon.code : undefined,
-          addOnsTotal
+          addOnsTotal,
+          selectedAddOns // Pass selectedAddOns to processFreeSubscription
         );
         if (result.success) {
+          // CRITICAL FIX: Refresh wallet balance after any successful payment
+          await fetchWalletBalance();
           onSubscriptionSuccess();
           onShowAlert('Subscription Activated!', 'Your free plan has been activated successfully.', 'success'); // Use onShowAlert
         } else {
@@ -240,9 +244,12 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
           accessToken, // Pass the access token here
           appliedCoupon ? appliedCoupon.code : undefined,
           walletDeduction,
-          addOnsTotal
+          addOnsTotal,
+          selectedAddOns // CRITICAL FIX: Pass selectedAddOns to processPayment
         );
         if (result.success) {
+          // CRITICAL FIX: Refresh wallet balance after any successful payment
+          await fetchWalletBalance();
           onSubscriptionSuccess();
           onShowAlert('Payment Successful!', 'Your subscription has been activated.', 'success'); // Use onShowAlert
         } else {
@@ -264,6 +271,32 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
       [addOnId]: Math.max(0, quantity),
     }));
   };
+
+  // CRITICAL FIX: Add "Add-ons Only" option to plans array for standalone purchases
+  const allPlansWithAddOnOption = [
+    {
+      id: 'addon_only_purchase',
+      name: '🛒 Add-ons Only',
+      price: 0,
+      duration: 'One-time Purchase',
+      optimizations: 0,
+      scoreChecks: 0,
+      linkedinMessages: 0,
+      guidedBuilds: 0,
+      tag: 'Buy individual features',
+      tagColor: 'text-gray-800 bg-gray-100',
+      gradient: 'from-gray-500 to-gray-700',
+      icon: 'gift',
+      features: [
+        '✅ Purchase only what you need',
+        '✅ No monthly commitment',
+        '✅ Credits never expire',
+        '✅ Mix and match features'
+      ],
+      popular: false
+    },
+    ...plans
+  ];
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-2 sm:p-4 backdrop-blur-sm">
@@ -308,7 +341,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
                   className="flex transition-transform duration-300 ease-in-out"
                   style={{ transform: `translateX(-${currentSlide * 100}%)` }}
                 >
-                  {plans.map((plan, index) => (
+                  {allPlansWithAddOnOption.map((plan, index) => (
                     <div key={plan.id} className="w-full flex-shrink-0 px-2 sm:px-4">
                       <div
                         className={`relative rounded-xl sm:rounded-3xl border-2 transition-all duration-300 ${
@@ -380,7 +413,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
                 <ChevronRight className="w-4 h-4 sm:w-6 h-6" />
               </button>
               <div className="flex justify-center space-x-2 mt-3 sm:mt-6">
-                {plans.map((_, idx) => (
+                {allPlansWithAddOnOption.map((_, idx) => (
                   <button
                     key={idx}
                     onClick={() => goToSlide(idx)}
@@ -394,8 +427,8 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
           </div>
 
           {/* Desktop Grid */}
-          <div className="hidden md:grid grid-cols-2 lg:grid-cols-5 gap-3 lg:gap-6 mb-4 lg:mb-8">
-            {plans.map((plan) => (
+          <div className="hidden md:grid grid-cols-2 lg:grid-cols-6 gap-3 lg:gap-6 mb-4 lg:mb-8">
+            {allPlansWithAddOnOption.map((plan) => (
               <div
                 key={plan.id}
                 className={`relative rounded-xl lg:rounded-3xl border-2 transition-all duration-300 cursor-pointer transform hover:scale-105 ${

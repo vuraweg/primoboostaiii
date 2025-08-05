@@ -159,6 +159,7 @@ serve(async (req) => {
     const couponCode = orderData.notes.couponCode
     const discountAmount = orderData.notes.discountAmount || 0
     const walletDeduction = orderData.notes.walletDeduction || 0
+    const selectedAddOns = JSON.parse(orderData.notes.selectedAddOns || '{}'); // ADD THIS LINE: Parse selectedAddOns
     const selectedAddOns = JSON.parse(orderData.notes.selectedAddOns || '{}');
 
     console.log(`[${new Date().toISOString()}] - Attempting to update payment_transactions record with ID: ${transactionId}`);
@@ -180,6 +181,74 @@ serve(async (req) => {
     console.log(`[${new Date().toISOString()}] - Payment transaction updated to success. Record ID: ${updatedTransaction.id}, coupon_code: ${updatedTransaction.coupon_code}`);
     transactionStatus = 'success'
     
+    // CRITICAL FIX: Process add-on credits FIRST (before subscription creation)
+    if (Object.keys(selectedAddOns).length > 0) {
+      console.log(`[${new Date().toISOString()}] - Processing add-on credits for user: ${user.id}`);
+      for (const addOnKey in selectedAddOns) {
+        const quantity = selectedAddOns[addOnKey];
+        if (quantity > 0) {
+          // Fetch the addon_type_id from the database using type_key
+          const { data: addonType, error: addonTypeError } = await supabase
+            .from('addon_types')
+            .select('id')
+            .eq('type_key', addOnKey)
+            .single();
+
+          if (addonTypeError || !addonType) {
+            console.error(`[${new Date().toISOString()}] - Error finding addon_type for key ${addOnKey}:`, addonTypeError);
+            // Continue to next add-on if one fails
+            continue;
+          }
+
+          // Insert into user_addon_credits
+          const { error: creditInsertError } = await supabase
+            .from('user_addon_credits')
+            .insert({
+              user_id: user.id,
+              addon_type_id: addonType.id,
+              quantity_purchased: quantity,
+              quantity_remaining: quantity,
+              payment_transaction_id: transactionId, // Link to the payment transaction
+            });
+
+          if (creditInsertError) {
+            console.error(`[${new Date().toISOString()}] - Error inserting add-on credits for ${addOnKey}:`, creditInsertError);
+          } else {
+            console.log(`[${new Date().toISOString()}] - Granted ${quantity} credits for add-on: ${addOnKey}`);
+          }
+        }
+      }
+    }
+
+    // CRITICAL FIX: Only create subscription if a real plan was purchased (not add-on only)
+    if (planId && planId !== 'addon_only_purchase') {
+      // CRITICAL FIX: Check for existing active subscription and upgrade it
+      const { data: existingSubscription, error: existingSubError } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .gt('end_date', new Date().toISOString())
+        .order('end_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingSubError) {
+        console.error('Error checking existing subscription:', existingSubError);
+      }
+
+      if (existingSubscription) {
+        console.log(`[${new Date().toISOString()}] - Found existing active subscription, upgrading...`);
+        // Mark existing subscription as upgraded
+        await supabase
+          .from('subscriptions')
+          .update({ 
+            status: 'upgraded',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingSubscription.id);
+      }
+
     if (Object.keys(selectedAddOns).length > 0) {
       console.log(`[${new Date().toISOString()}] - Processing add-on credits for user: ${user.id}`);
       for (const addOnKey in selectedAddOns) {
@@ -249,6 +318,7 @@ serve(async (req) => {
       }
       subscriptionId = subscription.id
 
+      // Update the payment transaction with the subscription_id
       const { error: updateSubscriptionIdError } = await supabase
         .from('payment_transactions')
         .update({ subscription_id: subscription.id })
@@ -258,9 +328,13 @@ serve(async (req) => {
         console.error('Error updating payment transaction with subscription_id:', updateSubscriptionIdError);
       }
     } else {
+      // If it was an add-on only purchase, ensure subscriptionId is null
+      subscriptionId = null;
+    } else {
       subscriptionId = null;
     }
 
+    // CRITICAL FIX: Properly record wallet deduction
     if (walletDeduction > 0) {
       console.log('Attempting to record wallet deduction:', {
         userId: user.id,
@@ -276,16 +350,16 @@ serve(async (req) => {
           amount: -(walletDeduction / 100),
           status: 'completed',
           transaction_ref: razorpay_payment_id,
-          activity_details: {
+          redeem_details: {
             subscription_id: subscriptionId,
             plan_id: planId,
-            original_amount: (orderData.amount / 100) + (walletDeduction / 100)
+            original_amount: (orderData.amount / 100) + (walletDeduction / 100),
+            addons_purchased: selectedAddOns
           }
         })
-        .throwOnError();
 
       if (walletError) {
-        console.error('Wallet deduction recording error (after throwOnError):', walletError);
+        console.error('Wallet deduction recording error:', walletError);
       } else {
         console.log('Wallet deduction successfully recorded.');
       }
@@ -306,30 +380,34 @@ serve(async (req) => {
           .single()
 
         if (!referrerError && referrerProfile) {
-          const commissionAmount = Math.floor(plan.price * 0.1)
+          // Calculate commission based on actual amount paid (plan + addons - discounts)
+          const totalPurchaseAmount = (orderData.amount / 100); // Convert from paise to rupees
+          const commissionAmount = Math.floor(totalPurchaseAmount * 0.1);
 
-          const { error: commissionError } = await supabase
-            .from('wallet_transactions')
-            .insert({
-              user_id: referrerProfile.id,
-              source_user_id: user.id,
-              type: 'referral',
-              amount: commissionAmount,
-              status: 'completed',
-              transaction_ref: `referral_${razorpay_payment_id}`,
-              activity_details: {
-                referred_user_id: user.id,
-                plan_purchased: planId,
-                plan_amount: plan.price,
-                commission_rate: 0.1
-              }
-            })
-            .throwOnError();
+          if (commissionAmount > 0) {
+            const { error: commissionError } = await supabase
+              .from('wallet_transactions')
+              .insert({
+                user_id: referrerProfile.id,
+                source_user_id: user.id,
+                type: 'referral',
+                amount: commissionAmount,
+                status: 'completed',
+                transaction_ref: `referral_${razorpay_payment_id}`,
+                redeem_details: {
+                  referred_user_id: user.id,
+                  plan_purchased: planId,
+                  total_purchase_amount: totalPurchaseAmount,
+                  commission_rate: 0.1,
+                  addons_included: selectedAddOns
+                }
+              });
 
-          if (commissionError) {
-            console.error('Referral commission error (after throwOnError):', commissionError);
-          } else {
-            console.log(`Referral commission of ₹${commissionAmount} credited to referrer successfully.`);
+            if (commissionError) {
+              console.error('Referral commission error:', commissionError);
+            } else {
+              console.log(`Referral commission of ₹${commissionAmount} credited to referrer successfully.`);
+            }
           }
         }
       }

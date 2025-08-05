@@ -132,9 +132,24 @@ serve(async (req) => {
     }
 
     // Get plan details
-    const plan = plans.find((p) => p.id === planId);
-    if (!plan) {
-      throw new Error('Invalid plan selected');
+    let plan;
+    if (planId === 'addon_only_purchase' || planId === null) {
+      // Handle add-on only purchases
+      plan = {
+        id: 'addon_only_purchase',
+        name: 'Add-on Only Purchase',
+        price: 0,
+        duration: 'One-time Purchase',
+        optimizations: 0,
+        scoreChecks: 0,
+        linkedinMessages: 0,
+        guidedBuilds: 0
+      };
+    } else {
+      plan = plans.find((p) => p.id === planId);
+      if (!plan) {
+        throw new Error('Invalid plan selected');
+      }
     }
 
     // Calculate final amount based on plan price
@@ -212,13 +227,14 @@ serve(async (req) => {
       .from('payment_transactions')
       .insert({
         user_id: user.id,
-        plan_id: planId,
+        plan_id: planId === 'addon_only_purchase' ? null : planId,
         status: 'pending', // Initial status
         amount: plan.price, // Original plan price
         currency: 'INR', // Explicitly set currency as it's not nullable and has a default
         coupon_code: appliedCoupon, // Save applied coupon code
         discount_amount: discountAmount, // Save discount amount
         final_amount: finalAmount, // Final amount after discounts/wallet/addons
+        purchase_type: planId === 'addon_only_purchase' ? 'addon_only' : (Object.keys(selectedAddOns || {}).length > 0 ? 'plan_with_addons' : 'plan'),
         // payment_id and order_id will be updated by verify-payment function
       })
       .select('id') // Select the ID of the newly created row

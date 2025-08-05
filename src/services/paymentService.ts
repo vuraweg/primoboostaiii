@@ -315,7 +315,7 @@ class PaymentService {
 
   // Create Razorpay order via backend
   // Updated return type to include transactionId
-  private async createOrder(planId: string, grandTotal: number, addOnsTotal: number, couponCode?: string, walletDeduction?: number): Promise<{ orderId: string; amount: number; keyId: string; transactionId: string }> {
+  private async createOrder(planId: string, grandTotal: number, addOnsTotal: number, couponCode?: string, walletDeduction?: number, selectedAddOns?: { [key: string]: number }): Promise<{ orderId: string; amount: number; keyId: string; transactionId: string }> {
     console.log('createOrder: Function called to create a new order.');
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -346,7 +346,8 @@ class PaymentService {
           amount: grandTotal, // Pass the grand total to the backend
           addOnsTotal,
           couponCode: couponCode || undefined,
-          walletDeduction: walletDeduction || 0
+          walletDeduction: walletDeduction || 0,
+          selectedAddOns: selectedAddOns || {} // ADD selectedAddOns to request body
         }),
       });
 
@@ -435,7 +436,8 @@ class PaymentService {
     accessToken: string,
     couponCode?: string,
     walletDeduction?: number,
-    addOnsTotal?: number
+    addOnsTotal?: number,
+    selectedAddOns?: { [key: string]: number } // ADD selectedAddOns parameter
   ): Promise<{ success: boolean; subscriptionId?: string; error?: string }> {
     console.log('processPayment: Function called with paymentData:', paymentData);
     try {
@@ -454,7 +456,7 @@ class PaymentService {
       let orderData;
       try {
         // Capture transactionId from createOrder response
-        orderData = await this.createOrder(paymentData.planId, paymentData.amount, addOnsTotal || 0, couponCode, walletDeduction);
+        orderData = await this.createOrder(paymentData.planId, paymentData.amount, addOnsTotal || 0, couponCode, walletDeduction, selectedAddOns);
         console.log('processPayment: Order created successfully:', orderData.orderId, 'Amount:', orderData.amount, 'Transaction ID:', orderData.transactionId);
         // NEW LOG: Inspect orderData
         console.log('processPayment: Received orderData from backend:', orderData);
@@ -532,9 +534,53 @@ class PaymentService {
   // New method to process free subscriptions
   async processFreeSubscription(planId: string, userId: string, couponCode?: string, addOnsTotal?: number): Promise<{ success: boolean; subscriptionId?: string; error?: string }> {
     try {
+      // CRITICAL FIX: Always create a payment_transactions record for zero-amount purchases
+      // This prevents coupon reuse and ensures proper tracking
+      const { data: transactionRecord, error: transactionError } = await supabase
+        .from('payment_transactions')
+        .insert({
+          user_id: userId,
+          plan_id: planId === 'addon_only_purchase' ? null : planId,
+          status: 'success', // Mark as successful immediately for free transactions
+          amount: 0, // Zero amount for free transactions
+          currency: 'INR',
+          coupon_code: couponCode,
+          discount_amount: 0,
+          final_amount: 0,
+          purchase_type: planId === 'addon_only_purchase' ? 'addon_only' : 'plan',
+          payment_id: `free_${Date.now()}`, // Generate a unique payment ID for free transactions
+          order_id: `order_free_${Date.now()}`,
+        })
+        .select()
+        .single();
+
+      if (transactionError) {
+        console.error('Error creating free transaction record:', transactionError);
+        throw new Error('Failed to record free transaction');
+      }
+
+      // If it's an add-on only purchase, don't create a subscription
+      if (planId === 'addon_only_purchase') {
+        return { success: true, subscriptionId: undefined };
+      }
+
       const plan = this.getPlanById(planId);
       if (!plan) {
         return { success: false, error: 'Plan not found' };
+      }
+
+      // CRITICAL FIX: Check for existing active subscription and upgrade it
+      const existingSubscription = await this.getUserSubscription(userId);
+      if (existingSubscription) {
+        console.log('Found existing subscription, upgrading...');
+        // Mark existing subscription as upgraded
+        await supabase
+          .from('subscriptions')
+          .update({ 
+            status: 'upgraded',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingSubscription.id);
       }
 
       const now = new Date();
@@ -569,7 +615,7 @@ class PaymentService {
           linkedin_messages_total: plan.linkedinMessages,
           guided_builds_used: 0,
           guided_builds_total: plan.guidedBuilds,
-          payment_id: null,
+          payment_id: transactionRecord.payment_id, // Link to the transaction record
           coupon_used: couponCode, // Pass couponCode here
           created_at: now.toISOString(),
           updated_at: now.toISOString(),
@@ -581,6 +627,12 @@ class PaymentService {
         console.error('Error creating free subscription:', error);
         throw new Error(error.message || 'Failed to create free subscription');
       }
+
+      // Update the transaction record with the subscription ID
+      await supabase
+        .from('payment_transactions')
+        .update({ subscription_id: data.id })
+        .eq('id', transactionRecord.id);
 
       return { success: true, subscriptionId: data.id };
 
@@ -870,7 +922,90 @@ class PaymentService {
       return { success: false, error: 'Failed to activate free trial' };
     }
   }
+
+  // NEW: Get user's add-on credits
+  async getUserAddonCredits(userId: string): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('user_addon_credits')
+        .select(`
+          *,
+          addon_types (
+            name,
+            type_key,
+            unit_price,
+            description
+          )
+        `)
+        .eq('user_id', userId)
+        .gt('quantity_remaining', 0)
+        .order('purchased_at', { ascending: false });
+
+      if (error) {
+        console.error('Error getting user addon credits:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getUserAddonCredits:', error);
+      return [];
+    }
+  }
+
+  // NEW: Use add-on credit
+  async useAddonCredit(userId: string, addonTypeKey: string): Promise<{ success: boolean; remaining: number; error?: string }> {
+    try {
+      // Get the addon type
+      const { data: addonType, error: addonTypeError } = await supabase
+        .from('addon_types')
+        .select('id')
+        .eq('type_key', addonTypeKey)
+        .single();
+
+      if (addonTypeError || !addonType) {
+        return { success: false, remaining: 0, error: 'Add-on type not found' };
+      }
+
+      // Get user's credits for this add-on type
+      const { data: userCredit, error: creditError } = await supabase
+        .from('user_addon_credits')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('addon_type_id', addonType.id)
+        .gt('quantity_remaining', 0)
+        .order('purchased_at', { ascending: true }) // Use oldest credits first
+        .limit(1)
+        .maybeSingle();
+
+      if (creditError) {
+        console.error('Error getting user addon credit:', creditError);
+        return { success: false, remaining: 0, error: creditError.message };
+      }
+
+      if (!userCredit || userCredit.quantity_remaining <= 0) {
+        return { success: false, remaining: 0, error: 'No credits remaining for this add-on' };
+      }
+
+      // Decrement the credit
+      const { error: updateError } = await supabase
+        .from('user_addon_credits')
+        .update({
+          quantity_remaining: userCredit.quantity_remaining - 1
+        })
+        .eq('id', userCredit.id);
+
+      if (updateError) {
+        console.error('Error using addon credit:', updateError);
+        return { success: false, remaining: 0, error: updateError.message };
+      }
+
+      return { success: true, remaining: userCredit.quantity_remaining - 1 };
+    } catch (error: any) {
+      console.error('Error in useAddonCredit:', error);
+      return { success: false, remaining: 0, error: error.message };
+    }
+  }
 }
 
 export const paymentService = new PaymentService();
-
