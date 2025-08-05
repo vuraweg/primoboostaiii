@@ -74,6 +74,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
   const addOns: AddOn[] = paymentService.getAddOns();
 
   const allPlansWithAddOnOption = [
+    ...plans,
     {
       id: 'addon_only_purchase',
       name: '🛒 Add-ons Only',
@@ -95,7 +96,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
       ],
       popular: false
     },
-    ...plans
+    
   ];
 
   // REMOVED: The useEffect block that sets selectedPlan based on currentSlide.
