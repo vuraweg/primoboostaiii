@@ -860,4 +860,3 @@ export const UserProfileManagement: React.FC<UserProfileManagementProps> = ({
       </div>
     </div>
   );
-};
