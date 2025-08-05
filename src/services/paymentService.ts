@@ -438,6 +438,9 @@ class PaymentService {
     addOnsTotal?: number
   ): Promise<{ success: boolean; subscriptionId?: string; error?: string }> {
     console.log('processPayment: Function called with paymentData:', paymentData);
+    // --- NEW LOG: Log walletDeduction received in processPayment ---
+    console.log('processPayment: walletDeduction received:', walletDeduction);
+    // --- END NEW LOG ---
     try {
       console.log('processPayment: Attempting to load Razorpay script...');
       const scriptLoaded = await this.loadRazorpayScript();
