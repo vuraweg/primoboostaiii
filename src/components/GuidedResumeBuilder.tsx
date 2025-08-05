@@ -431,7 +431,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                 </button>
                 <button
                   onClick={onNavigateBack}
-                  className="flex items-center justify-center space-x-2 bg-blue-600 mt-29 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300"
+                  className="flex items-center justify-center space-x-2 bg-blue-600 mt-35 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300"
                 >
                   <ArrowLeft className="w-5 h-5" />
                   <span className="block sm:inline">Back to Home</span>
