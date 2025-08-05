@@ -360,7 +360,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                 <div className="bg-blue-500/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
                   <Zap className="w-8 h-8 text-yellow-400" />
                 </div>
-                <h4 className="font-semibold mb-3 text-lg">AI-Powered Analysis</h4>
+                <h4 className="font-semibold mb-3 text-lg"  style={{ color: 'rgb(26, 65, 229)' }}>AI-Powered Analysis</h4>
                 <p className="text-blue-200 leading-relaxed">Advanced algorithms analyze and optimize your resume</p>
               </div>
               
