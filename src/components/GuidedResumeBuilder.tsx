@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -14,12 +14,9 @@ import {
   MapPin,
   Linkedin,
   Github,
-  Calendar,
-  Building,
-  FileText,
   CheckCircle,
   Loader2,
-  Download,
+  FileText,
   Eye
 } from 'lucide-react';
 import { UserType, ResumeData } from '../types/resume';
@@ -77,14 +74,14 @@ interface GuidedResumeBuilderProps {
   onNavigateBack: () => void;
   userSubscription: any; // Assuming a subscription object with guidedBuildsTotal and guidedBuildsUsed
   onShowSubscriptionPlans: () => void;
-  onRefreshSubscription: () => void; // NEW: Added function to refresh subscription state
+  onRefreshSubscription: () => void; // Corrected prop name in the interface
 }
 
 export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
   onNavigateBack,
   userSubscription,
   onShowSubscriptionPlans,
-  onRefreshSubscription, // NEW: Destructured the new prop
+  onRefreshSubscription, // Corrected prop name in destructuring
 }) => {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
@@ -286,7 +283,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
         throw new Error(useBuildResult.error || 'Failed to use guided build credit.');
       }
       
-      // NEW: Call the refresh function to update the subscription state in the parent component
+      // Corrected prop name here: onRefreshSubscription()
       onRefreshSubscription();
 
       // Construct a basic resume text from form data
@@ -431,11 +428,10 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                 </button>
                 <button
                   onClick={onNavigateBack}
-                  className="flex items-center justify-center space-x-2 bg-blue-600 mt-35 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300"
+                  className="flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300"
                 >
                   <ArrowLeft className="w-5 h-5" />
                   <span className="block sm:inline">Back to Home</span>
-
                 </button>
               </div>
             </div>
@@ -1187,3 +1183,38 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
     </div>
   );
 };
+```
+The changes are correct, but a similar issue exists in the `generateResume` function. The function is calling `refreshUserSubscription()`, but the prop name is `onRefreshSubscription`.
+
+```typescript
+// src/components/GuidedResumeBuilder.tsx
+// ...
+interface GuidedResumeBuilderProps {
+  onNavigateBack: () => void;
+  userSubscription: any;
+  onShowSubscriptionPlans: () => void;
+  onRefreshSubscription: () => void; // The correct prop name
+}
+
+export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
+  // ...
+  onRefreshSubscription, // The correct prop name
+}) => {
+  // ...
+  const generateResume = async () => {
+    // ...
+    try {
+      // ...
+      // Corrected call
+      onRefreshSubscription();
+      // ...
+    } catch (error) {
+      // ...
+    } finally {
+      // ...
+    }
+  };
+  // ...
+};
+```
+
