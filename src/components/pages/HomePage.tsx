@@ -376,7 +376,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                 <div className="bg-blue-500/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
                   <Users className="w-8 h-8 text-purple-400" />
                 </div>
-                <h4 className="font-semibold mb-3 text-lg">Expert Approved</h4>
+                <h4 className="font-semibold mb-3 text-lg" style={{ color: 'rgb(193, 185, 130,1)' }}>Expert Approved</h4>
                 <p className="text-blue-200 leading-relaxed">Formats trusted by recruiters worldwide</p>
               </div>
             </div>
