@@ -134,24 +134,24 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
   });
 
   const steps = [
-    {
-      id: 'experience',
-      title: 'Experience Level',
-      icon: <User className="w-5 h-5" />,
-      description: 'Tell us about your professional background',
-    },
-    {
-      id: 'contact',
-      title: 'Contact Details',
-      icon: <Mail className="w-5 h-5" />,
-      description: 'Your basic information and contact details',
-    },
-    {
-      id: 'education',
-      title: 'Education',
-      icon: <GraduationCap className="w-5 h-5" />,
-      description: 'Your academic background and qualifications',
-    },
+     {
+    id: 'experience',
+    title: 'Experience Level',
+    icon: (<User className="w-5 h-5" />),
+    description: 'Tell us about your professional background'
+  },
+  {
+    id: 'contact',
+    title: 'Contact Details',
+    icon: (<Mail className="w-5 h-5" />),
+    description: 'Your basic information and contact details'
+  },
+  {
+    id: 'education',
+    title: 'Education',
+    icon: (<GraduationCap className="w-5 h-5" />),
+    description: 'Your academic background and qualifications'
+  },
     {
       id: 'experience-work',
       title: 'Work Experience',
