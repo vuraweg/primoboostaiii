@@ -307,6 +307,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
   };
 
   const handleAddOnQuantityChange = (addOnId: string, quantity: number) => {
+    console.log('DEBUG: handleAddOnQuantityChange called for:', addOnId, 'with quantity:', quantity); // ADD THIS LINE
     setSelectedAddOns((prev) => ({
       ...prev,
       [addOnId]: Math.max(0, quantity),
