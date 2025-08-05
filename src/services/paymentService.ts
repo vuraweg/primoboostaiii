@@ -663,7 +663,7 @@ class PaymentService {
   async getUserSubscription(userId: string): Promise<Subscription | null> {
     try {
       // Fetch all subscriptions for the user that are not cancelled
-      const { data, error } = await supabase
+      const { data: subs, error: subsError } = await supabase
         .from('subscriptions')
         .select(`
           id,
@@ -684,16 +684,30 @@ class PaymentService {
           coupon_used
         `)
         .eq('user_id', userId)
-        .neq('status', 'cancelled') // Exclude cancelled subscriptions
-        .order('end_date', { ascending: false }); // Order by end date to prioritize newer plans
+        .neq('status', 'cancelled'); // Exclude cancelled subscriptions
 
-      if (error) {
-        console.error('Error getting subscriptions:', error);
+      if (subsError) {
+        console.error('Error getting subscriptions:', subsError);
         return null;
       }
 
-      if (!data || data.length === 0) {
-        return null; // No subscriptions found
+      // Fetch all add-on credits for the user
+      const { data: addons, error: addonsError } = await supabase
+        .from('user_addon_credits')
+        .select(`
+          id,
+          addon_type_id,
+          quantity_purchased,
+          quantity_remaining,
+          expires_at,
+          addon_types(type_key) // Join to get the type_key
+        `)
+        .eq('user_id', userId)
+        .gt('quantity_remaining', 0); // Only consider remaining credits
+
+      if (addonsError) {
+        console.error('Error getting add-on credits:', addonsError);
+        return null;
       }
 
       // Initialize combined totals
@@ -708,14 +722,8 @@ class PaymentService {
       let latestEndDate: Date | null = null;
       let overallStatus: 'active' | 'expired' | 'cancelled' = 'expired'; // Default to expired if no credits
 
-      // Aggregate credits from all relevant subscriptions
-      for (const sub of data) {
-        // Only consider credits from plans that are not yet fully used or have future end dates
-        // This logic assumes that once a plan is "used up" (used >= total), its credits are no longer available.
-        // If credits should persist even after a plan's individual usage is maxed out, this logic needs adjustment.
-        
-        // For combining, we sum up all totals and all used amounts.
-        // The "remaining" will be calculated from these combined totals.
+      // Aggregate credits from subscriptions
+      for (const sub of subs) {
         combinedOptimizationsUsed += sub.optimizations_used;
         combinedOptimizationsTotal += sub.optimizations_total;
         combinedScoreChecksUsed += sub.score_checks_used;
@@ -725,11 +733,34 @@ class PaymentService {
         combinedGuidedBuildsUsed += sub.guided_builds_used;
         combinedGuidedBuildsTotal += sub.guided_builds_total;
 
-        // Determine the latest end date among all non-cancelled subscriptions
         const currentEndDate = new Date(sub.end_date);
         if (!latestEndDate || currentEndDate > latestEndDate) {
           latestEndDate = currentEndDate;
         }
+      }
+
+      // Aggregate credits from add-ons
+      for (const addon of addons) {
+        const typeKey = (addon.addon_types as { type_key: string }).type_key;
+        const remaining = addon.quantity_remaining;
+
+        switch (typeKey) {
+          case 'optimization':
+            combinedOptimizationsTotal += remaining;
+            break;
+          case 'score_check':
+            combinedScoreChecksTotal += remaining;
+            break;
+          case 'linkedin_messages':
+            combinedLinkedinMessagesTotal += remaining;
+            break;
+          case 'guided_build':
+            combinedGuidedBuildsTotal += remaining;
+            break;
+          // Add other add-on types as needed
+        }
+        // Add-on credits don't typically have an 'end_date' that affects overall subscription status
+        // unless they are time-limited. For now, we assume they are perpetual until used.
       }
 
       // Determine overall status based on combined remaining credits and end date
@@ -744,12 +775,14 @@ class PaymentService {
         overallStatus = 'active';
       } else if (hasRemainingCredits && (!latestEndDate || latestEndDate <= now)) {
         // If credits remain but all plans are expired, consider it active until credits are used
-        // This is a business logic decision. If credits should expire with the plan, remove this branch.
         overallStatus = 'active'; // Credits persist beyond plan end date
       } else {
         overallStatus = 'expired';
       }
 
+      if (!hasRemainingCredits && subs.length === 0 && addons.length === 0) {
+          return null; // No subscriptions or add-ons found
+      }
 
       // Return a synthetic subscription object
       return {
@@ -757,7 +790,7 @@ class PaymentService {
         userId: userId,
         planId: 'combined', // Indicates this is a combined view
         status: overallStatus,
-        startDate: data[data.length - 1].start_date, // Oldest start date
+        startDate: subs.length > 0 ? subs[subs.length - 1].start_date : new Date().toISOString(), // Oldest start date from subs
         endDate: latestEndDate ? latestEndDate.toISOString() : new Date().toISOString(), // Latest end date
         optimizationsUsed: combinedOptimizationsUsed,
         optimizationsTotal: combinedOptimizationsTotal,
@@ -777,10 +810,67 @@ class PaymentService {
     }
   }
 
+// Helper function to get the addon_type_id
+private async getAddonTypeId(typeKey: string): Promise<string | null> {
+    const { data, error } = await supabase
+        .from('addon_types')
+        .select('id')
+        .eq('type_key', typeKey)
+        .single();
+    if (error) {
+        console.error(`Error fetching addon_type_id for ${typeKey}:`, error);
+        return null;
+    }
+    return data?.id || null;
+}
+
+// Helper function to decrement add-on credits
+private async decrementAddonCredit(userId: string, addonTypeKey: string): Promise<boolean> {
+    const addonTypeId = await this.getAddonTypeId(addonTypeKey);
+    if (!addonTypeId) {
+        return false; // Add-on type not found
+    }
+
+    // Find an add-on credit with remaining quantity
+    const { data: addonCredit, error: fetchError } = await supabase
+        .from('user_addon_credits')
+        .select('id, quantity_remaining')
+        .eq('user_id', userId)
+        .eq('addon_type_id', addonTypeId)
+        .gt('quantity_remaining', 0)
+        .order('expires_at', { ascending: true, nullsFirst: false }) // Prioritize expiring soonest
+        .limit(1)
+        .single();
+
+    if (fetchError || !addonCredit) {
+        return false; // No add-on credits available
+    }
+
+    // Decrement quantity_remaining
+    const { error: updateError } = await supabase
+        .from('user_addon_credits')
+        .update({ quantity_remaining: addonCredit.quantity_remaining - 1 })
+        .eq('id', addonCredit.id);
+
+    if (updateError) {
+        console.error(`Error decrementing add-on credit for ${addonTypeKey}:`, updateError);
+        return false;
+    }
+    return true;
+}
+
   // Use optimization (decrement count)
   async useOptimization(userId: string): Promise<{ success: boolean; remaining: number; error?: string }> {
     try {
-      // Fetch all active/upgraded subscriptions
+        // Try to use add-on credit first
+        const usedAddon = await this.decrementAddonCredit(userId, 'optimization');
+        if (usedAddon) {
+            const updatedCombinedSubscription = await this.getUserSubscription(userId);
+            const totalRemaining = (updatedCombinedSubscription?.optimizationsTotal || 0) - (updatedCombinedSubscription?.optimizationsUsed || 0);
+            return { success: true, remaining: totalRemaining };
+        }
+
+      // Fallback to subscription credits if no add-on credits were used
       const { data, error } = await supabase
         .from('subscriptions')
         .select(`
@@ -845,6 +935,14 @@ class PaymentService {
   // Use score check (decrement count)
   async useScoreCheck(userId: string): Promise<{ success: boolean; remaining: number; error?: string }> {
     try {
+        // Try to use add-on credit first
+        const usedAddon = await this.decrementAddonCredit(userId, 'score_check');
+        if (usedAddon) {
+            const updatedCombinedSubscription = await this.getUserSubscription(userId);
+            const totalRemaining = (updatedCombinedSubscription?.scoreChecksTotal || 0) - (updatedCombinedSubscription?.scoreChecksUsed || 0);
+            return { success: true, remaining: totalRemaining };
+        }
+
       const { data, error } = await supabase
         .from('subscriptions')
         .select(`
@@ -906,6 +1004,14 @@ class PaymentService {
   // Use LinkedIn message (decrement count)
   async useLinkedInMessage(userId: string): Promise<{ success: boolean; remaining: number; error?: string }> {
     try {
+        // Try to use add-on credit first
+        const usedAddon = await this.decrementAddonCredit(userId, 'linkedin_messages');
+        if (usedAddon) {
+            const updatedCombinedSubscription = await this.getUserSubscription(userId);
+            const totalRemaining = (updatedCombinedSubscription?.linkedinMessagesTotal || 0) - (updatedCombinedSubscription?.linkedinMessagesUsed || 0);
+            return { success: true, remaining: totalRemaining };
+        }
+
       const { data, error } = await supabase
         .from('subscriptions')
         .select(`
@@ -967,6 +1073,14 @@ class PaymentService {
   // Use guided build (decrement count)
   async useGuidedBuild(userId: string): Promise<{ success: boolean; remaining: number; error?: string }> {
     try {
+        // Try to use add-on credit first
+        const usedAddon = await this.decrementAddonCredit(userId, 'guided_build');
+        if (usedAddon) {
+            const updatedCombinedSubscription = await this.getUserSubscription(userId);
+            const totalRemaining = (updatedCombinedSubscription?.guidedBuildsTotal || 0) - (updatedCombinedSubscription?.guidedBuildsUsed || 0);
+            return { success: true, remaining: totalRemaining };
+        }
+
       const { data, error } = await supabase
         .from('subscriptions')
         .select(`
