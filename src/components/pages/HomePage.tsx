@@ -368,7 +368,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                 <div className="bg-blue-500/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
                   <Award className="w-8 h-8 text-green-400" />
                 </div>
-                <h4 className="font-semibold mb-3 text-lg">ATS Optimization</h4>
+                <h4 className="font-semibold mb-3 text-lg text-rgb(26, 65, 229)-500">ATS Optimization</h4>
                 <p className="text-blue-200 leading-relaxed">Ensure your resume passes all screening systems</p>
               </div>
               
