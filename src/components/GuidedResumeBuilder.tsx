@@ -27,6 +27,7 @@ import { optimizeResume } from '../services/geminiService';
 import { useAuth } from '../contexts/AuthContext';
 import { ResumePreview } from './ResumePreview';
 import { ExportButtons } from './ExportButtons';
+import { paymentService } from '../services/paymentService'; // Import the payment service
 
 interface ContactDetails {
   fullName: string;
@@ -181,11 +182,6 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
     }
   ];
 
-  // Check subscription on mount and whenever the subscription state changes
-// Inside src/components/GuidedResumeBuilder.tsx
-
-
-
   const updateFormData = (section: keyof FormData, data: any) => {
     setFormData(prev => ({
       ...prev,
@@ -268,13 +264,26 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
   };
 
   const generateResume = async () => {
+    if (!user) {
+      // Handle unauthenticated user case
+      alert("You must be logged in to generate a resume.");
+      onNavigateBack();
+      return;
+    }
+
     if (!userSubscription || userSubscription.guidedBuildsTotal - userSubscription.guidedBuildsUsed <= 0) {
       onShowSubscriptionPlans();
       return;
     }
-    
+
     setIsGenerating(true);
     try {
+      // Use the service to decrement the guided build count
+      const useBuildResult = await paymentService.useGuidedBuild(user.id);
+      if (!useBuildResult.success) {
+        throw new Error(useBuildResult.error || 'Failed to use guided build credit.');
+      }
+      
       // Construct a basic resume text from form data
       const resumeText = constructResumeText(formData);
 
@@ -290,9 +299,8 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
         formData.contactDetails.phone,
         formData.contactDetails.linkedin,
         formData.contactDetails.github,
-        formData.contactDetails.linkedin, // These last two seem redundant based on your current setup.
-        formData.contactDetails.github,    // You might want to review the optimizeResume signature.
-        '' // No specific target role
+        '', // No LinkedIn URL provided as a separate argument to the function anymore
+        '' // No GitHub URL provided as a separate argument to the function anymore
       );
 
       setGeneratedResume(result);
