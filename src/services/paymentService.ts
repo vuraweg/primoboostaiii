@@ -133,273 +133,56 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
     }
   });
 
- const steps = [
+const steps: Step[] = [
   {
     id: 'experience',
     title: 'Experience Level',
-   icon: React.createElement(User, { className: 'w-5 h-5' }),
-
-    description: 'Tell us about your professional background'
+    icon: <User className="w-5 h-5" />,
+    description: 'Tell us about your professional background',
   },
   {
     id: 'contact',
     title: 'Contact Details',
-    icon: (<Mail className="w-5 h-5" />),
-    description: 'Your basic information and contact details'
+    icon: <Mail className="w-5 h-5" />,
+    description: 'Your basic information and contact details',
   },
   {
     id: 'education',
     title: 'Education',
-    icon: (<GraduationCap className="w-5 h-5" />),
-    description: 'Your academic background and qualifications'
+    icon: <GraduationCap className="w-5 h-5" />,
+    description: 'Your academic background and qualifications',
   },
   {
     id: 'experience-work',
     title: 'Work Experience',
-    icon: (<Briefcase className="w-5 h-5" />),
-    description: 'Your professional experience and internships'
+    icon: <Briefcase className="w-5 h-5" />,
+    description: 'Your professional experience and internships',
   },
   {
     id: 'projects',
     title: 'Projects',
-    icon: (<Code className="w-5 h-5" />),
-    description: 'Your personal and academic projects'
+    icon: <Code className="w-5 h-5" />,
+    description: 'Your personal and academic projects',
   },
   {
     id: 'skills',
     title: 'Skills',
-    icon: (<Award className="w-5 h-5" />),
-    description: 'Your technical and soft skills'
+    icon: <Award className="w-5 h-5" />,
+    description: 'Your technical and soft skills',
   },
   {
     id: 'additional',
     title: 'Additional Sections',
-    icon: (<Plus className="w-5 h-5" />),
-    description: 'Optional sections like certifications and achievements'
+    icon: <Plus className="w-5 h-5" />,
+    description: 'Optional sections like certifications and achievements',
   },
   {
     id: 'review',
     title: 'Review & Generate',
-    icon: (<CheckCircle className="w-5 h-5" />),
-    description: 'Review your information and generate your resume'
+    icon: <CheckCircle className="w-5 h-5" />,
+    description: 'Review your information and generate your resume',
   }
 ];
-
-  const updateFormData = (section: keyof FormData, data: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [section]: data
-    }));
-  };
-
-  const addArrayItem = (section: keyof FormData, item: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [section]: [...(prev[section] as any[]), item]
-    }));
-  };
-
-  const removeArrayItem = (section: keyof FormData, index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      [section]: (prev[section] as any[]).filter((_, i) => i !== index)
-    }));
-  };
-
-  const updateArrayItem = (section: keyof FormData, index: number, data: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [section]: (prev[section] as any[]).map((item, i) => i === index ? data : item)
-    }));
-  };
-
-  const updateSkills = (category: string, index: number, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      skills: {
-        ...prev.skills,
-        [category]: prev.skills[category].map((skill, i) => i === index ? value : skill)
-      }
-    }));
-  };
-
-  const addSkill = (category: string) => {
-    setFormData(prev => ({
-      ...prev,
-      skills: {
-        ...prev.skills,
-        [category]: [...prev.skills[category], '']
-      }
-    }));
-  };
-
-  const removeSkill = (category: string, index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      skills: {
-        ...prev.skills,
-        [category]: prev.skills[category].filter((_, i) => i !== index)
-      }
-    }));
-  };
-
-  const canProceedToNext = () => {
-    switch (currentStep) {
-      case 0: // Experience Level
-        return formData.experienceLevel !== '';
-      case 1: // Contact Details
-        return formData.contactDetails.fullName && formData.contactDetails.email;
-      case 2: // Education
-        return formData.education.some(edu => edu.degree && edu.school);
-      case 3: // Work Experience
-        return true;
-      case 4: // Projects
-        return true;
-      case 5: // Skills
-        return Object.values(formData.skills).some(skillArray => skillArray.some(skill => skill.trim() !== ''));
-      case 6: // Additional Sections
-        return true;
-      case 7: // Review & Generate - always can proceed to generate once here
-        return true;
-      default:
-        return true;
-    }
-  };
-
-  const generateResume = async () => {
-    if (!user) {
-      // Handle unauthenticated user case
-      alert("You must be logged in to generate a resume.");
-      onNavigateBack();
-      return;
-    }
-
-    if (!userSubscription || userSubscription.guidedBuildsTotal - userSubscription.guidedBuildsUsed <= 0) {
-      onShowSubscriptionPlans();
-      return;
-    }
-
-    setIsGenerating(true);
-    try {
-      // Use the service to decrement the guided build count
-      const useBuildResult = await paymentService.useGuidedBuild(user.id);
-      if (!useBuildResult.success) {
-        throw new Error(useBuildResult.error || 'Failed to use guided build credit.');
-      }
-      
-      // NEW: Call the refresh function to update the subscription state in the parent component
-      onRefreshSubscription();
-
-      // Construct a basic resume text from form data
-      const resumeText = constructResumeText(formData);
-
-      // Use a generic job description for formatting
-      const genericJobDescription = "We are looking for a motivated individual with strong technical skills and good communication abilities. The ideal candidate should have relevant education and experience in their field.";
-
-      const result = await optimizeResume(
-        resumeText,
-        genericJobDescription,
-        formData.experienceLevel,
-        formData.contactDetails.fullName,
-        formData.contactDetails.email,
-        formData.contactDetails.phone,
-        formData.contactDetails.linkedin,
-        formData.contactDetails.github,
-        '', // No LinkedIn URL provided as a separate argument to the function anymore
-        '' // No GitHub URL provided as a separate argument to the function anymore
-      );
-
-      setGeneratedResume(result);
-      setShowPreview(true);
-    } catch (error) {
-      console.error('Error generating resume:', error);
-      alert('Failed to generate resume. Please try again.');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const constructResumeText = (data: FormData): string => {
-    let text = `Name: ${data.contactDetails.fullName}\n`;
-    text += `Email: ${data.contactDetails.email}\n`;
-    text += `Phone: ${data.contactDetails.phone}\n`;
-    if (data.contactDetails.location) text += `Location: ${data.contactDetails.location}\n`;
-    if (data.contactDetails.linkedin) text += `LinkedIn: ${data.contactDetails.linkedin}\n`;
-    if (data.contactDetails.github) text += `GitHub: ${data.contactDetails.github}\n`;
-
-    // Education
-    text += '\nEDUCATION:\n';
-    data.education.forEach(edu => {
-      if (edu.degree.trim() && edu.school.trim()) {
-        text += `${edu.degree} from ${edu.school} (${edu.year})`;
-        if (edu.cgpa.trim()) text += ` - CGPA: ${edu.cgpa}`;
-        if (edu.location.trim()) text += ` - ${edu.location}`;
-        text += '\n';
-      }
-    });
-
-    // Work Experience
-    if (data.workExperience.some(exp => exp.role.trim() && exp.company.trim())) {
-      text += '\nWORK EXPERIENCE:\n';
-      data.workExperience.forEach(exp => {
-        if (exp.role.trim() && exp.company.trim()) {
-          text += `${exp.role} at ${exp.company} (${exp.year})\n`;
-          exp.bullets.forEach(bullet => {
-            if (bullet.trim()) text += `• ${bullet}\n`;
-          });
-        }
-      });
-    }
-
-    // Projects
-    if (data.projects.some(proj => proj.title.trim())) {
-      text += '\nPROJECTS:\n';
-      data.projects.forEach(proj => {
-        if (proj.title.trim()) {
-          text += `${proj.title}\n`;
-          proj.bullets.forEach(bullet => {
-            if (bullet.trim()) text += `• ${bullet}\n`;
-          });
-        }
-      });
-    }
-
-    // Skills
-    text += '\nSKILLS:\n';
-    Object.entries(data.skills).forEach(([category, skills]) => {
-      const filteredSkills = skills.filter(skill => skill.trim() !== '');
-      if (filteredSkills.length > 0) {
-        text += `${category}: ${filteredSkills.join(', ')}\n`;
-      }
-    });
-
-    // Certifications
-    if (data.additionalSections.includeCertifications && data.certifications.some(cert => cert.trim())) {
-      text += '\nCERTIFICATIONS:\n';
-      data.certifications.forEach(cert => {
-        if (cert.trim()) text += `• ${cert}\n`;
-      });
-    }
-
-    // Achievements
-    if (data.additionalSections.includeAchievements && data.achievements.some(ach => ach.trim())) {
-      text += '\nACHIEVEMENTS:\n';
-      data.achievements.forEach(ach => {
-        if (ach.trim()) text += `• ${ach}\n`;
-      });
-    }
-
-    return text;
-  };
-
-  const nextStep = () => {
-    if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
-    } else if (currentStep === steps.length - 1) {
-      // This is the "Review & Generate" step
-      generateResume();
-    }
-  };
 
   const prevStep = () => {
     if (currentStep > 0) {
