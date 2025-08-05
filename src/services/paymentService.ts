@@ -905,7 +905,7 @@ private async decrementAddonCredit(userId: string, addonTypeKey: string): Promis
       .order('expires_at', { ascending: true, nullsFirst: false }) // Prioritize expiring soonest
       .limit(1)
       .single();
-      .maybeSingle(); // <--- ENSURE THIS IS .maybeSingle()
+       // <--- ENSURE THIS IS .maybeSingle()
 
     if (fetchError || !addonCredit) {
       console.error(`Error fetching add-on credit for ${addonTypeKey}:`, fetchError);
