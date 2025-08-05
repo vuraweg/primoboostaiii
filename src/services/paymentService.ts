@@ -250,7 +250,7 @@ class PaymentService {
         console.error('Error checking coupon usage on frontend:', error);
         // Continue without applying coupon if there's a database error
         return {
-          finalAmount: plan.price,
+          finalAmount: plan.price * 100, // Return in paise
           discountAmount: 0,
           couponApplied: null,
           error: 'Failed to verify coupon usage. Please try again.'
@@ -259,7 +259,7 @@ class PaymentService {
 
       if (data && data.length > 0) {
         return {
-          finalAmount: plan.price,
+          finalAmount: plan.price * 100, // Return in paise
           discountAmount: 0,
           couponApplied: null,
           error: 'This coupon has already been used by your account.'
@@ -271,7 +271,7 @@ class PaymentService {
     if (normalizedCoupon === this.COUPON_FULL_SUPPORT_CODE && planId === 'career_pro_max') {
       return {
         finalAmount: 0,
-        discountAmount: plan.price,
+        discountAmount: plan.price * 100, // Return in paise
         couponApplied: this.COUPON_FULL_SUPPORT_CODE
       };
     }
@@ -280,16 +280,16 @@ class PaymentService {
     if (normalizedCoupon === this.COUPON_FIRST100_CODE && planId === 'lite_check') {
       return {
         finalAmount: 0,
-        discountAmount: plan.price,
+        discountAmount: plan.price * 100, // Return in paise
         couponApplied: this.COUPON_FIRST100_CODE
       };
     }
 
     // first500 coupon - 98% off lite_check plan only (NEW LOGIC)
     if (normalizedCoupon === this.COUPON_FIRST500_CODE && planId === 'lite_check') {
-      const discountAmount = Math.floor(plan.price * 0.98); // 98% off
+      const discountAmount = Math.floor(plan.price * 100 * 0.98); // Calculate in paise
       return {
-        finalAmount: plan.price - discountAmount, // Should be 1 Rupee (99 - 98)
+        finalAmount: (plan.price * 100) - discountAmount, // Calculate in paise
         discountAmount: discountAmount,
         couponApplied: this.COUPON_FIRST500_CODE
       };
@@ -297,9 +297,9 @@ class PaymentService {
 
     // worthyone coupon - 50% off career_pro_max plan only
     if (normalizedCoupon === this.COUPON_WORTHYONE_CODE && planId === 'career_pro_max') {
-      const discountAmount = Math.floor(plan.price * 0.5);
+      const discountAmount = Math.floor(plan.price * 100 * 0.5); // Calculate in paise
       return {
-        finalAmount: plan.price - discountAmount,
+        finalAmount: (plan.price * 100) - discountAmount, // Calculate in paise
         discountAmount: discountAmount,
         couponApplied: this.COUPON_WORTHYONE_CODE
       };
@@ -307,7 +307,7 @@ class PaymentService {
 
     // Invalid or no coupon
     return {
-      finalAmount: plan.price,
+      finalAmount: plan.price * 100, // Return in paise
       discountAmount: 0,
       couponApplied: null
     };
@@ -343,7 +343,7 @@ class PaymentService {
         },
         body: JSON.stringify({
           planId,
-          amount: grandTotal, // Pass the grand total to the backend
+          amount: grandTotal, // Pass the grand total to the backend (already in paise)
           addOnsTotal,
           couponCode: couponCode || undefined,
           walletDeduction: walletDeduction || 0
@@ -454,6 +454,7 @@ class PaymentService {
       let orderData;
       try {
         // Capture transactionId from createOrder response
+        // paymentData.amount is already in paise from SubscriptionPlans.tsx
         orderData = await this.createOrder(paymentData.planId, paymentData.amount, addOnsTotal || 0, couponCode, walletDeduction);
         console.log('processPayment: Order created successfully:', orderData.orderId, 'Amount:', orderData.amount, 'Transaction ID:', orderData.transactionId);
         // NEW LOG: Inspect orderData
@@ -466,7 +467,7 @@ class PaymentService {
       return new Promise((resolve) => {
         const options: RazorpayOptions = {
           key: orderData.keyId,
-          amount: orderData.amount, // Amount in smallest currency unit (paise)
+          amount: orderData.amount, // Amount is already in paise
           currency: paymentData.currency,
           name: 'Resume Optimizer',
           description: `Subscription for ${this.getPlanById(paymentData.planId)?.name}`,
@@ -540,11 +541,11 @@ class PaymentService {
           user_id: userId,
           plan_id: planId === 'addon_only_purchase' ? null : planId,
           status: 'success', // Mark as successful immediately for free transactions
-          amount: 0, // Zero amount for free transactions
+          amount: 0, // Zero amount for free transactions (in paise)
           currency: 'INR',
           coupon_code: couponCode,
-          discount_amount: 0,
-          final_amount: 0,
+          discount_amount: 0, // Zero discount for free transactions (in paise)
+          final_amount: 0, // Zero final amount for free transactions (in paise)
           purchase_type: planId === 'addon_only_purchase' ? 'addon_only' : 'plan',
           payment_id: `free_${Date.now()}`, // Generate a unique payment ID for free transactions
           order_id: `order_free_${Date.now()}`,
