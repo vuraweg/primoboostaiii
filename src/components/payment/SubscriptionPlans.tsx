@@ -473,7 +473,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
               >
                 {plan.popular && (
                   <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                    <span className="bg-gradient-to-r from-green-300 to-emerald-500 text-white px-3 lg:px-6 py-1 lg:py-2 rounded-full text-xs lg:text-sm font-bold shadow-lg">
+                    <span className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-3 lg:px-6 py-1 lg:py-2 rounded-full text-xs lg:text-sm font-bold shadow-lg">
                       🏆 Most Popular
                     </span>
                   </div>
