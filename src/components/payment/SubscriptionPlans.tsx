@@ -258,7 +258,9 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
           user.id,
           appliedCoupon ? appliedCoupon.code : undefined,
           addOnsTotal, // addOnsTotal is already in paise
-          selectedAddOns // Pass selectedAddOns to processFreeSubscription
+          selectedAddOns, // Pass selectedAddOns to processFreeSubscription
+          selectedPlanData.price * 100, // Pass original plan price in paise
+          walletDeduction // Pass walletDeduction
         );
         if (result.success) {
           // CRITICAL FIX: Refresh wallet balance after any successful payment
@@ -745,4 +747,3 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
     </div>
   );
 };
-
