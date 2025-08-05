@@ -307,9 +307,8 @@ class PaymentService {
 
     // Invalid or no coupon
     return {
-     finalAmount: Math.round(plan.price * 100),
-     discountAmount: 0,
-
+      finalAmount: plan.price,
+      discountAmount: 0,
       couponApplied: null
     };
   }
