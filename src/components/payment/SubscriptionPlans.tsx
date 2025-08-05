@@ -33,8 +33,6 @@ interface SubscriptionPlansProps {
   isOpen: boolean;
   onNavigateBack: () => void;
   onSubscriptionSuccess: () => void;
-  // ADDED: onShowAlert prop
-  onShowAlert: (title: string, message: string, type?: 'info' | 'success' | 'warning' | 'error', actionText?: string, onAction?: () => void) => void;
 }
 
 type AddOn = {
@@ -53,7 +51,6 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
   isOpen,
   onNavigateBack,
   onSubscriptionSuccess,
-  onShowAlert, // ADDED: Destructure onShowAlert
 }) => {
   const { user } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState<string>('pro_pack');
@@ -147,12 +144,12 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
     // If you intend to use it, you would set setCurrentSlide(index);
   };
 
-  const handleApplyCoupon = async () => {
+  const handleApplyCoupon = () => {
     if (!couponCode.trim()) {
       setCouponError('Please enter a coupon code');
       return;
     }
-    const result = await paymentService.applyCoupon(selectedPlan, couponCode.trim(), user?.id || null);
+    const result = paymentService.applyCoupon(selectedPlan, couponCode.trim());
     if (result.couponApplied) {
       setAppliedCoupon({
         code: result.couponApplied,
@@ -160,13 +157,9 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
         finalAmount: result.finalAmount,
       });
       setCouponError('');
-      // ADDED: Show success alert for coupon application
-      onShowAlert('Coupon Applied!', `Coupon "${result.couponApplied}" applied successfully. You saved ₹${result.discount}!`, 'success');
     } else {
-      setCouponError(result.error || 'Invalid coupon code or not applicable to selected plan');
+      setCouponError('Invalid coupon code or not applicable to selected plan');
       setAppliedCoupon(null);
-      // ADDED: Show error alert for coupon application failure
-      onShowAlert('Coupon Error', result.error || 'Invalid coupon code or not applicable to selected plan', 'warning');
     }
   };
 
@@ -204,7 +197,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
       if (sessionError || !session || !session.access_token) {
         console.error('SubscriptionPlans: No active session found for payment:', sessionError);
         // Optionally, show an error message to the user or redirect to login
-        onShowAlert('Authentication Required', 'Please log in to complete your purchase.', 'error', 'Sign In', () => {}); // Use onShowAlert
+        alert('Please log in to complete your purchase.');
         setIsProcessing(false);
         return;
       }
@@ -222,10 +215,8 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
         );
         if (result.success) {
           onSubscriptionSuccess();
-          onShowAlert('Subscription Activated!', 'Your free plan has been activated successfully.', 'success'); // Use onShowAlert
         } else {
           console.error(result.error || 'Failed to activate free plan.');
-          onShowAlert('Activation Failed', result.error || 'Failed to activate free plan.', 'error'); // Use onShowAlert
         }
       } else {
         const paymentData = {
@@ -244,15 +235,12 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
         );
         if (result.success) {
           onSubscriptionSuccess();
-          onShowAlert('Payment Successful!', 'Your subscription has been activated.', 'success'); // Use onShowAlert
         } else {
           console.error(result.error || 'Payment failed.');
-          onShowAlert('Payment Failed', result.error || 'Payment processing failed. Please try again.', 'error'); // Use onShowAlert
         }
       }
     } catch (error) {
       console.error('Payment process error:', error);
-      onShowAlert('Payment Error', error instanceof Error ? error.message : 'An unexpected error occurred during payment.', 'error'); // Use onShowAlert
     } finally {
       setIsProcessing(false);
     }
@@ -267,7 +255,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-2 sm:p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-xl sm:rounded-2xl lg:rounded-3xl w-full max-w-7xl max-h-[95vh] overflow-y-auto flex flex-col">
+      <div className="bg-white rounded-xl sm:rounded-2xl lg:rounded-3xl w-full max-w-7xl h-[90vh] flex flex-col">
         <div className="relative bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 px-3 sm:px-6 py-4 sm:py-8 border-b border-gray-100 flex-shrink-0">
           {/* Back button */}
           <button
@@ -682,4 +670,3 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
     </div>
   );
 };
-
