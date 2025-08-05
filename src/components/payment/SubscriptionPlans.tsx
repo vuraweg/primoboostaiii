@@ -342,7 +342,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
                     <div key={plan.id} className="w-full flex-shrink-0 px-2 sm:px-4">
                       <div
                         className={`relative rounded-xl sm:rounded-3xl border-2 transition-all duration-300 ${
-                          index === currentSlide
+                          selectedPlan === plan.id
                             ? 'border-indigo-500 shadow-2xl shadow-indigo-500/20 ring-4 ring-indigo-100'
                             : 'border-gray-200'
                         } ${plan.popular ? 'ring-2 ring-green-500 ring-offset-4' : ''}`}
@@ -391,6 +391,24 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
                               </li>
                             ))}
                           </ul>
+                          {/* ADDED: Select Plan button for mobile carousel */}
+                          <button
+                            onClick={() => setSelectedPlan(plan.id)}
+                            className={`w-full py-2 sm:py-3 px-2 sm:px-4 rounded-lg sm:rounded-xl font-semibold transition-all duration-300 text-xs sm:text-base min-h-[44px] mt-2 ${
+                              selectedPlan === plan.id
+                                ? `bg-gradient-to-r ${plan.gradient || ''} text-white shadow-lg transform scale-105`
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            {selectedPlan === plan.id ? (
+                              <span className="flex items-center justify-center">
+                                <Check className="w-3 h-3 sm:w-5 h-5 mr-1 sm:mr-2" />
+                                Selected
+                              </span>
+                            ) : (
+                              'Select Plan'
+                            )}
+                          </button>
                         </div>
                       </div>
                     </div>
