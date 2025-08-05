@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -14,12 +14,9 @@ import {
   MapPin,
   Linkedin,
   Github,
-  Calendar,
-  Building,
-  FileText,
   CheckCircle,
   Loader2,
-  Download,
+  FileText,
   Eye
 } from 'lucide-react';
 import { UserType, ResumeData } from '../types/resume';
@@ -75,16 +72,16 @@ interface FormData {
 
 interface GuidedResumeBuilderProps {
   onNavigateBack: () => void;
-  userSubscription: any; // Assuming a subscription object with guidedBuildsTotal and guidedBuildsUsed
+  userSubscription: any;
   onShowSubscriptionPlans: () => void;
-  onRefreshSubscription: () => void; // NEW: Added function to refresh subscription state
+  refreshUserSubscription: () => void; // Corrected prop name to match the usage in the function
 }
 
 export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
   onNavigateBack,
   userSubscription,
   onShowSubscriptionPlans,
-  onRefreshSubscription, // NEW: Destructured the new prop
+  refreshUserSubscription, // Corrected prop name here
 }) => {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
@@ -287,7 +284,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
       }
       
       // NEW: Call the refresh function to update the subscription state in the parent component
-      onRefreshSubscription();
+      refreshUserSubscription();
 
       // Construct a basic resume text from form data
       const resumeText = constructResumeText(formData);
@@ -435,7 +432,6 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                 >
                   <ArrowLeft className="w-5 h-5" />
                   <span className="block sm:inline">Back to Home</span>
-
                 </button>
               </div>
             </div>
