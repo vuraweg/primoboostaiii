@@ -1,4 +1,3 @@
-// supabase/functions/create-order/index.ts
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -14,13 +13,13 @@ interface OrderRequest {
   walletDeduction?: number;
   addOnsTotal?: number;
   amount: number;
-  selectedAddOns?: { [key: string]: number };
+  selectedAddOns?: { [key: string]: number }; // ADD THIS LINE
 }
 
 interface PlanConfig {
   id: string;
   name: string;
-  price: number; // Price is in Rupees
+  price: number;
   duration: string;
   optimizations: number;
   scoreChecks: number;
@@ -109,8 +108,8 @@ serve(async (req) => {
   try {
     // Retrieve addOnsTotal from the request body
     const body: OrderRequest = await req.json();
-    const { planId, couponCode, walletDeduction, addOnsTotal, amount: frontendCalculatedAmount, selectedAddOns } = body;
-    console.log(`[${new Date().toISOString()}] - Request body parsed. planId: ${planId}, couponCode: ${couponCode}, walletDeduction: ${walletDeduction}, addOnsTotal: ${addOnsTotal}, frontendCalculatedAmount: ${frontendCalculatedAmount}, selectedAddOns: ${JSON.stringify(selectedAddOns)}`);
+    const { planId, couponCode, walletDeduction, addOnsTotal, amount: frontendCalculatedAmount, selectedAddOns } = body; // UPDATE THIS LINE
+    console.log(`[${new Date().toISOString()}] - Request body parsed. planId: ${planId}, couponCode: ${couponCode}, walletDeduction: ${walletDeduction}, addOnsTotal: ${addOnsTotal}, frontendCalculatedAmount: ${frontendCalculatedAmount}, selectedAddOns: ${JSON.stringify(selectedAddOns)}`); // UPDATE LOG
 
     // Get user from auth header
     const authHeader = req.headers.get('authorization');
@@ -153,11 +152,8 @@ serve(async (req) => {
       }
     }
 
-    // Convert plan price from Rupees to paise
-    const planPriceInPaise = plan.price * 100;
-    
     // Calculate final amount based on plan price
-    let finalAmount = planPriceInPaise;
+    let finalAmount = plan.price;
     let discountAmount = 0;
     let appliedCoupon = null;
 
@@ -167,13 +163,13 @@ serve(async (req) => {
       // NEW: full_support coupon - free career_pro_max plan
       if (normalizedCoupon === 'fullsupport' && planId === 'career_pro_max') {
         finalAmount = 0;
-        discountAmount = planPriceInPaise;
+        discountAmount = plan.price;
         appliedCoupon = 'fullsupport';
       }
       // first100 coupon - free lite_check plan only
       else if (normalizedCoupon === 'first100' && planId === 'lite_check') {
         finalAmount = 0;
-        discountAmount = planPriceInPaise;
+        discountAmount = plan.price;
         appliedCoupon = 'first100';
       }
       // first500 coupon - 98% off lite_check plan only (NEW LOGIC)
@@ -194,29 +190,28 @@ serve(async (req) => {
           throw new Error('Coupon "first500" has reached its usage limit.');
         }
 
-        discountAmount = Math.floor(planPriceInPaise * 0.98); // 98% off
-        finalAmount = planPriceInPaise - discountAmount; // Should be 100 paise
+        discountAmount = Math.floor(plan.price * 0.98); // 98% off
+        finalAmount = plan.price - discountAmount; // Should be 1 Rupee (99 - 98)
         appliedCoupon = 'first500';
       }
       // worthyone coupon - 50% off career_pro_max plan only
       else if (normalizedCoupon === 'worthyone' && planId === 'career_pro_max') {
-        discountAmount = Math.floor(planPriceInPaise * 0.5);
-        finalAmount = planPriceInPaise - discountAmount;
+        discountAmount = Math.floor(plan.price * 0.5);
+        finalAmount = plan.price - discountAmount;
         appliedCoupon = 'worthyone';
       }
     }
 
-    // Apply wallet deduction (walletDeduction is in Rupees, convert to paise)
+    // Apply wallet deduction
     if (walletDeduction && walletDeduction > 0) {
-      const walletDeductionInPaise = walletDeduction * 100;
-      finalAmount = Math.max(0, finalAmount - walletDeductionInPaise);
+      finalAmount = Math.max(0, finalAmount - walletDeduction);
     }
 
-    // Correctly add add-ons total to the final amount (addOnsTotal is in Rupees, convert to paise)
+    // Correctly add add-ons total to the final amount
     if (addOnsTotal && addOnsTotal > 0) {
-      finalAmount += addOnsTotal * 100;
+      finalAmount += addOnsTotal;
     }
-    
+
     // IMPORTANT: Validate that the calculated finalAmount matches the frontend's calculation
     // This prevents tampering with the price on the client-side.
     if (finalAmount !== frontendCalculatedAmount) {
@@ -226,19 +221,19 @@ serve(async (req) => {
 
     // --- NEW: Create a pending payment_transactions record ---
     console.log(`[${new Date().toISOString()}] - Creating pending payment_transactions record.`);
-    console.log(`[${new Date().toISOString()}] - Values for insert: user_id=${user.id}, status='pending', amount=${planPriceInPaise}, currency='INR', coupon_code=${appliedCoupon}, discount_amount=${discountAmount}, final_amount=${finalAmount}`);
+    console.log(`[${new Date().toISOString()}] - Values for insert: user_id=${user.id}, plan_id=${planId}, status='pending', amount=${plan.price}, currency='INR', coupon_code=${appliedCoupon}, discount_amount=${discountAmount}, final_amount=${finalAmount}`); // ADDED DETAILED LOG
 
     const { data: transaction, error: transactionError } = await supabase
       .from('payment_transactions')
       .insert({
         user_id: user.id,
-        // REMOVED: plan_id: planId === 'addon_only_purchase' ? null : planId,
+        plan_id: planId === 'addon_only_purchase' ? null : planId,
         status: 'pending', // Initial status
-        amount: planPriceInPaise, // Original plan price in paise
+        amount: plan.price, // Original plan price
         currency: 'INR', // Explicitly set currency as it's not nullable and has a default
         coupon_code: appliedCoupon, // Save applied coupon code
-        discount_amount: discountAmount, // Save discount amount in paise
-        final_amount: finalAmount, // Final amount after discounts/wallet/addons in paise
+        discount_amount: discountAmount, // Save discount amount
+        final_amount: finalAmount, // Final amount after discounts/wallet/addons
         purchase_type: planId === 'addon_only_purchase' ? 'addon_only' : (Object.keys(selectedAddOns || {}).length > 0 ? 'plan_with_addons' : 'plan'),
         // payment_id and order_id will be updated by verify-payment function
       })
@@ -246,12 +241,11 @@ serve(async (req) => {
       .single();
 
     if (transactionError) {
-      // MODIFIED: Log the full error object for detailed debugging
-      console.error(`[${new Date().toISOString()}] - Error inserting pending transaction:`, transactionError);  
+      console.error(`[${new Date().toISOString()}] - Error inserting pending transaction:`, transactionError); // Log full error object
       throw new Error('Failed to initiate payment transaction.');
     }
     const transactionId = transaction.id;
-    console.log(`[${new Date().toISOString()}] - Pending transaction created with ID: ${transactionId}, coupon_code: ${appliedCoupon}`);
+    console.log(`[${new Date().toISOString()}] - Pending transaction created with ID: ${transactionId}, coupon_code: ${appliedCoupon}`); // ADDED LOG
     // --- END NEW ---
 
     // Create Razorpay order
@@ -263,7 +257,7 @@ serve(async (req) => {
     }
 
     const orderData = {
-      amount: finalAmount, // Amount is now already in paise
+      amount: finalAmount * 100, // Convert to paise
       currency: 'INR',
       receipt: `receipt_${Date.now()}`,
       notes: {
