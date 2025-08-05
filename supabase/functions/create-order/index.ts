@@ -182,6 +182,7 @@ serve(async (req) => {
 
     // --- NEW: Create a pending payment_transactions record ---
     console.log(`[${new Date().toISOString()}] - Creating pending payment_transactions record.`);
+    console.log(`[${new Date().toISOString()}] - Inserting with coupon_code: ${appliedCoupon}, discount_amount: ${discountAmount}, final_amount: ${finalAmount}`); // ADDED LOG
     const { data: transaction, error: transactionError } = await supabase
       .from('payment_transactions')
       .insert({
@@ -203,7 +204,7 @@ serve(async (req) => {
       throw new Error('Failed to initiate payment transaction.');
     }
     const transactionId = transaction.id;
-    console.log(`[${new Date().toISOString()}] - Pending transaction created with ID: ${transactionId}`);
+    console.log(`[${new Date().toISOString()}] - Pending transaction created with ID: ${transactionId}, coupon_code: ${appliedCoupon}`); // ADDED LOG
     // --- END NEW ---
 
     // Create Razorpay order
