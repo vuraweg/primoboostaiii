@@ -367,7 +367,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
                         onClick={() => setSelectedPlan(plan.id)}
                       >
                         {plan.popular && (
-                          <div className="absolute -top-2 sm:-top-4 left-1/2 transform -translate-x-1/2">
+                          <div className="absolute -top-4 sm:-top-4 left-1/2 transform -translate-x-1/2">
                             <span className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-3 sm:px-6 py-1 sm:py-2 rounded-full text-xs font-bold shadow-lg">
                               🏆 Most Popular
                             </span>
