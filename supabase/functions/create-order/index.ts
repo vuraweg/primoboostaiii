@@ -20,7 +20,7 @@ interface OrderRequest {
 interface PlanConfig {
   id: string;
   name: string;
-  price: number;
+  price: number; // Price is in Rupees
   duration: string;
   optimizations: number;
   scoreChecks: number;
@@ -153,8 +153,11 @@ serve(async (req) => {
       }
     }
 
+    // Convert plan price from Rupees to paise
+    const planPriceInPaise = plan.price * 100;
+    
     // Calculate final amount based on plan price
-    let finalAmount = plan.price;
+    let finalAmount = planPriceInPaise;
     let discountAmount = 0;
     let appliedCoupon = null;
 
@@ -164,13 +167,13 @@ serve(async (req) => {
       // NEW: full_support coupon - free career_pro_max plan
       if (normalizedCoupon === 'fullsupport' && planId === 'career_pro_max') {
         finalAmount = 0;
-        discountAmount = plan.price;
+        discountAmount = planPriceInPaise;
         appliedCoupon = 'fullsupport';
       }
       // first100 coupon - free lite_check plan only
       else if (normalizedCoupon === 'first100' && planId === 'lite_check') {
         finalAmount = 0;
-        discountAmount = plan.price;
+        discountAmount = planPriceInPaise;
         appliedCoupon = 'first100';
       }
       // first500 coupon - 98% off lite_check plan only (NEW LOGIC)
@@ -191,28 +194,29 @@ serve(async (req) => {
           throw new Error('Coupon "first500" has reached its usage limit.');
         }
 
-        discountAmount = Math.floor(plan.price * 0.98); // 98% off
-        finalAmount = plan.price - discountAmount; // Should be 1 Rupee (99 - 98)
+        discountAmount = Math.floor(planPriceInPaise * 0.98); // 98% off
+        finalAmount = planPriceInPaise - discountAmount; // Should be 100 paise
         appliedCoupon = 'first500';
       }
       // worthyone coupon - 50% off career_pro_max plan only
       else if (normalizedCoupon === 'worthyone' && planId === 'career_pro_max') {
-        discountAmount = Math.floor(plan.price * 0.5);
-        finalAmount = plan.price - discountAmount;
+        discountAmount = Math.floor(planPriceInPaise * 0.5);
+        finalAmount = planPriceInPaise - discountAmount;
         appliedCoupon = 'worthyone';
       }
     }
 
-    // Apply wallet deduction
+    // Apply wallet deduction (walletDeduction is in Rupees, convert to paise)
     if (walletDeduction && walletDeduction > 0) {
-      finalAmount = Math.max(0, finalAmount - walletDeduction);
+      const walletDeductionInPaise = walletDeduction * 100;
+      finalAmount = Math.max(0, finalAmount - walletDeductionInPaise);
     }
 
-    // Correctly add add-ons total to the final amount
+    // Correctly add add-ons total to the final amount (addOnsTotal is in Rupees, convert to paise)
     if (addOnsTotal && addOnsTotal > 0) {
-      finalAmount += addOnsTotal;
+      finalAmount += addOnsTotal * 100;
     }
-
+    
     // IMPORTANT: Validate that the calculated finalAmount matches the frontend's calculation
     // This prevents tampering with the price on the client-side.
     if (finalAmount !== frontendCalculatedAmount) {
@@ -222,7 +226,7 @@ serve(async (req) => {
 
     // --- NEW: Create a pending payment_transactions record ---
     console.log(`[${new Date().toISOString()}] - Creating pending payment_transactions record.`);
-    console.log(`[${new Date().toISOString()}] - Values for insert: user_id=${user.id}, status='pending', amount=${plan.price}, currency='INR', coupon_code=${appliedCoupon}, discount_amount=${discountAmount}, final_amount=${finalAmount}`);
+    console.log(`[${new Date().toISOString()}] - Values for insert: user_id=${user.id}, status='pending', amount=${planPriceInPaise}, currency='INR', coupon_code=${appliedCoupon}, discount_amount=${discountAmount}, final_amount=${finalAmount}`);
 
     const { data: transaction, error: transactionError } = await supabase
       .from('payment_transactions')
@@ -230,11 +234,11 @@ serve(async (req) => {
         user_id: user.id,
         // REMOVED: plan_id: planId === 'addon_only_purchase' ? null : planId,
         status: 'pending', // Initial status
-        amount: plan.price, // Original plan price
+        amount: planPriceInPaise, // Original plan price in paise
         currency: 'INR', // Explicitly set currency as it's not nullable and has a default
         coupon_code: appliedCoupon, // Save applied coupon code
-        discount_amount: discountAmount, // Save discount amount
-        final_amount: finalAmount, // Final amount after discounts/wallet/addons
+        discount_amount: discountAmount, // Save discount amount in paise
+        final_amount: finalAmount, // Final amount after discounts/wallet/addons in paise
         purchase_type: planId === 'addon_only_purchase' ? 'addon_only' : (Object.keys(selectedAddOns || {}).length > 0 ? 'plan_with_addons' : 'plan'),
         // payment_id and order_id will be updated by verify-payment function
       })
@@ -243,7 +247,7 @@ serve(async (req) => {
 
     if (transactionError) {
       // MODIFIED: Log the full error object for detailed debugging
-      console.error(`[${new Date().toISOString()}] - Error inserting pending transaction:`, transactionError); 
+      console.error(`[${new Date().toISOString()}] - Error inserting pending transaction:`, transactionError);  
       throw new Error('Failed to initiate payment transaction.');
     }
     const transactionId = transaction.id;
@@ -259,7 +263,7 @@ serve(async (req) => {
     }
 
     const orderData = {
-      amount: finalAmount * 100, // Convert to paise
+      amount: finalAmount, // Amount is now already in paise
       currency: 'INR',
       receipt: `receipt_${Date.now()}`,
       notes: {
