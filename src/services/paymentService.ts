@@ -534,7 +534,15 @@ class PaymentService {
   }
 
   // New method to process free subscriptions
-  async processFreeSubscription(planId: string, userId: string, couponCode?: string, addOnsTotal?: number, selectedAddOns?: { [key: string]: number }): Promise<{ success: boolean; subscriptionId?: string; error?: string }> {
+  async processFreeSubscription(
+    planId: string,
+    userId: string,
+    couponCode?: string,
+    addOnsTotal?: number,
+    selectedAddOns?: { [key: string]: number },
+    originalPlanPrice?: number, // NEW: Original plan price in paise
+    walletDeduction?: number // NEW: Wallet deduction in paise
+  ): Promise<{ success: boolean; subscriptionId?: string; error?: string }> {
     try {
       // CRITICAL FIX: Always create a payment_transactions record for zero-amount purchases
       // This prevents coupon reuse and ensures proper tracking
@@ -544,11 +552,13 @@ class PaymentService {
           user_id: userId,
           plan_id: planId === 'addon_only_purchase' ? null : planId,
           status: 'success', // Mark as successful immediately for free transactions
-          amount: 0, // Zero amount for free transactions (in paise)
+          amount: originalPlanPrice || 0, // Use originalPlanPrice in paise
           currency: 'INR',
           coupon_code: couponCode,
-          discount_amount: 0, // Zero discount for free transactions (in paise)
-          final_amount: 0, // Zero final amount for free transactions (in paise)
+          // Calculate the discount amount. The final amount is 0, so discount is original price minus wallet deduction and addon costs
+          discount_amount: ((originalPlanPrice || 0) + (addOnsTotal || 0)) - (walletDeduction || 0),
+          final_amount: 0, // Final amount is 0
+          wallet_deduction_amount: walletDeduction || 0, // Store wallet deduction in paise
           purchase_type: planId === 'addon_only_purchase' ? 'addon_only' : 'plan',
           payment_id: `free_${Date.now()}`, // Generate a unique payment ID for free transactions
           order_id: `order_free_${Date.now()}`,
@@ -596,6 +606,33 @@ class PaymentService {
               console.log(`Granted ${quantity} credits for add-on: ${addOnKey}`);
             }
           }
+        }
+      }
+
+      // NEW: Record wallet deduction in wallet_transactions table
+      if (walletDeduction && walletDeduction > 0) {
+        console.log(`Recording wallet deduction of ${walletDeduction} paise for user ${userId}`);
+        const { error: walletError } = await supabase
+          .from('wallet_transactions')
+          .insert({
+            user_id: userId,
+            type: 'purchase_use',
+            amount: -(walletDeduction / 100), // Convert paise to rupees for wallet_transactions
+            status: 'completed',
+            transaction_ref: transactionRecord.id, // Link to the payment_transactions record
+            redeem_details: {
+              plan_id: planId,
+              coupon_code: couponCode,
+              addons_purchased: selectedAddOns,
+              original_amount: originalPlanPrice,
+              wallet_deduction: walletDeduction
+            }
+          });
+
+        if (walletError) {
+          console.error('Error recording wallet deduction:', walletError);
+        } else {
+          console.log('Wallet deduction successfully recorded.');
         }
       }
 
@@ -816,13 +853,13 @@ class PaymentService {
 // Helper function to get the addon_type_id
 private async getAddonTypeId(typeKey: string): Promise<string | null> {
     const { data, error } = await supabase
-        .from('addon_types')
-        .select('id')
-        .eq('type_key', typeKey)
-        .single();
+      .from('addon_types')
+      .select('id')
+      .eq('type_key', typeKey)
+      .single();
     if (error) {
-        console.error(`Error fetching addon_type_id for ${typeKey}:`, error);
-        return null;
+      console.error(`Error fetching addon_type_id for ${typeKey}:`, error);
+      return null;
     }
     return data?.id || null;
 }
@@ -831,33 +868,33 @@ private async getAddonTypeId(typeKey: string): Promise<string | null> {
 private async decrementAddonCredit(userId: string, addonTypeKey: string): Promise<boolean> {
     const addonTypeId = await this.getAddonTypeId(addonTypeKey);
     if (!addonTypeId) {
-        return false; // Add-on type not found
+      return false; // Add-on type not found
     }
 
     // Find an add-on credit with remaining quantity
     const { data: addonCredit, error: fetchError } = await supabase
-        .from('user_addon_credits')
-        .select('id, quantity_remaining')
-        .eq('user_id', userId)
-        .eq('addon_type_id', addonTypeId)
-        .gt('quantity_remaining', 0)
-        .order('expires_at', { ascending: true, nullsFirst: false }) // Prioritize expiring soonest
-        .limit(1)
-        .single();
+      .from('user_addon_credits')
+      .select('id, quantity_remaining')
+      .eq('user_id', userId)
+      .eq('addon_type_id', addonTypeId)
+      .gt('quantity_remaining', 0)
+      .order('expires_at', { ascending: true, nullsFirst: false }) // Prioritize expiring soonest
+      .limit(1)
+      .single();
 
     if (fetchError || !addonCredit) {
-        return false; // No add-on credits available
+      return false; // No add-on credits available
     }
 
     // Decrement quantity_remaining
     const { error: updateError } = await supabase
-        .from('user_addon_credits')
-        .update({ quantity_remaining: addonCredit.quantity_remaining - 1 })
-        .eq('id', addonCredit.id);
+      .from('user_addon_credits')
+      .update({ quantity_remaining: addonCredit.quantity_remaining - 1 })
+      .eq('id', addonCredit.id);
 
     if (updateError) {
-        console.error(`Error decrementing add-on credit for ${addonTypeKey}:`, updateError);
-        return false;
+      console.error(`Error decrementing add-on credit for ${addonTypeKey}:`, updateError);
+      return false;
     }
     return true;
 }
@@ -865,13 +902,13 @@ private async decrementAddonCredit(userId: string, addonTypeKey: string): Promis
   // Use optimization (decrement count)
   async useOptimization(userId: string): Promise<{ success: boolean; remaining: number; error?: string }> {
     try {
-        // Try to use add-on credit first
-        const usedAddon = await this.decrementAddonCredit(userId, 'optimization');
-        if (usedAddon) {
-            const updatedCombinedSubscription = await this.getUserSubscription(userId);
-            const totalRemaining = (updatedCombinedSubscription?.optimizationsTotal || 0) - (updatedCombinedSubscription?.optimizationsUsed || 0);
-            return { success: true, remaining: totalRemaining };
-        }
+      // Try to use add-on credit first
+      const usedAddon = await this.decrementAddonCredit(userId, 'optimization');
+      if (usedAddon) {
+        const updatedCombinedSubscription = await this.getUserSubscription(userId);
+        const totalRemaining = (updatedCombinedSubscription?.optimizationsTotal || 0) - (updatedCombinedSubscription?.optimizationsUsed || 0);
+        return { success: true, remaining: totalRemaining };
+      }
 
       // Fallback to subscription credits if no add-on credits were used
       const { data, error } = await supabase
@@ -938,13 +975,13 @@ private async decrementAddonCredit(userId: string, addonTypeKey: string): Promis
   // Use score check (decrement count)
   async useScoreCheck(userId: string): Promise<{ success: boolean; remaining: number; error?: string }> {
     try {
-        // Try to use add-on credit first
-        const usedAddon = await this.decrementAddonCredit(userId, 'score_check');
-        if (usedAddon) {
-            const updatedCombinedSubscription = await this.getUserSubscription(userId);
-            const totalRemaining = (updatedCombinedSubscription?.scoreChecksTotal || 0) - (updatedCombinedSubscription?.scoreChecksUsed || 0);
-            return { success: true, remaining: totalRemaining };
-        }
+      // Try to use add-on credit first
+      const usedAddon = await this.decrementAddonCredit(userId, 'score_check');
+      if (usedAddon) {
+        const updatedCombinedSubscription = await this.getUserSubscription(userId);
+        const totalRemaining = (updatedCombinedSubscription?.scoreChecksTotal || 0) - (updatedCombinedSubscription?.scoreChecksUsed || 0);
+        return { success: true, remaining: totalRemaining };
+      }
 
       const { data, error } = await supabase
         .from('subscriptions')
@@ -1007,13 +1044,13 @@ private async decrementAddonCredit(userId: string, addonTypeKey: string): Promis
   // Use LinkedIn message (decrement count)
   async useLinkedInMessage(userId: string): Promise<{ success: boolean; remaining: number; error?: string }> {
     try {
-        // Try to use add-on credit first
-        const usedAddon = await this.decrementAddonCredit(userId, 'linkedin_messages');
-        if (usedAddon) {
-            const updatedCombinedSubscription = await this.getUserSubscription(userId);
-            const totalRemaining = (updatedCombinedSubscription?.linkedinMessagesTotal || 0) - (updatedCombinedSubscription?.linkedinMessagesUsed || 0);
-            return { success: true, remaining: totalRemaining };
-        }
+      // Try to use add-on credit first
+      const usedAddon = await this.decrementAddonCredit(userId, 'linkedin_messages');
+      if (usedAddon) {
+        const updatedCombinedSubscription = await this.getUserSubscription(userId);
+        const totalRemaining = (updatedCombinedSubscription?.linkedinMessagesTotal || 0) - (updatedCombinedSubscription?.linkedinMessagesUsed || 0);
+        return { success: true, remaining: totalRemaining };
+      }
 
       const { data, error } = await supabase
         .from('subscriptions')
@@ -1027,7 +1064,7 @@ private async decrementAddonCredit(userId: string, addonTypeKey: string): Promis
         .order('end_date', { ascending: false });
 
       if (error) {
-        console.error('Error fetching subscriptions for usage:', error);
+        console.log('Error fetching subscriptions for usage:', error);
         return { success: false, remaining: 0, error: 'Failed to fetch subscriptions for usage.' };
       }
 
@@ -1076,13 +1113,13 @@ private async decrementAddonCredit(userId: string, addonTypeKey: string): Promis
   // Use guided build (decrement count)
   async useGuidedBuild(userId: string): Promise<{ success: boolean; remaining: number; error?: string }> {
     try {
-        // Try to use add-on credit first
-        const usedAddon = await this.decrementAddonCredit(userId, 'guided_build');
-        if (usedAddon) {
-            const updatedCombinedSubscription = await this.getUserSubscription(userId);
-            const totalRemaining = (updatedCombinedSubscription?.guidedBuildsTotal || 0) - (updatedCombinedSubscription?.guidedBuildsUsed || 0);
-            return { success: true, remaining: totalRemaining };
-        }
+      // Try to use add-on credit first
+      const usedAddon = await this.decrementAddonCredit(userId, 'guided_build');
+      if (usedAddon) {
+        const updatedCombinedSubscription = await this.getUserSubscription(userId);
+        const totalRemaining = (updatedCombinedSubscription?.guidedBuildsTotal || 0) - (updatedCombinedSubscription?.guidedBuildsUsed || 0);
+        return { success: true, remaining: totalRemaining };
+      }
 
       const { data, error } = await supabase
         .from('subscriptions')
