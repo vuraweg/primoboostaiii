@@ -662,10 +662,16 @@ class PaymentService {
   // Get user's active subscription from Supabase
   async getUserSubscription(userId: string): Promise<Subscription | null> {
     try {
+      // Fetch all subscriptions for the user that are not cancelled
       const { data, error } = await supabase
         .from('subscriptions')
         .select(`
-          *,
+          id,
+          user_id,
+          plan_id,
+          status,
+          start_date,
+          end_date,
           optimizations_used,
           optimizations_total,
           score_checks_used,
@@ -673,42 +679,98 @@ class PaymentService {
           linkedin_messages_used,
           linkedin_messages_total,
           guided_builds_used,
-          guided_builds_total
+          guided_builds_total,
+          payment_id,
+          coupon_used
         `)
         .eq('user_id', userId)
-        .eq('status', 'active')
-        .gt('end_date', new Date().toISOString())
-        .order('end_date', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .neq('status', 'cancelled') // Exclude cancelled subscriptions
+        .order('end_date', { ascending: false }); // Order by end date to prioritize newer plans
 
       if (error) {
-        console.error('Error getting subscription:', error);
+        console.error('Error getting subscriptions:', error);
         return null;
       }
 
-      if (!data) {
-        return null;
+      if (!data || data.length === 0) {
+        return null; // No subscriptions found
       }
 
+      // Initialize combined totals
+      let combinedOptimizationsUsed = 0;
+      let combinedOptimizationsTotal = 0;
+      let combinedScoreChecksUsed = 0;
+      let combinedScoreChecksTotal = 0;
+      let combinedLinkedinMessagesUsed = 0;
+      let combinedLinkedinMessagesTotal = 0;
+      let combinedGuidedBuildsUsed = 0;
+      let combinedGuidedBuildsTotal = 0;
+      let latestEndDate: Date | null = null;
+      let overallStatus: 'active' | 'expired' | 'cancelled' = 'expired'; // Default to expired if no credits
+
+      // Aggregate credits from all relevant subscriptions
+      for (const sub of data) {
+        // Only consider credits from plans that are not yet fully used or have future end dates
+        // This logic assumes that once a plan is "used up" (used >= total), its credits are no longer available.
+        // If credits should persist even after a plan's individual usage is maxed out, this logic needs adjustment.
+        
+        // For combining, we sum up all totals and all used amounts.
+        // The "remaining" will be calculated from these combined totals.
+        combinedOptimizationsUsed += sub.optimizations_used;
+        combinedOptimizationsTotal += sub.optimizations_total;
+        combinedScoreChecksUsed += sub.score_checks_used;
+        combinedScoreChecksTotal += sub.score_checks_total;
+        combinedLinkedinMessagesUsed += sub.linkedin_messages_used;
+        combinedLinkedinMessagesTotal += sub.linkedin_messages_total;
+        combinedGuidedBuildsUsed += sub.guided_builds_used;
+        combinedGuidedBuildsTotal += sub.guided_builds_total;
+
+        // Determine the latest end date among all non-cancelled subscriptions
+        const currentEndDate = new Date(sub.end_date);
+        if (!latestEndDate || currentEndDate > latestEndDate) {
+          latestEndDate = currentEndDate;
+        }
+      }
+
+      // Determine overall status based on combined remaining credits and end date
+      const now = new Date();
+      const hasRemainingCredits = 
+        (combinedOptimizationsTotal - combinedOptimizationsUsed > 0) ||
+        (combinedScoreChecksTotal - combinedScoreChecksUsed > 0) ||
+        (combinedLinkedinMessagesTotal - combinedLinkedinMessagesUsed > 0) ||
+        (combinedGuidedBuildsTotal - combinedGuidedBuildsUsed > 0);
+
+      if (hasRemainingCredits && latestEndDate && latestEndDate > now) {
+        overallStatus = 'active';
+      } else if (hasRemainingCredits && (!latestEndDate || latestEndDate <= now)) {
+        // If credits remain but all plans are expired, consider it active until credits are used
+        // This is a business logic decision. If credits should expire with the plan, remove this branch.
+        overallStatus = 'active'; // Credits persist beyond plan end date
+      } else {
+        overallStatus = 'expired';
+      }
+
+
+      // Return a synthetic subscription object
       return {
-        id: data.id,
-        userId: data.user_id,
-        planId: data.plan_id,
-        status: data.status,
-        startDate: data.start_date,
-        endDate: data.end_date,
-        optimizationsUsed: data.optimizations_used,
-        optimizationsTotal: data.optimizations_total,
-        paymentId: data.payment_id,
-        couponUsed: data.coupon_used,
-        scoreChecksUsed: data.score_checks_used,
-        scoreChecksTotal: data.score_checks_total,
-        linkedinMessagesUsed: data.linkedin_messages_used,
-        linkedinMessagesTotal: data.linkedin_messages_total,
-        guidedBuildsUsed: data.guided_builds_used,
-        guidedBuildsTotal: data.guided_builds_total
+        id: 'combined-subscription', // A unique ID for the combined view
+        userId: userId,
+        planId: 'combined', // Indicates this is a combined view
+        status: overallStatus,
+        startDate: data[data.length - 1].start_date, // Oldest start date
+        endDate: latestEndDate ? latestEndDate.toISOString() : new Date().toISOString(), // Latest end date
+        optimizationsUsed: combinedOptimizationsUsed,
+        optimizationsTotal: combinedOptimizationsTotal,
+        scoreChecksUsed: combinedScoreChecksUsed,
+        scoreChecksTotal: combinedScoreChecksTotal,
+        linkedinMessagesUsed: combinedLinkedinMessagesUsed,
+        linkedinMessagesTotal: combinedLinkedinMessagesTotal,
+        guidedBuildsUsed: combinedGuidedBuildsUsed,
+        guidedBuildsTotal: combinedGuidedBuildsTotal,
+        paymentId: null, // Not applicable for combined
+        couponUsed: null, // Not applicable for combined
       };
+
     } catch (error) {
       console.error('Error getting user subscription:', error);
       return null;
@@ -718,32 +780,62 @@ class PaymentService {
   // Use optimization (decrement count)
   async useOptimization(userId: string): Promise<{ success: boolean; remaining: number; error?: string }> {
     try {
-      const subscription = await this.getUserSubscription(userId);
-      
-      if (!subscription) {
+      // Fetch all active/upgraded subscriptions
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select(`
+          id,
+          optimizations_used,
+          optimizations_total
+        `)
+        .eq('user_id', userId)
+        .neq('status', 'cancelled')
+        .order('end_date', { ascending: false }); // Prioritize newer plans for usage
+
+      if (error) {
+        console.error('Error fetching subscriptions for usage:', error);
+        return { success: false, remaining: 0, error: 'Failed to fetch subscriptions for usage.' };
+      }
+
+      if (!data || data.length === 0) {
         return { success: false, remaining: 0, error: 'No active subscription found.' };
       }
 
-      const remaining = subscription.optimizationsTotal - subscription.optimizationsUsed;
-      
-      if (remaining <= 0) {
-        return { success: false, remaining: 0, error: 'No optimizations remaining.' };
+      let totalRemaining = 0;
+      let subscriptionToUpdate: { id: string; optimizations_used: number; optimizations_total: number } | null = null;
+
+      // Find a subscription with remaining credits to decrement
+      for (const sub of data) {
+        const remainingInSub = sub.optimizations_total - sub.optimizations_used;
+        if (remainingInSub > 0) {
+          subscriptionToUpdate = sub;
+          break; // Found a sub to use
+        }
       }
 
-      const { error } = await supabase
+      if (!subscriptionToUpdate) {
+        return { success: false, remaining: 0, error: 'No optimizations remaining across all plans.' };
+      }
+
+      // Decrement the chosen subscription
+      const { error: updateError } = await supabase
         .from('subscriptions')
-        .update({  
-          optimizations_used: subscription.optimizationsUsed + 1,
+        .update({
+          optimizations_used: subscriptionToUpdate.optimizations_used + 1,
           updated_at: new Date().toISOString()
         })
-        .eq('id', subscription.id);
+        .eq('id', subscriptionToUpdate.id);
 
-      if (error) {
-        console.error('Error using optimization:', error);
-        return { success: false, remaining: 0, error: error.message };
+      if (updateError) {
+        console.error('Error using optimization:', updateError);
+        return { success: false, remaining: 0, error: updateError.message };
       }
 
-      return { success: true, remaining: remaining - 1 };
+      // Recalculate total remaining across all plans after update
+      const updatedCombinedSubscription = await this.getUserSubscription(userId);
+      totalRemaining = (updatedCombinedSubscription?.optimizationsTotal || 0) - (updatedCombinedSubscription?.optimizationsUsed || 0);
+
+      return { success: true, remaining: totalRemaining };
     } catch (error: any) {
       console.error('Error using optimization:', error);
       return { success: false, remaining: 0, error: error.message };
@@ -753,26 +845,58 @@ class PaymentService {
   // Use score check (decrement count)
   async useScoreCheck(userId: string): Promise<{ success: boolean; remaining: number; error?: string }> {
     try {
-      const subscription = await this.getUserSubscription(userId);
-      if (!subscription) {
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select(`
+          id,
+          score_checks_used,
+          score_checks_total
+        `)
+        .eq('user_id', userId)
+        .neq('status', 'cancelled')
+        .order('end_date', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching subscriptions for usage:', error);
+        return { success: false, remaining: 0, error: 'Failed to fetch subscriptions for usage.' };
+      }
+
+      if (!data || data.length === 0) {
         return { success: false, remaining: 0, error: 'No active subscription found.' };
       }
-      const remaining = subscription.scoreChecksTotal - subscription.scoreChecksUsed;
-      if (remaining <= 0) {
-        return { success: false, remaining: 0, error: 'No score checks remaining.' };
+
+      let totalRemaining = 0;
+      let subscriptionToUpdate: { id: string; score_checks_used: number; score_checks_total: number } | null = null;
+
+      for (const sub of data) {
+        const remainingInSub = sub.score_checks_total - sub.score_checks_used;
+        if (remainingInSub > 0) {
+          subscriptionToUpdate = sub;
+          break;
+        }
       }
-      const { error } = await supabase
+
+      if (!subscriptionToUpdate) {
+        return { success: false, remaining: 0, error: 'No score checks remaining across all plans.' };
+      }
+
+      const { error: updateError } = await supabase
         .from('subscriptions')
         .update({
-          score_checks_used: subscription.scoreChecksUsed + 1,
+          score_checks_used: subscriptionToUpdate.score_checks_used + 1,
           updated_at: new Date().toISOString()
         })
-        .eq('id', subscription.id);
-      if (error) {
-        console.error('Error using score check:', error);
-        return { success: false, remaining: 0, error: error.message };
+        .eq('id', subscriptionToUpdate.id);
+
+      if (updateError) {
+        console.error('Error using score check:', updateError);
+        return { success: false, remaining: 0, error: updateError.message };
       }
-      return { success: true, remaining: remaining - 1 };
+
+      const updatedCombinedSubscription = await this.getUserSubscription(userId);
+      totalRemaining = (updatedCombinedSubscription?.scoreChecksTotal || 0) - (updatedCombinedSubscription?.scoreChecksUsed || 0);
+
+      return { success: true, remaining: totalRemaining };
     } catch (error: any) {
       console.error('Error using score check:', error);
       return { success: false, remaining: 0, error: error.message };
@@ -782,26 +906,58 @@ class PaymentService {
   // Use LinkedIn message (decrement count)
   async useLinkedInMessage(userId: string): Promise<{ success: boolean; remaining: number; error?: string }> {
     try {
-      const subscription = await this.getUserSubscription(userId);
-      if (!subscription) {
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select(`
+          id,
+          linkedin_messages_used,
+          linkedin_messages_total
+        `)
+        .eq('user_id', userId)
+        .neq('status', 'cancelled')
+        .order('end_date', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching subscriptions for usage:', error);
+        return { success: false, remaining: 0, error: 'Failed to fetch subscriptions for usage.' };
+      }
+
+      if (!data || data.length === 0) {
         return { success: false, remaining: 0, error: 'No active subscription found.' };
       }
-      const remaining = subscription.linkedinMessagesTotal - subscription.linkedinMessagesUsed;
-      if (remaining <= 0) {
-        return { success: false, remaining: 0, error: 'No LinkedIn messages remaining.' };
+
+      let totalRemaining = 0;
+      let subscriptionToUpdate: { id: string; linkedin_messages_used: number; linkedin_messages_total: number } | null = null;
+
+      for (const sub of data) {
+        const remainingInSub = sub.linkedin_messages_total - sub.linkedin_messages_used;
+        if (remainingInSub > 0) {
+          subscriptionToUpdate = sub;
+          break;
+        }
       }
-      const { error } = await supabase
+
+      if (!subscriptionToUpdate) {
+        return { success: false, remaining: 0, error: 'No LinkedIn messages remaining across all plans.' };
+      }
+
+      const { error: updateError } = await supabase
         .from('subscriptions')
         .update({
-          linkedin_messages_used: subscription.linkedinMessagesUsed + 1,
+          linkedin_messages_used: subscriptionToUpdate.linkedin_messages_used + 1,
           updated_at: new Date().toISOString()
         })
-        .eq('id', subscription.id);
-      if (error) {
-        console.error('Error using LinkedIn message:', error);
-        return { success: false, remaining: 0, error: error.message };
+        .eq('id', subscriptionToUpdate.id);
+
+      if (updateError) {
+        console.error('Error using LinkedIn message:', updateError);
+        return { success: false, remaining: 0, error: updateError.message };
       }
-      return { success: true, remaining: remaining - 1 };
+
+      const updatedCombinedSubscription = await this.getUserSubscription(userId);
+      totalRemaining = (updatedCombinedSubscription?.linkedinMessagesTotal || 0) - (updatedCombinedSubscription?.linkedinMessagesUsed || 0);
+
+      return { success: true, remaining: totalRemaining };
     } catch (error: any) {
       console.error('Error using LinkedIn message:', error);
       return { success: false, remaining: 0, error: error.message };
@@ -811,26 +967,58 @@ class PaymentService {
   // Use guided build (decrement count)
   async useGuidedBuild(userId: string): Promise<{ success: boolean; remaining: number; error?: string }> {
     try {
-      const subscription = await this.getUserSubscription(userId);
-      if (!subscription) {
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select(`
+          id,
+          guided_builds_used,
+          guided_builds_total
+        `)
+        .eq('user_id', userId)
+        .neq('status', 'cancelled')
+        .order('end_date', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching subscriptions for usage:', error);
+        return { success: false, remaining: 0, error: 'Failed to fetch subscriptions for usage.' };
+      }
+
+      if (!data || data.length === 0) {
         return { success: false, remaining: 0, error: 'No active subscription found.' };
       }
-      const remaining = subscription.guidedBuildsTotal - subscription.guidedBuildsUsed;
-      if (remaining <= 0) {
-        return { success: false, remaining: 0, error: 'No guided builds remaining.' };
+
+      let totalRemaining = 0;
+      let subscriptionToUpdate: { id: string; guided_builds_used: number; guided_builds_total: number } | null = null;
+
+      for (const sub of data) {
+        const remainingInSub = sub.guided_builds_total - sub.guided_builds_used;
+        if (remainingInSub > 0) {
+          subscriptionToUpdate = sub;
+          break;
+        }
       }
-      const { error } = await supabase
+
+      if (!subscriptionToUpdate) {
+        return { success: false, remaining: 0, error: 'No guided builds remaining across all plans.' };
+      }
+
+      const { error: updateError } = await supabase
         .from('subscriptions')
         .update({
-          guided_builds_used: subscription.guidedBuildsUsed + 1,
+          guided_builds_used: subscriptionToUpdate.guided_builds_used + 1,
           updated_at: new Date().toISOString()
         })
-        .eq('id', subscription.id);
-      if (error) {
-        console.error('Error using guided build:', error);
-        return { success: false, remaining: 0, error: error.message };
+        .eq('id', subscriptionToUpdate.id);
+
+      if (updateError) {
+        console.error('Error using guided build:', updateError);
+        return { success: false, remaining: 0, error: updateError.message };
       }
-      return { success: true, remaining: remaining - 1 };
+
+      const updatedCombinedSubscription = await this.getUserSubscription(userId);
+      totalRemaining = (updatedCombinedSubscription?.guidedBuildsTotal || 0) - (updatedCombinedSubscription?.guidedBuildsUsed || 0);
+
+      return { success: true, remaining: totalRemaining };
     } catch (error: any) {
       console.error('Error using guided build:', error);
       return { success: false, remaining: 0, error: error.message };
