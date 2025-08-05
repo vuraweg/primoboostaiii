@@ -215,6 +215,7 @@ serve(async (req) => {
     const walletDeduction = orderData.notes.walletDeduction || 0;
     const selectedAddOns = JSON.parse(orderData.notes.selectedAddOns || "{}");
 
+    console.log(`[${new Date().toISOString()}] - Received selectedAddOns: ${JSON.stringify(selectedAddOns)}`);
     console.log(`[${new Date().toISOString()}] - walletDeduction retrieved from orderData.notes: ${walletDeduction}`);
 
     console.log(`[${new Date().toISOString()}] - Attempting to update payment_transactions record with ID: ${transactionId}`);
@@ -251,6 +252,7 @@ serve(async (req) => {
             continue;
           }
 
+          console.log(`[${new Date().toISOString()}] - Found addOn config: ${JSON.stringify(addOn)}`);
           console.log(`[${new Date().toISOString()}] - Looking up addon_type for type_key: ${addOn.type}`);
           const { data: addonType, error: addonTypeError } = await supabase
             .from("addon_types")
@@ -278,7 +280,7 @@ serve(async (req) => {
           if (creditInsertError) {
             console.error(`[${new Date().toISOString()}] - Error inserting add-on credits for ${addOn.type}:`, creditInsertError);
           } else {
-            console.log(`[${new Date().toISOString()}] - Granted ${quantity} credits for add-on: ${addOn.type}`);
+            console.log(`[${new Date().toISOString()}] - Successfully inserted ${quantity} credits for add-on: ${addOn.type}`);
           }
         }
       }
