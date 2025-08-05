@@ -10,16 +10,16 @@ const corsHeaders = {
 interface OrderRequest {
   planId: string;
   couponCode?: string;
-  walletDeduction?: number;
-  addOnsTotal?: number;
-  amount: number;
-  selectedAddOns?: { [key: string]: number }; // ADD THIS LINE
+  walletDeduction?: number; // In paise
+  addOnsTotal?: number; // In paise
+  amount: number; // In paise (frontend calculated grandTotal)
+  selectedAddOns?: { [key: string]: number };
 }
 
 interface PlanConfig {
   id: string;
   name: string;
-  price: number;
+  price: number; // In Rupees
   duration: string;
   optimizations: number;
   scoreChecks: number;
@@ -108,8 +108,9 @@ serve(async (req) => {
   try {
     // Retrieve addOnsTotal from the request body
     const body: OrderRequest = await req.json();
-    const { planId, couponCode, walletDeduction, addOnsTotal, amount: frontendCalculatedAmount, selectedAddOns } = body; // UPDATE THIS LINE
-    console.log(`[${new Date().toISOString()}] - Request body parsed. planId: ${planId}, couponCode: ${couponCode}, walletDeduction: ${walletDeduction}, addOnsTotal: ${addOnsTotal}, frontendCalculatedAmount: ${frontendCalculatedAmount}, selectedAddOns: ${JSON.stringify(selectedAddOns)}`); // UPDATE LOG
+    // All amounts from frontend (amount, walletDeduction, addOnsTotal) are now in paise
+    const { planId, couponCode, walletDeduction, addOnsTotal, amount: frontendCalculatedAmount, selectedAddOns } = body;
+    console.log(`[${new Date().toISOString()}] - Request body parsed. planId: ${planId}, couponCode: ${couponCode}, walletDeduction: ${walletDeduction}, addOnsTotal: ${addOnsTotal}, frontendCalculatedAmount: ${frontendCalculatedAmount}, selectedAddOns: ${JSON.stringify(selectedAddOns)}`);
 
     // Get user from auth header
     const authHeader = req.headers.get('authorization');
@@ -138,7 +139,7 @@ serve(async (req) => {
       plan = {
         id: 'addon_only_purchase',
         name: 'Add-on Only Purchase',
-        price: 0,
+        price: 0, // In Rupees
         duration: 'One-time Purchase',
         optimizations: 0,
         scoreChecks: 0,
@@ -152,8 +153,8 @@ serve(async (req) => {
       }
     }
 
-    // Calculate final amount based on plan price
-    let finalAmount = plan.price;
+    // Calculate final amount based on plan price (all calculations in paise)
+    let finalAmount = plan.price * 100; // Convert plan price to paise
     let discountAmount = 0;
     let appliedCoupon = null;
 
@@ -163,13 +164,13 @@ serve(async (req) => {
       // NEW: full_support coupon - free career_pro_max plan
       if (normalizedCoupon === 'fullsupport' && planId === 'career_pro_max') {
         finalAmount = 0;
-        discountAmount = plan.price;
+        discountAmount = plan.price * 100; // In paise
         appliedCoupon = 'fullsupport';
       }
       // first100 coupon - free lite_check plan only
       else if (normalizedCoupon === 'first100' && planId === 'lite_check') {
         finalAmount = 0;
-        discountAmount = plan.price;
+        discountAmount = plan.price * 100; // In paise
         appliedCoupon = 'first100';
       }
       // first500 coupon - 98% off lite_check plan only (NEW LOGIC)
@@ -190,30 +191,31 @@ serve(async (req) => {
           throw new Error('Coupon "first500" has reached its usage limit.');
         }
 
-        discountAmount = Math.floor(plan.price * 0.98); // 98% off
-        finalAmount = plan.price - discountAmount; // Should be 1 Rupee (99 - 98)
+        discountAmount = Math.floor(plan.price * 100 * 0.98); // Calculate in paise
+        finalAmount = (plan.price * 100) - discountAmount; // Calculate in paise
         appliedCoupon = 'first500';
       }
       // worthyone coupon - 50% off career_pro_max plan only
       else if (normalizedCoupon === 'worthyone' && planId === 'career_pro_max') {
-        discountAmount = Math.floor(plan.price * 0.5);
-        finalAmount = plan.price - discountAmount;
+        discountAmount = Math.floor(plan.price * 100 * 0.5); // Calculate in paise
+        finalAmount = (plan.price * 100) - discountAmount; // Calculate in paise
         appliedCoupon = 'worthyone';
       }
     }
 
-    // Apply wallet deduction
+    // Apply wallet deduction (walletDeduction is already in paise from frontend)
     if (walletDeduction && walletDeduction > 0) {
       finalAmount = Math.max(0, finalAmount - walletDeduction);
     }
 
-    // Correctly add add-ons total to the final amount
+    // Correctly add add-ons total to the final amount (addOnsTotal is already in paise from frontend)
     if (addOnsTotal && addOnsTotal > 0) {
       finalAmount += addOnsTotal;
     }
 
     // IMPORTANT: Validate that the calculated finalAmount matches the frontend's calculation
     // This prevents tampering with the price on the client-side.
+    // frontendCalculatedAmount is already in paise
     if (finalAmount !== frontendCalculatedAmount) {
       console.error(`[${new Date().toISOString()}] - Price mismatch detected! Backend calculated: ${finalAmount}, Frontend sent: ${frontendCalculatedAmount}`);
       throw new Error('Price mismatch detected. Please try again.');
@@ -221,19 +223,20 @@ serve(async (req) => {
 
     // --- NEW: Create a pending payment_transactions record ---
     console.log(`[${new Date().toISOString()}] - Creating pending payment_transactions record.`);
-    console.log(`[${new Date().toISOString()}] - Values for insert: user_id=${user.id}, plan_id=${planId}, status='pending', amount=${plan.price}, currency='INR', coupon_code=${appliedCoupon}, discount_amount=${discountAmount}, final_amount=${finalAmount}`); // ADDED DETAILED LOG
+    // All amounts for insert are now in paise (integers)
+    console.log(`[${new Date().toISOString()}] - Values for insert: user_id=${user.id}, plan_id=${planId}, status='pending', amount=${plan.price * 100}, currency='INR', coupon_code=${appliedCoupon}, discount_amount=${discountAmount}, final_amount=${finalAmount}`);
 
     const { data: transaction, error: transactionError } = await supabase
       .from('payment_transactions')
       .insert({
         user_id: user.id,
-        plan_id: planId === 'addon_only_purchase' ? null : planId,
+        plan_id: planId === 'addon_only_purchase' ? null : planId, // plan_id is text, not uuid
         status: 'pending', // Initial status
-        amount: plan.price, // Original plan price
+        amount: plan.price * 100, // Original plan price in paise
         currency: 'INR', // Explicitly set currency as it's not nullable and has a default
         coupon_code: appliedCoupon, // Save applied coupon code
-        discount_amount: discountAmount, // Save discount amount
-        final_amount: finalAmount, // Final amount after discounts/wallet/addons
+        discount_amount: discountAmount, // Save discount amount (in paise)
+        final_amount: finalAmount, // Final amount after discounts/wallet/addons (in paise)
         purchase_type: planId === 'addon_only_purchase' ? 'addon_only' : (Object.keys(selectedAddOns || {}).length > 0 ? 'plan_with_addons' : 'plan'),
         // payment_id and order_id will be updated by verify-payment function
       })
@@ -241,11 +244,11 @@ serve(async (req) => {
       .single();
 
     if (transactionError) {
-      console.error(`[${new Date().toISOString()}] - Error inserting pending transaction:`, transactionError); // Log full error object
+      console.error(`[${new Date().toISOString()}] - Error inserting pending transaction:`, transactionError);
       throw new Error('Failed to initiate payment transaction.');
     }
     const transactionId = transaction.id;
-    console.log(`[${new Date().toISOString()}] - Pending transaction created with ID: ${transactionId}, coupon_code: ${appliedCoupon}`); // ADDED LOG
+    console.log(`[${new Date().toISOString()}] - Pending transaction created with ID: ${transactionId}, coupon_code: ${appliedCoupon}`);
     // --- END NEW ---
 
     // Create Razorpay order
@@ -257,19 +260,19 @@ serve(async (req) => {
     }
 
     const orderData = {
-      amount: finalAmount * 100, // Convert to paise
+      amount: finalAmount, // Amount is already in paise
       currency: 'INR',
       receipt: `receipt_${Date.now()}`,
       notes: {
         planId: planId,
         planName: plan.name,
-        originalAmount: plan.price,
+        originalAmount: plan.price * 100, // Original plan price in paise
         couponCode: appliedCoupon,
-        discountAmount: discountAmount,
-        walletDeduction: walletDeduction || 0,
-        addOnsTotal: addOnsTotal || 0, // Add addOnsTotal to notes for record-keeping
+        discountAmount: discountAmount, // In paise
+        walletDeduction: walletDeduction || 0, // In paise
+        addOnsTotal: addOnsTotal || 0, // In paise
         transactionId: transactionId, // Pass the transactionId to Razorpay notes
-        selectedAddOns: JSON.stringify(selectedAddOns || {}), // ADD THIS LINE: Stringify the selectedAddOns object
+        selectedAddOns: JSON.stringify(selectedAddOns || {}),
       },
     };
 
@@ -305,7 +308,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         orderId: order.id,
-        amount: finalAmount,
+        amount: finalAmount, // Amount is already in paise
         keyId: razorpayKeyId,
         currency: 'INR',
         transactionId: transactionId, // Return the transactionId to the frontend
