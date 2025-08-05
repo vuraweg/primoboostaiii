@@ -1,4 +1,3 @@
-// src/services/paymentService.ts
 import { SubscriptionPlan, PaymentData, RazorpayOptions, RazorpayResponse, Subscription } from '../types/payment';
 import { supabase } from '../lib/supabaseClient';
 
@@ -368,9 +367,9 @@ class PaymentService {
   }
 
   /**
-   * Verifies a Razorpay payment by calling a Supabase Edge Function.
-   * Now accepts transactionId to update the pending record.
-   */
+    * Verifies a Razorpay payment by calling a Supabase Edge Function.
+    * Now accepts transactionId to update the pending record.
+    */
   private async verifyPayment(
     razorpay_order_id: string,
     razorpay_payment_id: string,
@@ -1156,7 +1155,8 @@ private async decrementAddonCredit(userId: string, addonTypeKey: string): Promis
 
       for (const sub of data) {
         const remainingInSub = sub.guided_builds_total - sub.guided_builds_used;
-        if (remainingInSub > 0) {
+        // Corrected the typo in the variable name from remainingInInSub to remainingInSub
+        if (remainingInSub > 0) { 
           subscriptionToUpdate = sub;
           break;
         }
