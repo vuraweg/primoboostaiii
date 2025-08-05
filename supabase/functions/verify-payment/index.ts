@@ -109,6 +109,7 @@ serve(async (req) => {
     const requestBody: PaymentVerificationRequest = await req.json();
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, transactionId } = requestBody;
     transactionIdFromRequest = transactionId; // Store it
+    console.log(`[${new Date().toISOString()}] - verify-payment received. transactionId: ${transactionIdFromRequest}`); // ADDED LOG
 
     // Get user from auth header
     const authHeader = req.headers.get('authorization')
@@ -170,6 +171,7 @@ serve(async (req) => {
 
     // --- NEW: Update the existing pending payment_transactions record ---
     // This update now correctly targets the record created by the create-order function
+    console.log(`[${new Date().toISOString()}] - Attempting to update payment_transactions record with ID: ${transactionId}`); // ADDED LOG
     const { data: updatedTransaction, error: updateTransactionError } = await supabase
       .from('payment_transactions')
       .update({
@@ -188,6 +190,7 @@ serve(async (req) => {
       console.error('Error updating payment transaction to success:', updateTransactionError);
       throw new Error('Failed to update payment transaction status.');
     }
+    console.log(`[${new Date().toISOString()}] - Payment transaction updated to success. Record ID: ${updatedTransaction.id}, coupon_code: ${updatedTransaction.coupon_code}`); // ADDED LOG
     transactionStatus = 'success'; // Set status for final response
 
     // Create subscription
