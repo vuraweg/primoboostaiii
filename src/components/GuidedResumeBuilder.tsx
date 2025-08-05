@@ -77,12 +77,14 @@ interface GuidedResumeBuilderProps {
   onNavigateBack: () => void;
   userSubscription: any; // Assuming a subscription object with guidedBuildsTotal and guidedBuildsUsed
   onShowSubscriptionPlans: () => void;
+  onRefreshSubscription: () => void; // NEW: Added function to refresh subscription state
 }
 
 export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
   onNavigateBack,
   userSubscription,
   onShowSubscriptionPlans,
+  onRefreshSubscription, // NEW: Destructured the new prop
 }) => {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
@@ -135,49 +137,49 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
     {
       id: 'experience',
       title: 'Experience Level',
-      icon: <User className="w-5 h-5" />,
+      icon: (<User className="w-5 h-5" />),
       description: 'Tell us about your professional background'
     },
     {
       id: 'contact',
       title: 'Contact Details',
-      icon: <Mail className="w-5 h-5" />,
+      icon: (<Mail className="w-5 h-5" />),
       description: 'Your basic information and contact details'
     },
     {
       id: 'education',
       title: 'Education',
-      icon: <GraduationCap className="w-5 h-5" />,
+      icon: (<GraduationCap className="w-5 h-5" />),
       description: 'Your academic background and qualifications'
     },
     {
       id: 'experience-work',
       title: 'Work Experience',
-      icon: <Briefcase className="w-5 h-5" />,
+      icon: (<Briefcase className="w-5 h-5" />),
       description: 'Your professional experience and internships'
     },
     {
       id: 'projects',
       title: 'Projects',
-      icon: <Code className="w-5 h-5" />,
+      icon: (<Code className="w-5 h-5" />),
       description: 'Your personal and academic projects'
     },
     {
       id: 'skills',
       title: 'Skills',
-      icon: <Award className="w-5 h-5" />,
+      icon: (<Award className="w-5 h-5" />),
       description: 'Your technical and soft skills'
     },
     {
       id: 'additional',
       title: 'Additional Sections',
-      icon: <Plus className="w-5 h-5" />,
+      icon: (<Plus className="w-5 h-5" />),
       description: 'Optional sections like certifications and achievements'
     },
     {
       id: 'review',
       title: 'Review & Generate',
-      icon: <CheckCircle className="w-5 h-5" />,
+      icon: (<CheckCircle className="w-5 h-5" />),
       description: 'Review your information and generate your resume'
     }
   ];
@@ -284,6 +286,9 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
         throw new Error(useBuildResult.error || 'Failed to use guided build credit.');
       }
       
+      // NEW: Call the refresh function to update the subscription state in the parent component
+      onRefreshSubscription();
+
       // Construct a basic resume text from form data
       const resumeText = constructResumeText(formData);
 
@@ -473,9 +478,9 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
-                { id: 'fresher', label: 'Fresher/New Graduate', desc: 'Just graduated or starting career', icon: <GraduationCap className="w-8 h-8" /> },
-                { id: 'student', label: 'Student', desc: 'Currently studying, seeking internships', icon: <User className="w-8 h-8" /> },
-                { id: 'experienced', label: 'Experienced Professional', desc: '1+ years of work experience', icon: <Briefcase className="w-8 h-8" /> }
+                { id: 'fresher', label: 'Fresher/New Graduate', desc: 'Just graduated or starting career', icon: (<GraduationCap className="w-8 h-8" />) },
+                { id: 'student', label: 'Student', desc: 'Currently studying, seeking internships', icon: (<User className="w-8 h-8" />) },
+                { id: 'experienced', label: 'Experienced Professional', desc: '1+ years of work experience', icon: (<Briefcase className="w-8 h-8" />) }
               ].map((option) => (
                 <button
                   key={option.id}
@@ -1039,160 +1044,6 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
                   >
                     <Plus className="w-4 h-4 mr-1" /> Add Achievement
                   </button>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-
-      case 7: // Review & Generate
-        return (
-          <div className="space-y-6">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Review Your Resume Information</h2>
-              <p className="text-gray-600">Please review the details below. If everything looks good, click "Generate Resume"!</p>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-6">
-              {/* Contact Details Summary */}
-              <div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-3 flex items-center">
-                  <Mail className="w-5 h-5 mr-2 text-blue-600" /> Contact Details
-                </h3>
-                <p className="text-gray-700"><strong>Full Name:</strong> {formData.contactDetails.fullName || 'N/A'}</p>
-                <p className="text-gray-700"><strong>Email:</strong> {formData.contactDetails.email || 'N/A'}</p>
-                <p className="text-gray-700"><strong>Phone:</strong> {formData.contactDetails.phone || 'N/A'}</p>
-                <p className="text-gray-700"><strong>Location:</strong> {formData.contactDetails.location || 'N/A'}</p>
-                <p className="text-gray-700"><strong>LinkedIn:</strong> {formData.contactDetails.linkedin || 'N/A'}</p>
-                <p className="text-gray-700"><strong>GitHub:</strong> {formData.contactDetails.github || 'N/A'}</p>
-              </div>
-
-              <hr className="border-t border-gray-200" />
-
-              {/* Education Summary */}
-              <div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-3 flex items-center">
-                  <GraduationCap className="w-5 h-5 mr-2 text-blue-600" /> Education
-                </h3>
-                {formData.education.length > 0 && formData.education.some(edu => edu.degree.trim() || edu.school.trim()) ? (
-                  formData.education.map((edu, index) => (
-                    <div key={index} className="mb-2 last:mb-0">
-                      <p className="text-gray-700 font-medium">{edu.degree || 'N/A'} from {edu.school || 'N/A'}</p>
-                      <p className="text-gray-600 text-sm">{edu.year} {edu.cgpa && `- CGPA: ${edu.cgpa}`} {edu.location && `(${edu.location})`}</p>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-gray-600 italic">No education details added.</p>
-                )}
-              </div>
-
-              <hr className="border-t border-gray-200" />
-
-              {/* Work Experience Summary */}
-              <div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-3 flex items-center">
-                  <Briefcase className="w-5 h-5 mr-2 text-blue-600" /> Work Experience
-                </h3>
-                {formData.workExperience.length > 0 && formData.workExperience.some(exp => exp.role.trim() || exp.company.trim()) ? (
-                  formData.workExperience.map((exp, index) => (
-                    <div key={index} className="mb-2 last:mb-0">
-                      <p className="text-gray-700 font-medium">{exp.role || 'N/A'} at {exp.company || 'N/A'}</p>
-                      <p className="text-gray-600 text-sm mb-1">{exp.year}</p>
-                      <ul className="list-disc list-inside text-gray-700 text-sm ml-4">
-                        {exp.bullets.filter(bullet => bullet.trim() !== '').map((bullet, bulletIndex) => (
-                          <li key={bulletIndex}>{bullet}</li>
-                        ))}
-                      </ul>
-                      {exp.bullets.filter(bullet => bullet.trim() !== '').length === 0 && <p className="text-gray-600 text-sm italic">No bullet points provided.</p>}
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-gray-600 italic">No work experience added.</p>
-                )}
-              </div>
-
-              <hr className="border-t border-gray-200" />
-
-              {/* Projects Summary */}
-              <div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-3 flex items-center">
-                  <Code className="w-5 h-5 mr-2 text-blue-600" /> Projects
-                </h3>
-                {formData.projects.length > 0 && formData.projects.some(proj => proj.title.trim()) ? (
-                  formData.projects.map((proj, index) => (
-                    <div key={index} className="mb-2 last:mb-0">
-                      <p className="text-gray-700 font-medium">{proj.title || 'N/A'}</p>
-                      <ul className="list-disc list-inside text-gray-700 text-sm ml-4">
-                        {proj.bullets.filter(bullet => bullet.trim() !== '').map((bullet, bulletIndex) => (
-                          <li key={bulletIndex}>{bullet}</li>
-                        ))}
-                      </ul>
-                      {proj.bullets.filter(bullet => bullet.trim() !== '').length === 0 && <p className="text-gray-600 text-sm italic">No bullet points provided.</p>}
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-gray-600 italic">No projects added.</p>
-                )}
-              </div>
-
-              <hr className="border-t border-gray-200" />
-
-              {/* Skills Summary */}
-              <div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-3 flex items-center">
-                  <Award className="w-5 h-5 mr-2 text-blue-600" /> Skills
-                </h3>
-                {Object.keys(formData.skills).every(cat => formData.skills[cat].filter(s => s.trim() !== '').length === 0) ? (
-                  <p className="text-gray-600 italic">No skills added.</p>
-                ) : (
-                  Object.entries(formData.skills).map(([category, skills]) => {
-                    const filteredSkills = skills.filter(skill => skill.trim() !== '');
-                    return filteredSkills.length > 0 && (
-                      <p key={category} className="text-gray-700 mb-1">
-                        <strong>{category}:</strong> {filteredSkills.join(', ')}
-                      </p>
-                    );
-                  })
-                )}
-              </div>
-
-              {(formData.additionalSections.includeCertifications || formData.additionalSections.includeAchievements) && (
-                <hr className="border-t border-gray-200" />
-              )}
-
-              {/* Certifications Summary */}
-              {formData.additionalSections.includeCertifications && (
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-3 flex items-center">
-                    <Award className="w-5 h-5 mr-2 text-yellow-500" /> Certifications
-                  </h3>
-                  {formData.certifications.length > 0 && formData.certifications.some(cert => cert.trim() !== '') ? (
-                    <ul className="list-disc list-inside text-gray-700 text-sm ml-4">
-                      {formData.certifications.filter(cert => cert.trim() !== '').map((cert, index) => (
-                        <li key={index}>{cert}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-gray-600 italic">No certifications added.</p>
-                  )}
-                </div>
-              )}
-
-              {/* Achievements Summary */}
-              {formData.additionalSections.includeAchievements && (
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-3 flex items-center">
-                    <CheckCircle className="w-5 h-5 mr-2 text-green-500" /> Achievements
-                  </h3>
-                  {formData.achievements.length > 0 && formData.achievements.some(ach => ach.trim() !== '') ? (
-                    <ul className="list-disc list-inside text-gray-700 text-sm ml-4">
-                      {formData.achievements.filter(ach => ach.trim() !== '').map((ach, index) => (
-                        <li key={index}>{ach}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-gray-600 italic">No achievements added.</p>
-                  )}
                 </div>
               )}
             </div>
