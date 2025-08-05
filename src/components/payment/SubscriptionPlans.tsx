@@ -72,6 +72,33 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
   const plans: SubscriptionPlan[] = paymentService.getPlans();
   const addOns: AddOn[] = paymentService.getAddOns();
 
+  // MOVE THIS BLOCK UP HERE
+  const allPlansWithAddOnOption = [
+    {
+      id: 'addon_only_purchase',
+      name: '🛒 Add-ons Only',
+      price: 0,
+      duration: 'One-time Purchase',
+      optimizations: 0,
+      scoreChecks: 0,
+      linkedinMessages: 0,
+      guidedBuilds: 0,
+      tag: 'Buy individual features',
+      tagColor: 'text-gray-800 bg-gray-100',
+      gradient: 'from-gray-500 to-gray-700',
+      icon: 'gift',
+      features: [
+        '✅ Purchase only what you need',
+        '✅ No monthly commitment',
+        '✅ Credits never expire',
+        '✅ Mix and match features'
+      ],
+      popular: false
+    },
+    ...plans
+  ];
+  // END OF MOVED BLOCK
+
   useEffect(() => {
     if (allPlansWithAddOnOption.length > 0) {
       setSelectedPlan(allPlansWithAddOnOption[currentSlide]?.id || allPlansWithAddOnOption[0].id);
@@ -271,32 +298,6 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
       [addOnId]: Math.max(0, quantity),
     }));
   };
-
-  // CRITICAL FIX: Add "Add-ons Only" option to plans array for standalone purchases
-  const allPlansWithAddOnOption = [
-    {
-      id: 'addon_only_purchase',
-      name: '🛒 Add-ons Only',
-      price: 0,
-      duration: 'One-time Purchase',
-      optimizations: 0,
-      scoreChecks: 0,
-      linkedinMessages: 0,
-      guidedBuilds: 0,
-      tag: 'Buy individual features',
-      tagColor: 'text-gray-800 bg-gray-100',
-      gradient: 'from-gray-500 to-gray-700',
-      icon: 'gift',
-      features: [
-        '✅ Purchase only what you need',
-        '✅ No monthly commitment',
-        '✅ Credits never expire',
-        '✅ Mix and match features'
-      ],
-      popular: false
-    },
-    ...plans
-  ];
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-2 sm:p-4 backdrop-blur-sm">
@@ -715,4 +716,3 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
     </div>
   );
 };
-
