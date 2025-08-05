@@ -574,18 +574,28 @@ class PaymentService {
       // CRITICAL FIX: Process add-on credits for free transactions too
       if (selectedAddOns && Object.keys(selectedAddOns).length > 0) {
         console.log('Processing add-on credits for free transaction...');
-        for (const addOnKey in selectedAddOns) {
-          const quantity = selectedAddOns[addOnKey];
+        for (const addOnId in selectedAddOns) {
+          const quantity = selectedAddOns[addOnId];
           if (quantity > 0) {
+            // NEW: Get the add-on configuration using its ID
+            const addOnConfig = this.getAddOnById(addOnId);
+            if (!addOnConfig) {
+              console.error(`Add-on configuration not found for ID: ${addOnId}`);
+              continue;
+            }
+            
+            // Use the type property from the add-on config as the type_key
+            const addOnTypeKey = addOnConfig.type;
+            
             // Get addon type
             const { data: addonType, error: addonTypeError } = await supabase
               .from('addon_types')
               .select('id')
-              .eq('type_key', addOnKey)
+              .eq('type_key', addOnTypeKey)
               .single();
 
             if (addonTypeError || !addonType) {
-              console.error(`Error finding addon_type for key ${addOnKey}:`, addonTypeError);
+              console.error(`Error finding addon_type for key ${addOnTypeKey}:`, addonTypeError);
               continue;
             }
 
@@ -601,9 +611,9 @@ class PaymentService {
               });
 
             if (creditInsertError) {
-              console.error(`Error inserting add-on credits for ${addOnKey}:`, creditInsertError);
+              console.error(`Error inserting add-on credits for ${addOnTypeKey}:`, creditInsertError);
             } else {
-              console.log(`Granted ${quantity} credits for add-on: ${addOnKey}`);
+              console.log(`Granted ${quantity} credits for add-on: ${addOnTypeKey}`);
             }
           }
         }
