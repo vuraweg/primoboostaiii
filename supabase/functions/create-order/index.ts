@@ -197,7 +197,7 @@ serve(async (req) => {
       }
       // worthyone coupon - 50% off career_pro_max plan only
       else if (normalizedCoupon === 'worthyone' && planId === 'career_pro_max') {
-        discountAmount = Math.floor(plan.price * 100 * 0.5); // Calculate in paise
+        const discountAmount = Math.floor(plan.price * 100 * 0.5); // Calculate in paise
         finalAmount = (plan.price * 100) - discountAmount; // Calculate in paise
         appliedCoupon = 'worthyone';
       }
@@ -269,7 +269,7 @@ serve(async (req) => {
         originalAmount: plan.price * 100, // Original plan price in paise
         couponCode: appliedCoupon,
         discountAmount: discountAmount, // In paise
-        walletDeduction: walletDeduction || 0, // In paise
+        walletDeduction: walletDeduction, // In paise - Store the actual walletDeduction
         addOnsTotal: addOnsTotal || 0, // In paise
         transactionId: transactionId, // Pass the transactionId to Razorpay notes
         selectedAddOns: JSON.stringify(selectedAddOns || {}),
@@ -329,3 +329,4 @@ serve(async (req) => {
     );
   }
 });
+
