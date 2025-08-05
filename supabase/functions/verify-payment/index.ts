@@ -96,7 +96,6 @@ const plans: PlanConfig[] = [
   },
 ];
 
-// Added Add-on products for individual purchases
 const addOns = [
   {
     id: "jd_optimization_single",
@@ -211,8 +210,10 @@ serve(async (req) => {
     const orderData = await orderResponse.json();
     const planId = orderData.notes.planId;
     const couponCode = orderData.notes.couponCode;
-    const discountAmount = orderData.notes.discountAmount || 0;
-    const walletDeduction = orderData.notes.walletDeduction || 0;
+    // Modified line to explicitly parse as a number with a default of 0
+    const discountAmount = parseFloat(orderData.notes.discountAmount || "0");
+    // Modified line to explicitly parse as a number with a default of 0
+    const walletDeduction = parseFloat(orderData.notes.walletDeduction || "0");
     const selectedAddOns = JSON.parse(orderData.notes.selectedAddOns || "{}");
 
     console.log(`[${new Date().toISOString()}] - Received selectedAddOns: ${JSON.stringify(selectedAddOns)}`);
@@ -225,7 +226,8 @@ serve(async (req) => {
         payment_id: razorpay_payment_id,
         status: "success",
         order_id: razorpay_order_id,
-        wallet_deduction_amount: walletDeduction / 100, // Correctly store in rupees
+        // Corrected to store the value as a number (rupees)
+        wallet_deduction_amount: walletDeduction,
         coupon_code: couponCode,
         discount_amount: discountAmount,
       })
@@ -361,13 +363,13 @@ serve(async (req) => {
 
     if (walletDeduction > 0) {
       console.log(`[${new Date().toISOString()}] - Attempting to record wallet deduction for user: ${user.id}`);
-      console.log(`[${new Date().toISOString()}] - Wallet deduction amount for insert: ${-(walletDeduction / 100)}`);
+      console.log(`[${new Date().toISOString()}] - Wallet deduction amount for insert: ${-(walletDeduction)}`);
       const { error: walletError } = await supabase
         .from("wallet_transactions")
         .insert({
           user_id: user.id,
           type: "purchase_use",
-          amount: -(walletDeduction / 100),
+          amount: -(walletDeduction),
           status: "completed",
           transaction_ref: razorpay_payment_id,
           redeem_details: {
