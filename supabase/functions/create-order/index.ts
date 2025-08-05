@@ -210,7 +210,7 @@ serve(async (req) => {
       .from('payment_transactions')
       .insert({
         user_id: user.id,
-        plan_id: planId,
+        
         status: 'pending', // Initial status
         amount: plan.price, // Original plan price
         currency: 'INR', // Explicitly set currency as it's not nullable and has a default
