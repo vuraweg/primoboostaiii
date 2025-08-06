@@ -150,7 +150,7 @@ ${userType === 'experienced' ? `
 ` : `
 - Professional Summary: OPTIONAL - only include if candidate has relevant internships/experience
 - Education: PROMINENT - include degree, institution, year, relevant coursework if applicable
-- Education: INCLUDE CGPA if mentioned in original resume (e.g., "CGPA: 8.4/10")
+- Education: INCLUDE CGPA if mentioned in original resume (e.g., "CGPA: 8.4/10") and date format ex;2021-2024 
 - Academic Projects: IMPORTANT - treat as main experience section
 - Work Experience: COMBINE all internships, trainings, and work experience under this single section
 - Achievements: Include if present in original resume (academic awards, competitions, etc.)
