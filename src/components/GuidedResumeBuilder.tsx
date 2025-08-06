@@ -19,12 +19,14 @@ import {
   FileText,
   Eye
 } from 'lucide-react';
+import { paymentService } from '../services/paymentService';
+
 import { UserType, ResumeData } from '../types/resume';
 import { optimizeResume } from '../services/geminiService';
 import { useAuth } from '../contexts/AuthContext';
 import { ResumePreview } from './ResumePreview';
 import { ExportButtons } from './ExportButtons';
-import { paymentService } from '../services/paymentService'; // Import the payment service
+ // Import the payment service
 
 interface ContactDetails {
   fullName: string;
@@ -75,6 +77,7 @@ interface GuidedResumeBuilderProps {
   userSubscription: any;
   onShowSubscriptionPlans: () => void;
   refreshUserSubscription: () => void; // Corrected prop name to match the usage in the function
+  onShowAlert: (message: string) => void; // ✅ ADD THIS
 }
 
 export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
@@ -82,6 +85,7 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
   userSubscription,
   onShowSubscriptionPlans,
   refreshUserSubscription, // Corrected prop name here
+   onShowAlert // ✅ ADD THIS
 }) => {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
@@ -270,10 +274,15 @@ export const GuidedResumeBuilder: React.FC<GuidedResumeBuilderProps> = ({
       return;
     }
 
-    if (!userSubscription || userSubscription.guidedBuildsTotal - userSubscription.guidedBuildsUsed <= 0) {
-      onShowSubscriptionPlans();
-      return;
-    }
+  const guidedBuildsTotal = userSubscription?.guidedBuildsTotal ?? 0;
+const guidedBuildsUsed = userSubscription?.guidedBuildsUsed ?? 0;
+const remainingGuidedBuilds = guidedBuildsTotal - guidedBuildsUsed;
+
+if (remainingGuidedBuilds <= 0) {
+  onShowAlert?.("You’ve used all your guided resume credits. Upgrade to unlock more!");
+  onShowSubscriptionPlans?.();
+  return;
+}
 
     setIsGenerating(true);
     try {
