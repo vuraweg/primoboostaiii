@@ -53,7 +53,10 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
   isAuthenticated,
   onShowAuth,
   onShowProfile,
-  onNavigateBack
+  onNavigateBack,
+  userSubscription,
+  refreshUserSubscription,
+  onShowSubscriptionPlans
 }) => {
   const { user } = useAuth();
 
