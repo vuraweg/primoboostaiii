@@ -241,6 +241,7 @@ function App() {
               onNavigateBack={handleNavigateHome}
               onShowSubscriptionPlans={handleShowSubscriptionPlans}
               onShowAlert={handleShowAlert}
+             userSubscription={userSubscription}
               refreshUserSubscription={refreshUserSubscription}
             />
           </main>
