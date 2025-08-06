@@ -27,7 +27,7 @@ class PaymentService {
       duration: 'One-time Purchase',
       optimizations: 50, // Updated from 30
       scoreChecks: 50,
-      linkedinMessages: 999999999, // Unlimited
+      linkedinMessages: 99999, // Unlimited
       guidedBuilds: 5,
       tag: 'Serious job seekers & job switchers',
       tagColor: 'text-purple-800 bg-purple-100',
@@ -51,7 +51,7 @@ class PaymentService {
       duration: 'One-time Purchase',
       optimizations: 30, // Updated
       scoreChecks: 30,
-      linkedinMessages: 999999999, // Updated
+      linkedinMessages: 99999, // Updated
       guidedBuilds: 3,
       tag: 'Active job seekers',
       tagColor: 'text-blue-800 bg-blue-100',
