@@ -377,9 +377,9 @@ class PaymentService {
   }
 
   /**
-    * Verifies a Razorpay payment by calling a Supabase Edge Function.
-    * Now accepts transactionId to update the pending record.
-    */
+   * Verifies a Razorpay payment by calling a Supabase Edge Function.
+   * Now accepts transactionId to update the pending record.
+   */
   private async verifyPayment(
     razorpay_order_id: string,
     razorpay_payment_id: string,
@@ -474,7 +474,7 @@ class PaymentService {
           walletDeduction,
           selectedAddOns // ADDED selectedAddOns HERE
         );
-        console.log('processPayment: Order created successfully:', orderData.orderId, 'Amount:', orderData.amount, 'Transaction ID:', orderData.transactionId);
+        console.log('processPayment: Order created successfully with Order ID:', orderData.orderId, 'Amount:', orderData.amount, 'Transaction ID:', orderData.transactionId);
         console.log('processPayment: Received orderData from backend:', orderData);
       } catch (createOrderError) {
         console.error('processPayment: Error creating order via backend:', createOrderError);
@@ -892,10 +892,12 @@ private async getAddonTypeId(typeKey: string): Promise<string | null> {
 private async decrementAddonCredit(userId: string, addonTypeKey: string): Promise<boolean> {
     const addonTypeId = await this.getAddonTypeId(addonTypeKey);
     if (!addonTypeId) {
+      console.log(`[${new Date().toISOString()}] - decrementAddonCredit: Add-on type ID not found for key: ${addonTypeKey}`);
       return false; // Add-on type not found
     }
 
     // Find an add-on credit with remaining quantity
+    console.log(`[${new Date().toISOString()}] - decrementAddonCredit: Fetching add-on credit for user: ${userId}, type: ${addonTypeKey}`);
     const { data: addonCredit, error: fetchError } = await supabase
       .from('user_addon_credits')
       .select('id, quantity_remaining')
@@ -904,13 +906,18 @@ private async decrementAddonCredit(userId: string, addonTypeKey: string): Promis
       .gt('quantity_remaining', 0)
       .order('expires_at', { ascending: true, nullsFirst: false }) // Prioritize expiring soonest
       .limit(1)
-      .single();
-       // <--- ENSURE THIS IS .maybeSingle()
+      .maybeSingle(); // Changed from .single() to .maybeSingle()
 
-    if (fetchError || !addonCredit) {
-      console.error(`Error fetching add-on credit for ${addonTypeKey}:`, fetchError);
+    if (fetchError) {
+      console.error(`[${new Date().toISOString()}] - decrementAddonCredit: Error fetching add-on credit for ${addonTypeKey}:`, fetchError);
+      return false; // Error fetching add-on credits
+    }
+    if (!addonCredit) {
+      console.log(`[${new Date().toISOString()}] - decrementAddonCredit: No add-on credits available for ${addonTypeKey}.`);
       return false; // No add-on credits available
     }
+
+    console.log(`[${new Date().toISOString()}] - decrementAddonCredit: Found add-on credit ID: ${addonCredit.id}, current remaining: ${addonCredit.quantity_remaining}`);
 
     // Decrement quantity_remaining
     const { error: updateError } = await supabase
@@ -919,9 +926,10 @@ private async decrementAddonCredit(userId: string, addonTypeKey: string): Promis
       .eq('id', addonCredit.id);
 
     if (updateError) {
-      console.error(`Error decrementing add-on credit for ${addonTypeKey}:`, updateError);
+      console.error(`[${new Date().toISOString()}] - decrementAddonCredit: Error decrementing add-on credit for ${addonTypeKey}:`, updateError);
       return false;
     }
+    console.log(`[${new Date().toISOString()}] - decrementAddonCredit: Successfully decremented add-on credit for ${addonTypeKey}. New remaining: ${addonCredit.quantity_remaining - 1}`);
     return true;
 }
 
@@ -1138,15 +1146,20 @@ private async decrementAddonCredit(userId: string, addonTypeKey: string): Promis
 
   // Use guided build (decrement count)
   async useGuidedBuild(userId: string): Promise<{ success: boolean; remaining: number; error?: string }> {
+    console.log(`[${new Date().toISOString()}] - useGuidedBuild: Called for userId:`, userId);
     try {
       // Try to use add-on credit first
       const usedAddon = await this.decrementAddonCredit(userId, 'guided_build');
+      console.log(`[${new Date().toISOString()}] - useGuidedBuild: Addon used result:`, usedAddon);
+
       if (usedAddon) {
         const updatedCombinedSubscription = await this.getUserSubscription(userId);
         const totalRemaining = (updatedCombinedSubscription?.guidedBuildsTotal || 0) - (updatedCombinedSubscription?.guidedBuildsUsed || 0);
+        console.log(`[${new Date().toISOString()}] - useGuidedBuild: Returning success: true, remaining:`, totalRemaining, ' (from add-on)');
         return { success: true, remaining: totalRemaining };
       }
 
+      console.log(`[${new Date().toISOString()}] - useGuidedBuild: No add-on credits used. Attempting to fetch subscriptions for usage...`);
       const { data, error } = await supabase
         .from('subscriptions')
         .select(`
@@ -1158,30 +1171,34 @@ private async decrementAddonCredit(userId: string, addonTypeKey: string): Promis
         .neq('status', 'cancelled')
         .order('end_date', { ascending: false });
 
+      console.log(`[${new Date().toISOString()}] - useGuidedBuild: Subscriptions fetch result - Data:`, data, 'Error:', error);
+
       if (error) {
-        console.error('Error fetching subscriptions for usage:', error);
+        console.error(`[${new Date().toISOString()}] - useGuidedBuild: Error fetching subscriptions:`, error);
         return { success: false, remaining: 0, error: 'Failed to fetch subscriptions for usage.' };
       }
 
       if (!data || data.length === 0) {
+        console.log(`[${new Date().toISOString()}] - useGuidedBuild: No active subscription found for guided build decrement.`);
         return { success: false, remaining: 0, error: 'No active subscription found.' };
       }
 
-      let totalRemaining = 0;
       let subscriptionToUpdate: { id: string; guided_builds_used: number; guided_builds_total: number } | null = null;
 
       for (const sub of data) {
         const remainingInSub = sub.guided_builds_total - sub.guided_builds_used;
-        // Corrected the typo in the variable name from remainingInInSub to remainingInSub
-        if (remainingInSub > 0) { 
+        if (remainingInSub > 0) {
           subscriptionToUpdate = sub;
           break;
         }
       }
 
       if (!subscriptionToUpdate) {
+        console.log(`[${new Date().toISOString()}] - useGuidedBuild: No guided build credits remaining across all plans.`);
         return { success: false, remaining: 0, error: 'No guided builds remaining across all plans.' };
       }
+
+      console.log(`[${new Date().toISOString()}] - useGuidedBuild: Found subscription to update:`, subscriptionToUpdate.id, 'Current used:', subscriptionToUpdate.guided_builds_used, 'Total:', subscriptionToUpdate.guided_builds_total);
 
       const { error: updateError } = await supabase
         .from('subscriptions')
@@ -1191,18 +1208,23 @@ private async decrementAddonCredit(userId: string, addonTypeKey: string): Promis
         })
         .eq('id', subscriptionToUpdate.id);
 
+      console.log(`[${new Date().toISOString()}] - useGuidedBuild: Subscription update result. Error:`, updateError);
+
       if (updateError) {
-        console.error('Error using guided build:', updateError);
-        return { success: false, remaining: 0, error: updateError.message };
+        console.error(`[${new Date().toISOString()}] - useGuidedBuild: Error updating subscription usage:`, updateError);
+        return { success: false, remaining: subscriptionToUpdate.guided_builds_total - subscriptionToUpdate.guided_builds_used, error: updateError.message };
       }
 
       const updatedCombinedSubscription = await this.getUserSubscription(userId);
-      totalRemaining = (updatedCombinedSubscription?.guidedBuildsTotal || 0) - (updatedCombinedSubscription?.guidedBuildsUsed || 0);
+      console.log(`[${new Date().toISOString()}] - useGuidedBuild: Updated combined subscription after decrement:`, updatedCombinedSubscription);
+
+      const totalRemaining = (updatedCombinedSubscription?.guidedBuildsTotal || 0) - (updatedCombinedSubscription?.guidedBuildsUsed || 0);
+      console.log(`[${new Date().toISOString()}] - useGuidedBuild: Returning success: true, remaining:`, totalRemaining);
 
       return { success: true, remaining: totalRemaining };
     } catch (error: any) {
-      console.error('Error using guided build:', error);
-      return { success: false, remaining: 0, error: error.message };
+      console.error(`[${new Date().toISOString()}] - useGuidedBuild: Unexpected error:`, error);
+      return { success: false, remaining: 0, error: error.message || 'An unexpected error occurred.' };
     }
   }
 
