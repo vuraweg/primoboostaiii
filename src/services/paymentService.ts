@@ -16,7 +16,7 @@ class PaymentService {
   private readonly COUPON_FIRST100_CODE = 'first100';
   private readonly COUPON_WORTHYONE_CODE = 'worthyone';
   private readonly COUPON_FULL_SUPPORT_CODE = 'fullsupportt'; // NEW: Full Support Coupon
-  private readonly COUPON_FIRST500_CODE = 'first100'; // NEW: First 500 Coupon
+  private readonly COUPON_FIRST500_CODE = 'first200'; // NEW: First 500 Coupon
 
   // Updated subscription plans - New structure
   private readonly plans: SubscriptionPlan[] = [
