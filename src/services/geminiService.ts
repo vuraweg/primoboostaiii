@@ -88,77 +88,6 @@ SECTION ORDER FOR FRESHERS:
     }
   };
 
-  const atsBlock = `
-ATS OUTPUT REQUIREMENTS:
-1) Return an ATS-ready resume TEXT inside a JSON field named "atsResume".
-2) "atsResume" must be plain text, single column, no tables/images/emojis, no headers/footers.
-3) Use ASCII hyphen "-" bullets only.
-4) ALL CAPS section headings in this exact order (omit if empty):
-   - CONTACT INFORMATION
-   - SUMMARY
-   - TECHNICAL SKILLS
-   - WORK EXPERIENCE
-   - PROJECTS
-   - EDUCATION
-   - CERTIFICATIONS
-   - ACHIEVEMENTS
-   - EXTRA-CURRICULAR ACTIVITIES
-   - LANGUAGES KNOWN
-5) Contact line format: Name | Location | Phone | Email | LinkedIn: <url> (if not empty) | GitHub: <url> (if not empty)
-6) Dates: "Mon YYYY – Mon YYYY"; for current roles use "Present".
-7) Role line format: Title – Company | Location (optional) | Dates (same line).
-8) Max 3 bullets per item, <= 20 words each, start with strong action verbs, include quantified impact.
-9) Avoid repeating any single word > 2 times overall; include JD keywords naturally.
-10) No bold/italics/page numbers/columns/graphics.
-
-ATS TEXT TEMPLATE (scaffold):
-CONTACT INFORMATION
-\${name} | \${location} | \${phone} | \${email}\${linkedinOpt}\${githubOpt}
-
-\${summaryOpt}
-
-TECHNICAL SKILLS
-- \${SkillCategory1}: \${skill1}, \${skill2}, \${skill3}, \${skill4}
-- \${SkillCategory2}: \${skill1}, \${skill2}, \${skill3}, \${skill4}
-
-WORK EXPERIENCE
-\${Role} – \${Company} | \${LocationOpt} | \${Dates}
-- \${Bullet 1}
-- \${Bullet 2}
-- \${Bullet 3}
-
-PROJECTS
-\${Project Title} | \${TechOpt}
-- \${Bullet 1}
-- \${Bullet 2}
-- \${Bullet 3}
-
-EDUCATION
-\${Degree} – \${School} | \${LocationOpt} | \${DatesOrYear} \${CGPAOpt}
-
-CERTIFICATIONS
-- \${Cert 1}
-- \${Cert 2}
-
-ACHIEVEMENTS
-- \${Achievement 1}
-- \${Achievement 2}
-
-EXTRA-CURRICULAR ACTIVITIES
-- \${Activity 1}
-- \${Activity 2}
-
-LANGUAGES KNOWN
-- \${Language 1}
-- \${Language 2}
-
-Where:
-- linkedinOpt is " | LinkedIn: <url>" only if linkedin != ""
-- githubOpt is " | GitHub: <url>" only if github != ""
-- summaryOpt included only if "summary" exists
-- LocationOpt/TechOpt optional if present
-`;
-
   const promptContent = `${getPromptForUserType(userType)}
 
 CRITICAL REQUIREMENTS FOR BULLET POINTS:
@@ -190,7 +119,6 @@ SKILLS REQUIREMENTS:
 4. Match skills to job requirements and industry standards
 5. Include both technical and soft skills relevant to the role
 6.NO NEED TO GENERATE SOFT SKILLS
-
 CERTIFICATIONS REQUIREMENTS:
 1. For each certification, provide a concise 2-3 sentence description in the 'description' field.
 
@@ -251,8 +179,8 @@ JSON Structure:
   "location": "...",
   "phone": "${userPhone || '...'}",
   "email": "${userEmail || '...'}",
-  "linkedin": "${userLinkedin || linkedinUrl || ''}",
-  "github": "${userGithub || githubUrl || ''}",
+  "linkedin": "${userLinkedin || linkedinUrl || '...'}",
+  "github": "${userGithub || githubUrl || '...'}",
   "targetRole": "${targetRole || '...'}",
   ${userType === 'experienced' ? '"summary": "...",' : ''}
   ${userType === 'student' ? '"careerObjective": "...",' : ''}
@@ -274,13 +202,8 @@ JSON Structure:
   "achievements": ["...", "..."],
   "extraCurricularActivities": ["...", "..."],
   "languagesKnown": ["...", "..."],
-  "personalDetails": "..." ,` : ''}
-  "fileName": "Resume_${userName || 'Candidate'}_${targetRole || 'Role'}.txt",
-  "atsResume": "..."
+  "personalDetails": "..."` : ''}
 }
-
-${atsBlock}
-
 Resume:
 ${resume}
 
@@ -291,26 +214,30 @@ User Type: ${userType.toUpperCase()}
 
 LinkedIn URL provided: ${linkedinUrl || 'NONE - leave empty'}
 GitHub URL provided: ${githubUrl || 'NONE - leave empty'}`;
-
-  const maxRetries = 5;
-  let retryCount = 0;
-  let delay = 2000;
+ 
+   const maxRetries = 5; // Increased from 3 to 5
+   let retryCount = 3;
+   let delay = 2000; // Increased from 1000 (1 second) to 2000 (2 seconds)
 
   while (retryCount < maxRetries) {
     try {
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+          "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
           'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://primoboost.ai',
-          'X-Title': 'PrimoBoost AI'
+          "HTTP-Referer": "https://primoboost.ai",
+          "X-Title": "PrimoBoost AI"
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
-          messages: [{ role: 'user', content: promptContent }],
-          temperature: 0.2
-        })
+          model: "google/gemini-2.5-flash",
+          messages: [
+            {
+              role: "user",
+              content: promptContent // Use promptContent here
+            }
+          ]
+        }),
       });
 
       if (!response.ok) {
@@ -320,71 +247,137 @@ GitHub URL provided: ${githubUrl || 'NONE - leave empty'}`;
         if (response.status === 401) {
           throw new Error('Invalid API key. Please check your OpenRouter API key configuration.');
         } else if (response.status === 429 || response.status >= 500) {
-          console.warn(`Retrying due to OpenRouter API error: ${response.status}. Attempt ${retryCount + 1}/${maxRetries}. Retrying in ${Math.round(delay / 1000)}s...`);
+          // Retry for rate limits or server errors
+          console.warn(`Retrying due to OpenRouter API error: ${response.status}. Attempt ${retryCount + 1}/${maxRetries}. Retrying in ${delay / 1000}s...`);
           retryCount++;
-          await new Promise((resolve) => setTimeout(resolve, delay));
-          delay = Math.min(delay * 2, 20000);
-          continue;
+          await new Promise(resolve => setTimeout(resolve, delay));
+          delay *= 2; // Exponential backoff
+          continue; // Continue to the next iteration of the while loop
         } else {
+          // Non-retryable error
           throw new Error(`OpenRouter API error: ${response.status} - ${errorText}`);
         }
       }
 
       const data = await response.json();
       let result = data?.choices?.[0]?.message?.content;
-      if (!result) throw new Error('No response content from OpenRouter API');
 
-      // Extract JSON (supports fenced and unfenced)
-      const jsonMatch = result.match(/```json\s*([\s\S]*?)\s*```/i);
-      let cleanedResult: string = jsonMatch?.[1]?.trim()
-        ?? result.replace(/```json/gi, '').replace(/```/g, '').trim();
-
-      // Remove leading/trailing junk before/after the first "{" and last "}"
-      const firstBrace = cleanedResult.indexOf('{');
-      const lastBrace = cleanedResult.lastIndexOf('}');
-      if (firstBrace !== -1 && lastBrace !== -1) {
-        cleanedResult = cleanedResult.slice(firstBrace, lastBrace + 1);
+      if (!result) {
+        throw new Error('No response content from OpenRouter API');
       }
 
-      let parsedResult: any;
+      // Enhanced JSON extraction
+      const jsonMatch = result.match(/```json\s*([\s\S]*?)\s*```/);
+      let cleanedResult: string;
+      if (jsonMatch && jsonMatch[1]) {
+        cleanedResult = jsonMatch[1].trim();
+      } else {
+        // Fallback to simpler cleaning if no ```json block is found
+        cleanedResult = result.replace(/```json/g, '').replace(/```/g, '').trim();
+      }
+
       try {
-        parsedResult = JSON.parse(cleanedResult);
-      } catch (e) {
-        console.error('JSON parsing error:', e);
-        console.error('Raw response attempted to parse:', cleanedResult);
+        const parsedResult = JSON.parse(cleanedResult);
+
+        // Ensure skills have proper count values
+        if (parsedResult.skills && Array.isArray(parsedResult.skills)) {
+          parsedResult.skills = parsedResult.skills.map((skill: any) => ({
+            ...skill,
+            count: skill.list ? skill.list.length : 0
+          }));
+        }
+
+        // Ensure certifications are strings, not objects
+        if (parsedResult.certifications && Array.isArray(parsedResult.certifications)) {
+          parsedResult.certifications = parsedResult.certifications.map((cert: any) => {
+            if (typeof cert === 'object' && cert !== null) {
+              // Handle various object formats
+              if (cert.title && cert.description) {
+                return `${cert.title} - ${cert.description}`;
+              } else if (cert.title && cert.issuer) {
+                return `${cert.title} - ${cert.issuer}`;
+              } else if (cert.title) {
+                return cert.title;
+              } else if (cert.name) {
+                return cert.name;
+              } else if (cert.description) {
+                return cert.description;
+              } else {
+                // Convert any other object structure to string
+                return Object.values(cert).filter(Boolean).join(' - ');
+              }
+            }
+            // If it's already a string, return as is
+            return String(cert);
+          });
+        }
+
+        // Ensure work experience is properly formatted
+        if (parsedResult.workExperience && Array.isArray(parsedResult.workExperience)) {
+          parsedResult.workExperience = parsedResult.workExperience.filter((work: any) =>
+            work && work.role && work.company && work.year
+          );
+        }
+
+        // Ensure projects are properly formatted
+        if (parsedResult.projects && Array.isArray(parsedResult.projects)) {
+          parsedResult.projects = parsedResult.projects.filter((project: any) =>
+            project && project.title && project.bullets && project.bullets.length > 0
+          );
+        }
+
+        // Prioritize user profile data first
+        parsedResult.name = userName || parsedResult.name || "";
+        parsedResult.linkedin = userLinkedin || linkedinUrl || "";
+        parsedResult.github = userGithub || githubUrl || "";
+
+        // Targeted cleaning and fallback for email
+        if (userEmail) {
+          parsedResult.email = userEmail; // Prioritize user provided email
+        } else if (parsedResult.email) {
+          const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/;
+          const match = parsedResult.email.match(emailRegex);
+          parsedResult.email = match && match[1] ? match[1] : ""; // Extract valid email or set empty
+        } else {
+          parsedResult.email = ""; // Ensure it's an empty string if nothing is found
+        }
+
+        // Targeted cleaning and fallback for phone
+        if (userPhone) {
+          parsedResult.phone = userPhone; // Prioritize user provided phone
+        } else if (parsedResult.phone) {
+          // This regex tries to capture common phone number patterns including international codes, parentheses, spaces, and hyphens.
+          // It's designed to be robust but might need adjustments for very unusual formats.
+          const phoneRegex = /(\+?\d{1,3}[-.\s]?)?(\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4}/;
+          const match = parsedResult.phone.match(phoneRegex);
+          parsedResult.phone = match && match[0] ? match[0] : ""; // Extract valid phone or set empty
+        } else {
+          parsedResult.phone = ""; // Ensure it's an empty string if nothing is found
+        }
+
+        return parsedResult;
+      } catch (parseError) {
+        console.error('JSON parsing error:', parseError);
+        console.error('Raw response attempted to parse:', cleanedResult); // Log the string that failed to parse
         throw new Error('Invalid JSON response from OpenRouter API');
       }
+    } catch (error) {
+      console.error('Error calling OpenRouter API:', error);
 
-      // Normalize skills count
-      if (parsedResult.skills && Array.isArray(parsedResult.skills)) {
-        parsedResult.skills = parsedResult.skills.map((skill: any) => ({
-          ...skill,
-          count: Array.isArray(skill.list) ? skill.list.length : 0
-        }));
+      // Re-throw with more specific error message if it's already a known error
+      if (error instanceof Error && (
+          error.message.includes('API key') ||
+          error.message.includes('Rate limit') ||
+          error.message.includes('service is temporarily unavailable') ||
+          error.message.includes('Invalid JSON response')
+      )) {
+        throw error;
       }
 
-      // Normalize certifications to strings
-      if (parsedResult.certifications && Array.isArray(parsedResult.certifications)) {
-        parsedResult.certifications = parsedResult.certifications.map((cert: any) => {
-          if (typeof cert === 'string') return cert;
-          if (cert && typeof cert === 'object') {
-            if (cert.title && cert.description) return `${cert.title} - ${cert.description}`;
-            if (cert.title && cert.issuer) return `${cert.title} - ${cert.issuer}`;
-            if (cert.title) return cert.title;
-            if (cert.name) return cert.name;
-            if (cert.description) return cert.description;
-            return Object.values(cert).filter(Boolean).join(' - ');
-          }
-          return String(cert ?? '');
-        });
-      }
-
-      // Filter malformed experience/projects
-      if (Array.isArray(parsedResult.workExperience)) {
-        parsedResult.workExperience = parsedResult.workExperience.filter(
-          (w: any) => w && w.role && w.company && w.year
-        );
-      }
-      if (Array.isArray(parsedResult.projects)) {
-        parsedResult.projects = parsedResult.projects.filter(
-          (p: any) => p && p.title && Array.isArray(p.bullets) && p.bulle
+      // Generic error for network issues or other unknown errors
+      throw new Error('Failed to connect to OpenRouter API. Please check your internet connection and try again.');
+    }
+  }
+  // If the loop finishes, it means all retries failed
+  throw new Error(`Failed to optimize resume after ${maxRetries} attempts.`);
+};
