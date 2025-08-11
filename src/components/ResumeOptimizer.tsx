@@ -706,17 +706,7 @@ const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
                   <FileText className="w-4 h-4" />
                   <span>Resume Preview</span>
                 </button>
-                <button
-                  onClick={() => setActiveTab('analysis')}
-                  className={`inline-flex items-center space-x-2 px-4 py-2 rounded-xl transition-colors font-medium text-sm ${
-                    activeTab === 'analysis'
-                      ? 'bg-purple-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  <BarChart3 className="w-4 h-4" />
-                  <span>Score Analysis</span>
-                </button>
+                
               </div>
 
               <button
